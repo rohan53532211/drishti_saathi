@@ -31,8 +31,43 @@ data class Frame(
     /** Vertical lens size (B measurement); progressives need a minimum. */
     val lensHeightMm: Double = 0.0,
     val image: String? = null,
+    /** Try-on cut-out placement data (Track E); null for frames without a bundled PNG or older stored sessions. */
+    val overlay: FrameOverlay? = null,
 ) {
     val sizeMark: String get() = "${lensWidthMm.toInt()}-${bridgeMm.toInt()}-${templeMm.toInt()}"
+}
+
+/**
+ * Where things sit in a frame's try-on PNG (pixels of that PNG, origin top-left, y down).
+ * "Left" and "right" are as seen in the picture, not the wearer's sides.
+ */
+@Serializable
+data class FrameOverlay(
+    /** Asset path, e.g. "frames/pm0569.png". */
+    val png: String,
+    val widthPx: Int,
+    val heightPx: Int,
+    /** [x, y] centroid of the lens opening on the picture's left / right. */
+    val leftLensCenterPx: List<Double>,
+    val rightLensCenterPx: List<Double>,
+    /** Total width of the frame front, hinge to hinge. */
+    val frontWidthPx: Double,
+    /** Average height of the lens openings. */
+    val lensHeightPx: Double,
+) {
+    val lensCentreDistancePx: Double
+        get() = kotlin.math.hypot(rightLensCenterPx[0] - leftLensCenterPx[0], rightLensCenterPx[1] - leftLensCenterPx[1])
+
+    fun validate(id: String) {
+        require(png.isNotBlank() && widthPx > 0 && heightPx > 0) { "frames.json: $id overlay needs png and size" }
+        require(leftLensCenterPx.size == 2 && rightLensCenterPx.size == 2) { "frames.json: $id lens centres must be [x, y]" }
+        listOf(leftLensCenterPx, rightLensCenterPx).forEach { (x, y) ->
+            require(x in 0.0..widthPx.toDouble() && y in 0.0..heightPx.toDouble()) { "frames.json: $id lens centre outside the PNG" }
+        }
+        require(leftLensCenterPx[0] < rightLensCenterPx[0]) { "frames.json: $id left lens centre must be left of the right one" }
+        require(frontWidthPx > lensCentreDistancePx && frontWidthPx <= widthPx) { "frames.json: $id bad frontWidthPx" }
+        require(lensHeightPx > 0 && lensHeightPx <= heightPx) { "frames.json: $id bad lensHeightPx" }
+    }
 }
 
 @Serializable
@@ -48,6 +83,7 @@ data class FrameCatalog(@SerialName("_comment") val comment: String? = null, val
                 require(ColourPref.ANY !in f.colours && LookPref.BOTH !in f.looks) {
                     "frames.json: ${f.id} must use concrete colours/looks, not ANY/BOTH"
                 }
+                f.overlay?.validate(f.id)
             }
         }
     }
