@@ -220,6 +220,10 @@ class MediaPipeFaceTracker(
     // ---------------------------------------------------------------------------------------------
 
     private fun analyze(proxy: ImageProxy) {
+        if (!started) {
+            proxy.close()
+            return
+        }
         val bitmap: Bitmap
         val ts: Long
         try {
