@@ -137,5 +137,18 @@
 
 
   "tryOn": {
+    "lensCentreAbovePupilMm": 2.0,
+    "frontOffsetMm": 12.0,
+    "defaultPdMm": 63.0,
+    "faceWidthLandmarkLeft": 234,
+    "faceWidthLandmarkRight": 454,
+    "useTransformMatrix": true,
+    "maxYawDeg": 45.0,
+    "maxPitchDeg": 30.0,
+    "perspective": true,
+    "defaultFocalLengthFraction": 0.7,
+    "widthScale": 1.0,
+    "smoothingAlpha": 0.5,
+    "smoothingResetFraction": 0.35
   }
 }
