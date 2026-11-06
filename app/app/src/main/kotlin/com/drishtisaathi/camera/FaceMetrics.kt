@@ -117,8 +117,10 @@ object FaceMetrics {
         return Math.toDegrees(asin(t.coerceIn(-1.0, 1.0)))
     }
 
-    /** PROVISIONAL: swap for Track A's head pose when merged. */
-    fun headPose(f: FaceFrame): HeadPose = HeadPose(
+    /** Engine head pose (Track A) when the app has set up [EngineBridge]; else the camera's own estimate. */
+    fun headPose(f: FaceFrame): HeadPose = EngineBridge.headPose(f) ?: provisionalHeadPose(f)
+
+    fun provisionalHeadPose(f: FaceFrame): HeadPose = HeadPose(
         yawDeg = f.transformMatrix?.takeIf { it.size == 16 }?.let(::yawFromMatrixDeg) ?: yawFromLandmarksDeg(f),
         rollDeg = provisionalRollDeg(f),
     )

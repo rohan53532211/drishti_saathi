@@ -123,10 +123,11 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         answers: InterviewAnswers,
         staff: StaffMeasurements = StaffMeasurements(),
         tests: VisionTests = VisionTests(),
+        face: MeasuredFace? = null,
     ): Assessment {
         val notes = linkedSetOf<Note>()
         val referral = referral(answers, tests)
-        val (pd, faceWidth) = anatomy(staff, notes)
+        val (pd, faceWidth) = anatomy(staff, face, notes)
 
         val advice = if (referral.adviceWithheld) null else lensAdvice(answers, tests, notes)
         return Assessment(referral, advice, notes.toList(), pd, faceWidth)
@@ -165,8 +166,11 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
 
     // ---- PD / face width -----------------------------------------------------------------------
 
-    private fun anatomy(staff: StaffMeasurements, notes: MutableSet<Note>): Pair<Estimate<Double>, Estimate<Double>> {
+    private fun anatomy(
+        staff: StaffMeasurements, face: MeasuredFace?, notes: MutableSet<Note>,
+    ): Pair<Estimate<Double>, Estimate<Double>> {
         val fw = staff.faceWidthMm?.let { Estimate(it, Confidence.MEDIUM, Source.STAFF_ENTRY) }
+            ?: face?.faceWidthMm
             ?: Estimate(priors.faceWidthMm.mean, Confidence.LOW, Source.POPULATION_AVERAGE).also { notes += Note.FACE_WIDTH_ASSUMED }
 
         val pd = if (staff.pdMm != null) {
@@ -177,6 +181,11 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
                 notes += Note.PD_IMPLAUSIBLE
                 Estimate(staff.pdMm, Confidence.LOW, Source.STAFF_ENTRY)
             }
+        } else if (face != null) {
+            if (face.lowPlausibility) {
+                notes += Note.PD_IMPLAUSIBLE
+                face.pdMm.copy(confidence = Confidence.LOW)
+            } else face.pdMm
         } else {
             notes += Note.PD_ASSUMED
             Estimate(priors.pdMm.mean, Confidence.LOW, Source.POPULATION_AVERAGE)

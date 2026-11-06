@@ -449,6 +449,7 @@ object S {
         "TITANIUM" to t("titanium", "टाइटेनियम"),
         "ACETATE" to t("acetate", "एसीटेट"),
         "TR90" to t("TR90 (flexible)", "TR90 (लचीला)"),
+        "WOOD" to t("wood", "लकड़ी"),
     )
 
     // ---- Addition 2: match labels and reason bullets -----------------------------------------
@@ -498,6 +499,8 @@ object S {
         ReasonCode.LENS_HEIGHT_LOW to t("Lens too short for progressive (%.0f mm, needs %.0f mm)", "प्रोग्रेसिव के लिए लेंस छोटा (%.0f mm, चाहिए %.0f mm)"),
         ReasonCode.THIN_LENS to R_THIN_EDGE,
         ReasonCode.THICK_LENS to R_THICK_EDGE,
+        ReasonCode.BRIDGE_FITS to t("Bridge suits your nose (bridge %.0f mm, nose %.0f mm)", "ब्रिज नाक पर ठीक (ब्रिज %.0f mm, नाक %.0f mm)"),
+        ReasonCode.BRIDGE_MISMATCH to t("Bridge may not sit well (bridge %.0f mm, nose %.0f mm)", "ब्रिज नाक पर ठीक न बैठे (ब्रिज %.0f mm, नाक %.0f mm)"),
     )
 
     fun fit(v: FitVerdict) = FIT.getValue(v)

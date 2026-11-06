@@ -19,6 +19,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /** Rule-based face shape. Used only for style suggestions, never for fit or optics. */
+@kotlinx.serialization.Serializable
 enum class FaceShape { ROUND, OVAL, SQUARE, LONG, HEART }
 
 /** How the face-plane mm/px scale was obtained; caps the confidence of every mm measure. */
@@ -336,4 +337,15 @@ class FaceAggregator(
 fun PlausibilityGate.check(m: FaceMeasurement): PlausibilityGate.Result = check(m.pdMm, m.faceWidthMm)
 
 /** Plausibility gate on aggregated output (re-runs the same check the aggregator already applied). */
+/**
+ * Camera capture result for the rules engine and storage. Null when the plausibility gate says RESCAN:
+ * the numbers are discarded, never used.
+ */
+fun FaceAggregator.AggregatedFace.toMeasuredFace(): com.drishtisaathi.engine.MeasuredFace? = if (rescan) null else
+    com.drishtisaathi.engine.MeasuredFace(
+        pdMm = pdMm, faceWidthMm = faceWidthMm, bridgeWidthMm = bridgeWidth.estimate,
+        faceShape = shape, suggestedFrameShapes = suggestedFrameShapes, framesUsed = framesUsed,
+        lowPlausibility = plausibility.verdict != PlausibilityGate.Verdict.OK,
+    )
+
 fun PlausibilityGate.check(face: FaceAggregator.AggregatedFace): PlausibilityGate.Result = check(face.pd.mm, face.faceWidth.mm)

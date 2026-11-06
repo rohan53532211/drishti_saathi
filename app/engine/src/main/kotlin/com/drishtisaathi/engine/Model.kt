@@ -81,6 +81,21 @@ data class InterviewAnswers(
 @Serializable
 data class StaffMeasurements(val pdMm: Double? = null, val faceWidthMm: Double? = null)
 
+/** M2 camera capture, aggregated over the accepted frames (median, outliers dropped). Landmarks only, no image. */
+@Serializable
+data class MeasuredFace(
+    val pdMm: Estimate<Double>,
+    val faceWidthMm: Estimate<Double>,
+    /** Addition 5: nose width where the frame bridge rests. */
+    val bridgeWidthMm: Estimate<Double>? = null,
+    /** Addition 6: rule-based, used for style suggestions only. */
+    val faceShape: Estimate<com.drishtisaathi.engine.face.FaceShape>? = null,
+    val suggestedFrameShapes: List<FrameShape> = emptyList(),
+    val framesUsed: Int = 0,
+    /** The plausibility gate flagged the numbers: kept, but at LOW confidence. */
+    val lowPlausibility: Boolean = false,
+)
+
 /** Phase 3 on-screen test results for one eye. Unused in Phase 1 but the rules already handle them. */
 @Serializable
 data class MeasuredEye(

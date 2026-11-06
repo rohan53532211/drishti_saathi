@@ -29,6 +29,8 @@ fun HomeScreen(
     onStaffMode: (Boolean) -> Unit,
     onStart: () -> Unit,
     onHistory: () -> Unit,
+    /** Staff mode only: camera check, screen calibration. */
+    staffTools: @Composable () -> Unit = {},
 ) {
     val l = state.lang
     AppScaffold(l, onLang) { pad ->
@@ -43,6 +45,7 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
             BigButton(S.startNew[l], onStart, container = Teal)
             if (state.staffMode) BigButton(S.history[l], onHistory)
+            if (state.staffMode) staffTools()
 
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(S.staffMode[l], style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))

@@ -30,6 +30,7 @@ import com.drishtisaathi.engine.ReferralLevel
 import com.drishtisaathi.engine.RulesConfig
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
+import com.drishtisaathi.i18n.SFlow
 
 /** M6: one screen with profile, bands + confidence, starting trial lens, lens package, frames, referral status. */
 @Composable
@@ -44,6 +45,8 @@ fun ResultScreen(
     extraActions: @Composable () -> Unit = {},
     onToggleCompare: (String) -> Unit = {},
     onCompare: () -> Unit = {},
+    /** Live try-on (addition 8); the argument is the frame to start with, null = first. */
+    onTryOn: ((String?) -> Unit)? = null,
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -104,6 +107,9 @@ fun ResultScreen(
 
                 // ---- Frames ----
                 SectionCard(S.suggestedFrames[l]) {
+                    if (onTryOn != null && r.frames.any { it.frame.overlay != null }) {
+                        BigButton(SFlow.tryOnAll[l], { onTryOn(null) }, container = Teal)
+                    }
                     r.frames.forEachIndexed { i, rf ->
                         if (i > 0) HorizontalDivider()
                         Text("${i + 1}. ${rf.frame.name}", style = MaterialTheme.typography.titleMedium)
@@ -115,6 +121,9 @@ fun ResultScreen(
                         }
                         Text(Fmt.frameLine(rf, l), style = MaterialTheme.typography.bodyMedium)
                         ReasonBullets(rf, l)
+                        if (onTryOn != null && rf.frame.overlay != null) {
+                            TextButton({ onTryOn(rf.frame.id) }) { Text(SFlow.tryOn[l]) }
+                        }
                         if (state.staffMode) Text(
                             "${S.score[l]} ${"%.2f".format(rf.score)} · ${S.confidence(rf.thicknessConfidence)[l]}",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary,
@@ -137,6 +146,21 @@ fun ResultScreen(
             SectionCard(S.staffOnly[l]) {
                 Labeled(S.pd[l], Fmt.mm(a.pdMm.value), Fmt.meta(a.pdMm, l))
                 Labeled(S.faceWidth[l], Fmt.mm(a.faceWidthMm.value), Fmt.meta(a.faceWidthMm, l))
+                state.face?.let { f ->
+                    f.bridgeWidthMm?.let { Labeled(SFlow.bridgeWidth[l], Fmt.mm(it.value), Fmt.meta(it, l)) }
+                    f.faceShape?.let { shape ->
+                        val suits = f.suggestedFrameShapes.joinToString(", ") { S.frameShape(it)[l] }
+                        Labeled(
+                            SFlow.faceShape[l], SFlow.faceShape(shape.value)[l],
+                            if (suits.isEmpty()) null else "${SFlow.shapesThatSuit[l]}: $suits",
+                        )
+                    }
+                    Labeled(SFlow.framesMeasured[l], f.framesUsed.toString(), null)
+                }
+                state.captureStatus?.takeIf { it != com.drishtisaathi.engine.face.FaceCapture.Status.OK }?.let {
+                    Text(SFlow.captureStatus(it)[l], style = MaterialTheme.typography.bodySmall, color = RoutineAmber)
+                }
+                Labeled(SFlow.screenTests[l], if (state.testsDone) SFlow.testsDone[l] else SFlow.testsNotDone[l], null)
             }
 
             if (state.staffMode && state.sessionId != null) VerificationCard(l, state.verification, onSaveVerification)

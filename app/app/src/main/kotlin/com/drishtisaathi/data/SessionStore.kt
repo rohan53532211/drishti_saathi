@@ -41,6 +41,15 @@ data class SessionEntity(
     val finalAdd: String? = null,
     val pdMeterMm: Double? = null,
     val verifiedAt: Long? = null,
+    /** v3: camera face measurement + screen test results ([Measurements] as JSON); null for older sessions. */
+    val measurementsJson: String? = null,
+)
+
+/** Camera capture (M2) and on-screen test (M3) results stored with a session. Numbers only, never images. */
+@kotlinx.serialization.Serializable
+data class Measurements(
+    val face: com.drishtisaathi.engine.MeasuredFace? = null,
+    val tests: com.drishtisaathi.engine.VisionTests? = null,
 )
 
 @Dao
@@ -52,7 +61,7 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :id") suspend fun delete(id: Long)
 }
 
-@Database(entities = [SessionEntity::class], version = 2, exportSchema = true)
+@Database(entities = [SessionEntity::class], version = 3, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun sessions(): SessionDao
 
@@ -65,9 +74,15 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE sessions ADD COLUMN consentAt INTEGER")
             }
         }
+        /** v3 adds measurementsJson (camera + screen tests). */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sessions ADD COLUMN measurementsJson TEXT")
+            }
+        }
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "drishti.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build().also { instance = it }
         }
     }
@@ -84,4 +99,7 @@ object SessionCodec {
     fun encode(a: InterviewAnswers) = json.encodeToString(InterviewAnswers.serializer(), a)
     fun encode(s: StaffMeasurements) = json.encodeToString(StaffMeasurements.serializer(), s)
     fun encode(r: SessionResult) = json.encodeToString(SessionResult.serializer(), r)
+    fun measurements(e: SessionEntity): Measurements =
+        e.measurementsJson?.let { json.decodeFromString(Measurements.serializer(), it) } ?: Measurements()
+    fun encode(m: Measurements) = json.encodeToString(Measurements.serializer(), m)
 }

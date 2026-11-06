@@ -105,6 +105,8 @@ enum class ReasonCode {
     LIGHTWEIGHT, HEAVIER,
     LOOK_MATCH, LOOK_MISMATCH,
     LENS_HEIGHT_OK, LENS_HEIGHT_LOW,
+    // Addition 5
+    BRIDGE_FITS, BRIDGE_MISMATCH,
 }
 
 /**
@@ -203,6 +205,8 @@ class FrameRanker(private val rules: RulesConfig) {
         materialId: String,
         prefs: FramePrefs,
         topN: Int = c.topN,
+        /** Addition 5: measured nose width at the bridge; null = bridge not scored. */
+        bridgeWidthMm: Double? = null,
     ): List<RankedFrame> {
         val material = rules.material(materialId)
         val powerConf = lensPowersD.map { it.confidence }.fold(pdMm.confidence) { a, b -> a.min(b) }
@@ -213,7 +217,7 @@ class FrameRanker(private val rules: RulesConfig) {
         return frames
             // Frames far over budget are not shown at all.
             .filter { cap == Int.MAX_VALUE || it.priceInr <= cap * (1 + c.hideOverBudgetFraction) }
-            .map { f -> score(f, faceW, fitAssumed, pdMm, lensPowersD, material, powerConf, prefs) }
+            .map { f -> score(f, faceW, fitAssumed, pdMm, lensPowersD, material, powerConf, prefs, bridgeWidthMm) }
             // In-budget frames always rank above over-budget ones; score decides within each group.
             .sortedWith(
                 compareByDescending<RankedFrame> { it.withinBudget }
@@ -230,19 +234,30 @@ class FrameRanker(private val rules: RulesConfig) {
 
     private fun score(
         f: Frame, faceW: Double, fitAssumed: Boolean, pdMm: Estimate<Double>, lensPowersD: List<Estimate<Double>>,
-        material: MaterialSpec, powerConf: Confidence, p: FramePrefs,
+        material: MaterialSpec, powerConf: Confidence, p: FramePrefs, bridgeWidthMm: Double? = null,
     ): RankedFrame {
         val reasons = mutableListOf<FrameReason>()
 
         // ---- fit ----
         val width = frameWidthMm(f)
         val delta = width - faceW
-        val fitScore = (1.0 - abs(delta) / c.fitToleranceMm).coerceIn(0.0, 1.0)
+        val widthFit = (1.0 - abs(delta) / c.fitToleranceMm).coerceIn(0.0, 1.0)
         val fit = fitVerdict(delta)
         reasons += when {
-            fit == FitVerdict.GOOD -> FrameReason(ReasonCode.FITS_FACE, true, width, faceW, impact = c.weightFit * fitScore, assumed = fitAssumed)
-            delta < 0 -> FrameReason(ReasonCode.NARROW_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - fitScore), assumed = fitAssumed)
-            else -> FrameReason(ReasonCode.WIDE_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - fitScore), assumed = fitAssumed)
+            fit == FitVerdict.GOOD -> FrameReason(ReasonCode.FITS_FACE, true, width, faceW, impact = c.weightFit * widthFit, assumed = fitAssumed)
+            delta < 0 -> FrameReason(ReasonCode.NARROW_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - widthFit), assumed = fitAssumed)
+            else -> FrameReason(ReasonCode.WIDE_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - widthFit), assumed = fitAssumed)
+        }
+        // Addition 5: when the nose bridge was measured, part of the fit score is bridge (DBL) vs nose width.
+        val fitScore = if (bridgeWidthMm == null) widthFit else {
+            val d = f.bridgeMm - bridgeWidthMm
+            val bridgeFit = (1.0 - abs(d) / c.bridgeFitToleranceMm).coerceIn(0.0, 1.0)
+            val ok = abs(d) <= c.bridgeGoodWithinMm
+            reasons += FrameReason(
+                if (ok) ReasonCode.BRIDGE_FITS else ReasonCode.BRIDGE_MISMATCH, ok, f.bridgeMm, bridgeWidthMm,
+                impact = c.weightFit * c.bridgeFitShare * if (ok) bridgeFit else 1 - bridgeFit,
+            )
+            (1 - c.bridgeFitShare) * widthFit + c.bridgeFitShare * bridgeFit
         }
 
         // ---- thinness ----
@@ -370,12 +385,16 @@ class DrishtiEngine(private val rules: RulesConfig, priors: AnthroPriors, privat
         answers: InterviewAnswers,
         staff: StaffMeasurements = StaffMeasurements(),
         tests: VisionTests = VisionTests(),
+        face: MeasuredFace? = null,
     ): SessionResult {
-        val a = rulesEngine.assess(answers, staff, tests)
+        val a = rulesEngine.assess(answers, staff, tests, face)
         val advice = a.advice ?: return SessionResult(a, emptyList()) // referral only: no frames either
         val powers = advice.eyes.map { Estimate(it.thicknessPowerD, it.startingTrialLens.confidence, it.startingTrialLens.source) }
         val prefs = FramePrefs.from(answers, advice.lensType.value)
-        val frames = ranker.rank(catalog.frames, a.faceWidthMm, a.pdMm, powers, advice.materialId.value, prefs)
+        val frames = ranker.rank(
+            catalog.frames, a.faceWidthMm, a.pdMm, powers, advice.materialId.value, prefs,
+            bridgeWidthMm = face?.bridgeWidthMm?.value,
+        )
         return SessionResult(a, frames)
     }
 
@@ -396,5 +415,12 @@ class DrishtiEngine(private val rules: RulesConfig, priors: AnthroPriors, privat
     companion object {
         fun fromJson(rulesJson: String, priorsJson: String, framesJson: String) =
             DrishtiEngine(RulesConfig.parse(rulesJson), AnthroPriors.parse(priorsJson), FrameCatalog.parse(framesJson))
+
+        /** All 30 frames: frames.json (F01–F10) plus frames/more_frames.json (F11–F30, sizes estimated from photos). */
+        fun fromJson(rulesJson: String, priorsJson: String, framesJson: String, moreFramesJson: String) =
+            DrishtiEngine(
+                RulesConfig.parse(rulesJson), AnthroPriors.parse(priorsJson),
+                com.drishtisaathi.engine.tryon.TryOnCatalog.parseCombined(framesJson, moreFramesJson),
+            )
     }
 }

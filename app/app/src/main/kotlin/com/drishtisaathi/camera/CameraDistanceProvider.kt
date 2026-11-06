@@ -120,8 +120,9 @@ class CameraDistanceProvider internal constructor(
     }
 
     companion object {
-        /** PROVISIONAL: swap for an adapter to Track A's engine DistanceEstimator when merged. */
+        /** Track A's engine estimator once the app has set up [EngineBridge]; the provisional one otherwise. */
         internal fun defaultEstimator(config: CameraConfig): FrameDistanceEstimator =
-            ProvisionalIrisDistanceEstimator(config.provisionalIrisDiameterMm)
+            EngineBridge.rules?.let(::EngineDistanceEstimator)
+                ?: ProvisionalIrisDistanceEstimator(config.provisionalIrisDiameterMm)
     }
 }

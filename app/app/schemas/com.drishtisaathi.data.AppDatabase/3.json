@@ -1,0 +1,108 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "f2f2df847818486f414f4b00204dc991",
+    "entities": [
+      {
+        "tableName": "sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `createdAt` INTEGER NOT NULL, `lang` TEXT NOT NULL, `phoneModel` TEXT NOT NULL, `answersJson` TEXT NOT NULL, `staffJson` TEXT NOT NULL, `resultJson` TEXT NOT NULL, `referralLevel` TEXT NOT NULL, `consentAt` INTEGER, `finalTrialRight` TEXT, `finalTrialLeft` TEXT, `finalAdd` TEXT, `pdMeterMm` REAL, `verifiedAt` INTEGER, `measurementsJson` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lang",
+            "columnName": "lang",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "phoneModel",
+            "columnName": "phoneModel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "answersJson",
+            "columnName": "answersJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staffJson",
+            "columnName": "staffJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resultJson",
+            "columnName": "resultJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "referralLevel",
+            "columnName": "referralLevel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "consentAt",
+            "columnName": "consentAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "finalTrialRight",
+            "columnName": "finalTrialRight",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "finalTrialLeft",
+            "columnName": "finalTrialLeft",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "finalAdd",
+            "columnName": "finalAdd",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pdMeterMm",
+            "columnName": "pdMeterMm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "verifiedAt",
+            "columnName": "verifiedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "measurementsJson",
+            "columnName": "measurementsJson",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f2f2df847818486f414f4b00204dc991')"
+    ]
+  }
+}

@@ -165,6 +165,10 @@ data class FrameScoringConfig(
     val endpieceMmEachSide: Double,
     val idealFrameToFaceWidthRatio: Double,
     val fitToleranceMm: Double,
+    /** Addition 5: frame bridge (DBL) vs measured nose width. Share of the fit score given to the bridge. */
+    val bridgeFitShare: Double = 0.3,
+    val bridgeGoodWithinMm: Double = 2.0,
+    val bridgeFitToleranceMm: Double = 5.0,
     val goodFitWithinMm: Double,
     val thinnestMm: Double,
     val thickestMm: Double,

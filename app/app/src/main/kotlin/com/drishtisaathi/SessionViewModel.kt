@@ -4,7 +4,16 @@ import android.app.Application
 import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.drishtisaathi.calibration.PersistentCalibrationRepository
+import com.drishtisaathi.camera.EngineBridge
 import com.drishtisaathi.data.AppDatabase
+import com.drishtisaathi.data.Measurements
+import com.drishtisaathi.engine.AnthroPriors
+import com.drishtisaathi.engine.MeasuredFace
+import com.drishtisaathi.engine.ReferralLevel
+import com.drishtisaathi.engine.VisionTests
+import com.drishtisaathi.engine.face.FaceCapture
+import com.drishtisaathi.engine.face.FaceFrame
 import com.drishtisaathi.data.SessionCodec
 import com.drishtisaathi.data.SessionEntity
 import com.drishtisaathi.engine.DrishtiEngine
@@ -56,6 +65,12 @@ data class UiState(
     val consentAt: Long? = null,
     /** Addition 3: ids of up to 2 frames ticked for comparison. */
     val compareIds: List<String> = emptyList(),
+    /** M2 camera capture; null = skipped, not done, or discarded by the plausibility gate. */
+    val face: MeasuredFace? = null,
+    val captureStatus: FaceCapture.Status? = null,
+    /** M3 on-screen tests; empty = skipped or not done. */
+    val tests: VisionTests = VisionTests(),
+    val testsDone: Boolean = false,
 ) {
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
     val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
@@ -67,8 +82,19 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     private fun asset(name: String) = getApplication<Application>().assets.open(name).bufferedReader().use { it.readText() }
 
     val rules: RulesConfig by lazy { RulesConfig.parse(asset("rules.json")) }
+    private val priors: AnthroPriors by lazy { AnthroPriors.parse(asset("anthro_priors.json")) }
+    /** All 30 frames: frames.json + frames/more_frames.json (try-on catalogue). */
     val engine: DrishtiEngine by lazy {
-        DrishtiEngine.fromJson(asset("rules.json"), asset("anthro_priors.json"), asset("frames.json"))
+        DrishtiEngine.fromJson(asset("rules.json"), asset("anthro_priors.json"), asset("frames.json"), asset("frames/more_frames.json"))
+    }
+    private val faceCapture: FaceCapture by lazy { FaceCapture(rules, priors) }
+
+    /** Screen scale persists per phone; the customer's iris size is in memory only and cleared per session. */
+    val calibration = PersistentCalibrationRepository(app)
+
+    init {
+        // Camera code (distance, head pose) uses the engine's maths from here on.
+        EngineBridge.rules = rules
     }
     val choiceContext: ChoiceContext by lazy {
         ChoiceContext(rules.frameScoring.budgetMaxPriceInrLow, rules.frameScoring.budgetMaxPriceInrMid)
@@ -92,11 +118,40 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     fun setLang(lang: Lang) = _state.update { it.copy(lang = lang) }
     fun setStaffMode(on: Boolean) = _state.update { it.copy(staffMode = on) }
 
-    /** Fresh session; keeps language and staff mode. */
-    fun startNew() = _state.update { UiState(lang = it.lang, staffMode = it.staffMode) }
+    /** Fresh session; keeps language and staff mode. Forgets the previous customer's iris calibration. */
+    fun startNew() {
+        calibration.clearCustomer()
+        _state.update { UiState(lang = it.lang, staffMode = it.staffMode) }
+    }
 
     /** Customer tapped "I agree": a fresh session starts with the consent time recorded. */
-    fun giveConsent() = _state.update { UiState(lang = it.lang, staffMode = it.staffMode, consentAt = System.currentTimeMillis()) }
+    fun giveConsent() {
+        calibration.clearCustomer()
+        _state.update { UiState(lang = it.lang, staffMode = it.staffMode, consentAt = System.currentTimeMillis()) }
+    }
+
+    // ---- camera capture + screen tests -------------------------------------------------------
+
+    /**
+     * True when the interview alone already triggers an urgent referral: the camera steps and screen tests
+     * are skipped and the customer goes straight to the referral screen.
+     */
+    fun interviewNeedsUrgentReferral(): Boolean {
+        val s = _state.value
+        return engine.evaluate(s.answers, s.staff).assessment.referral.level == ReferralLevel.URGENT
+    }
+
+    /** M2: measures PD, face width, bridge, shape from the accepted frames (landmarks only; frames dropped after). */
+    fun setCapture(frames: List<FaceFrame>): FaceCapture.Status {
+        val out = faceCapture.analyse(frames, calibration.calibration.value.irisDiameterMm)
+        _state.update { it.copy(face = out.face, captureStatus = out.status, result = null) }
+        return out.status
+    }
+
+    fun skipCapture() = _state.update { it.copy(face = null, captureStatus = null, result = null) }
+
+    fun setVisionTests(tests: VisionTests) = _state.update { it.copy(tests = tests, testsDone = true, result = null) }
+    fun skipVisionTests() = _state.update { it.copy(tests = VisionTests(), testsDone = false, result = null) }
 
     // ---- interview -------------------------------------------------------------------------
 
@@ -139,7 +194,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** Runs the engine and saves the session (updates the same row if answers were edited after results). */
     fun computeResult(): SessionResult {
         val s = _state.value
-        val result = engine.evaluate(s.answers, s.staff)
+        val result = engine.evaluate(s.answers, s.staff, s.tests, s.face)
         val createdAt = s.createdAt ?: System.currentTimeMillis()
         _state.update { it.copy(result = result, createdAt = createdAt) }
         val previous = saveJob
@@ -161,6 +216,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 finalAdd = s.verification.finalAdd.ifBlank { null },
                 pdMeterMm = s.verification.pdMeterMm,
                 verifiedAt = s.verification.verifiedAt,
+                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone })),
             )
             if (current == null) {
                 val id = dao.insert(entity)
@@ -194,7 +250,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             saveJob?.join()
             _state.value.sessionId?.let { removeSession(it) }
-            startNew()
+            startNew() // also clears the customer's calibration
             onDone()
         }
     }
@@ -214,6 +270,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     fun openSession(id: Long, onLoaded: () -> Unit) = viewModelScope.launch {
         val e = dao.get(id) ?: return@launch
         val answers = SessionCodec.answers(e)
+        val m = SessionCodec.measurements(e)
         _state.update {
             it.copy(
                 answers = answers,
@@ -225,6 +282,10 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 questionIndex = 0,
                 editingFromConfirm = false,
                 consentAt = e.consentAt,
+                face = m.face,
+                captureStatus = null,
+                tests = m.tests ?: VisionTests(),
+                testsDone = m.tests != null,
                 verification = Verification(
                     e.finalTrialRight.orEmpty(), e.finalTrialLeft.orEmpty(), e.finalAdd.orEmpty(), e.pdMeterMm, e.verifiedAt,
                 ),

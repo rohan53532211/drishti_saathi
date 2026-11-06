@@ -32,7 +32,7 @@ object Fmt {
             ReasonCode.THIN_LENS, ReasonCode.THICK_LENS -> tpl.format(r.a ?: 0.0, S.materialShort(r.materialId ?: ""))
             ReasonCode.IN_BUDGET, ReasonCode.OVER_BUDGET -> tpl.format((r.a ?: 0.0).toInt())
             ReasonCode.LIGHTWEIGHT, ReasonCode.HEAVIER, ReasonCode.LENS_HEIGHT_OK -> tpl.format(r.a ?: 0.0)
-            ReasonCode.LENS_HEIGHT_LOW -> tpl.format(r.a ?: 0.0, r.b ?: 0.0)
+            ReasonCode.LENS_HEIGHT_LOW, ReasonCode.BRIDGE_FITS, ReasonCode.BRIDGE_MISMATCH -> tpl.format(r.a ?: 0.0, r.b ?: 0.0)
             else -> tpl
         }[l]
     }
