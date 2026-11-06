@@ -1,0 +1,99 @@
+{
+  "_comment": "Drishti Saathi clinical constants and rules. DRAFT: every number here must be reviewed by an optometrist before field use. Edit values here, not in code. Unknown keys are rejected so typos fail loudly in the unit tests.",
+  "version": 1,
+
+  "optics": {
+    "letterArcmin": 5.0,
+    "lcaBlueOffsetD": 0.67,
+    "farPointAgreementMaxD": 0.50,
+    "whiteFarPointMaxM": 0.80,
+    "armsLengthM": 0.70,
+    "workingDistanceDefaultM": 0.40,
+    "workingDistanceFineWorkM": 0.33,
+    "hofstetterMinIntercept": 15.0,
+    "hofstetterMinSlopePerYear": 0.25,
+    "powerStepD": 0.25,
+    "addMinD": 0.75,
+    "addMaxD": 3.00,
+    "repeatSpreadHighMaxD": 0.25,
+    "repeatSpreadMediumMaxD": 0.50,
+    "measuredBandHalfWidthD": 0.50
+  },
+
+  "ages": {
+    "presbyopiaFrom": 40,
+    "nearPointTestFrom": 38,
+    "childReferralUnder": 12,
+    "polycarbonateUnder": 18
+  },
+
+  "addAgeTable": [
+    { "minAge": 40, "maxAge": 44, "lowD": 0.75, "highD": 1.00 },
+    { "minAge": 45, "maxAge": 49, "lowD": 1.25, "highD": 1.50 },
+    { "minAge": 50, "maxAge": 54, "lowD": 1.75, "highD": 2.00 },
+    { "minAge": 55, "maxAge": 150, "lowD": 2.25, "highD": 2.50 }
+  ],
+
+  "oldNumbers": {
+    "freshMaxYears": 2,
+    "bandHalfWidthFreshD": 0.50,
+    "bandHalfWidthStaleD": 1.00,
+    "significantDistanceSeD": 0.50,
+    "significantCylinderD": 0.50
+  },
+
+  "materials": [
+    { "id": "CR39", "index": 1.50, "centreThicknessMinusMm": 2.0, "minEdgePlusMm": 1.0 },
+    { "id": "POLYCARBONATE", "index": 1.59, "centreThicknessMinusMm": 1.5, "minEdgePlusMm": 1.0 },
+    { "id": "HI_160", "index": 1.60, "centreThicknessMinusMm": 1.5, "minEdgePlusMm": 1.0 },
+    { "id": "HI_167", "index": 1.67, "centreThicknessMinusMm": 1.5, "minEdgePlusMm": 1.0 }
+  ],
+
+  "materialRules": {
+    "defaultMaterial": "CR39",
+    "impactMaterial": "POLYCARBONATE",
+    "impactOccupations": ["SPORT_ACTIVE"],
+    "highIndexFromAbsSeD": 4.0,
+    "highIndexMaterial": "HI_160",
+    "veryHighIndexFromAbsSeD": 6.0,
+    "veryHighIndexMaterial": "HI_167"
+  },
+
+  "lensTypeRules": {
+    "progressiveOccupations": ["OFFICE_COMPUTER", "SHOP_BUSINESS"],
+    "progressiveScreenHours": ["H4_PLUS"],
+    "lowBudgets": ["LOW"]
+  },
+
+  "coatingRules": [
+    { "id": "screen-time", "when": { "screenHours": ["H4_PLUS"] }, "coatings": ["ANTI_REFLECTIVE", "BLUE_FILTER_OPTIONAL"] },
+    { "id": "night-driving", "when": { "nightDriving": true }, "coatings": ["ANTI_REFLECTIVE"] },
+    { "id": "outdoor-work", "when": { "outdoorWork": true }, "coatings": ["PHOTOCHROMIC_OR_TINT"] }
+  ],
+
+  "referral": {
+    "lowConfidenceCountForReferral": 2
+  },
+
+  "frameScoring": {
+    "weightFit": 0.35,
+    "weightThinness": 0.30,
+    "weightStyle": 0.15,
+    "weightBudget": 0.20,
+    "endpieceMmEachSide": 6.0,
+    "idealFrameToFaceWidthRatio": 1.0,
+    "fitToleranceMm": 15.0,
+    "goodFitWithinMm": 6.0,
+    "thinnestMm": 2.0,
+    "thickestMm": 8.0,
+    "styleMismatchScore": 0.3,
+    "budgetMaxPriceInrLow": 1500,
+    "budgetMaxPriceInrMid": 4000,
+    "overBudgetFalloffInr": 2000,
+    "topN": 5
+  },
+
+  "plausibility": {
+    "pdResidualSdMultiplier": 3.0
+  }
+}
