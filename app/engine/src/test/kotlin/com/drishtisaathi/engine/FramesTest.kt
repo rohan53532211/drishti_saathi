@@ -3,6 +3,7 @@ package com.drishtisaathi.engine
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -158,5 +159,79 @@ class FramesTest {
     @Test fun `no power - no thickness table`() {
         val res = engine.evaluate(InterviewAnswers(age = 30))
         assertNull(engine.thicknessByMaterial(frame("F01"), res.assessment))
+    }
+
+    // ---- Addition 4: new preferences ------------------------------------------------------------
+
+    private fun one(id: String, prefs: FramePrefs, face: Double = 134.0) =
+        ranker.rank(listOf(frame(id)), est(face), est(62.0), emptyList(), "CR39", prefs).single()
+
+    @Test fun `colour preference - match scores higher and says so`() {
+        val match = one("F03", FramePrefs(colour = ColourPref.BROWN_TORTOISE))
+        val miss = one("F03", FramePrefs(colour = ColourPref.COLOURFUL))
+        assertTrue(match.score > miss.score)
+        assertTrue(match.reasons.any { it.code == ReasonCode.COLOUR_MATCH })
+        assertTrue(miss.reasons.any { it.code == ReasonCode.COLOUR_MISMATCH && !it.positive })
+        // ANY -> neutral, no colour bullet
+        assertTrue(one("F03", FramePrefs(colour = ColourPref.ANY)).reasons.none { it.code.name.startsWith("COLOUR") })
+    }
+
+    @Test fun `lightweight or first-time wearer favours light frames`() {
+        val light = one("F06", FramePrefs(lightweight = true))   // 10 g
+        val heavy = one("F05", FramePrefs(lightweight = true))   // 30 g
+        assertEquals(1.0, light.weightScore, 1e-9)
+        assertTrue(heavy.weightScore < 0.3)
+        assertTrue(light.reasons.any { it.code == ReasonCode.LIGHTWEIGHT && it.a == 10.0 })
+        assertEquals(heavy.weightScore, one("F05", FramePrefs(firstTimeWearer = true)).weightScore, 1e-9)
+        assertEquals(1.0, one("F05", FramePrefs()).weightScore, 1e-9) // no preference -> neutral
+    }
+
+    @Test fun `look preference`() {
+        assertTrue(one("F01", FramePrefs(look = LookPref.PROFESSIONAL)).score > one("F01", FramePrefs(look = LookPref.CASUAL)).score)
+        assertEquals(1.0, one("F01", FramePrefs(look = LookPref.BOTH)).lookScore, 1e-9)
+    }
+
+    @Test fun `progressive needs minimum lens height`() {
+        val short = one("F08", FramePrefs(lensType = LensType.PROGRESSIVE))  // 26 mm
+        assertEquals(rules.frameScoring.shortLensHeightPenalty, short.lensHeightPenalty, 1e-9)
+        val low = short.reasons.first { it.code == ReasonCode.LENS_HEIGHT_LOW }
+        assertEquals(26.0, low.a!!, 1e-9)
+        assertEquals(28.0, low.b!!, 1e-9)
+        val sv = one("F08", FramePrefs(lensType = LensType.SINGLE_VISION))
+        assertEquals(0.0, sv.lensHeightPenalty, 1e-9)
+        assertTrue(sv.score > short.score)
+        assertTrue(one("F01", FramePrefs(lensType = LensType.PROGRESSIVE)).reasons.any { it.code == ReasonCode.LENS_HEIGHT_OK })
+    }
+
+    @Test fun `facade passes interview preferences into ranking`() {
+        val a = InterviewAnswers(age = 30, colourPreference = ColourPref.COLOURFUL, lightweightPreference = true)
+        val top = engine.evaluate(a).frames
+        assertTrue(top.flatMap { it.reasons }.any { it.code == ReasonCode.COLOUR_MATCH || it.code == ReasonCode.COLOUR_MISMATCH })
+        assertTrue(top.flatMap { it.reasons }.any { it.code == ReasonCode.LIGHTWEIGHT || it.code == ReasonCode.HEAVIER })
+    }
+
+    @Test fun `catalogue rejects ANY as a frame colour`() {
+        val bad = TestAssets.text("frames.json").replaceFirst("\"colours\": [\"METALLIC\", \"DARK\"]", "\"colours\": [\"ANY\"]")
+        assertThrows(IllegalArgumentException::class.java) { FrameCatalog.parse(bad) }
+    }
+
+    @Test fun `catalogue requires the addition 4 fields`() {
+        val missing = TestAssets.text("frames.json").replaceFirst(", \"weightGrams\": 16", "")
+        assertThrows(IllegalArgumentException::class.java) { FrameCatalog.parse(missing) }
+    }
+
+    @Test fun `sessions stored before addition 4 still decode`() {
+        val res = engine.evaluate(InterviewAnswers(age = 46, nearBlur = true, budget = Budget.LOW))
+        val json = Json { encodeDefaults = true }.encodeToString(SessionResult.serializer(), res)
+        // Strip the new frame and ranking fields, as an older build would have written them
+        val old = json
+            .replace(Regex(""","colours":\[[^\]]*\]"""), "")
+            .replace(Regex(""","looks":\[[^\]]*\]"""), "")
+            .replace(Regex(""","weightGrams":\d+"""), "")
+            .replace(Regex(""","lensHeightMm":[\d.]+"""), "")
+            .replace(Regex(""","(colourScore|weightScore|lookScore|lensHeightPenalty)":[\d.]+"""), "")
+        assertTrue(!old.contains("weightGrams"))
+        val decoded = Json { ignoreUnknownKeys = true }.decodeFromString(SessionResult.serializer(), old)
+        assertEquals(res.frames.map { it.frame.id }, decoded.frames.map { it.frame.id })
     }
 }

@@ -1,6 +1,9 @@
 package com.drishtisaathi.interview
 
 import com.drishtisaathi.engine.Budget
+import com.drishtisaathi.engine.ColourPref
+import com.drishtisaathi.engine.LookPref
+import com.drishtisaathi.engine.ReadingFrequency
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.Occupation
 import com.drishtisaathi.engine.ScreenHours
@@ -53,7 +56,7 @@ object Questions {
             get = { it.age }, set = { a, v -> a.copy(age = v) }),
         Question.YesNo("wearsGlasses", S.qWearsGlasses, { it.wearsGlasses }, { a, v ->
             // Clearing the follow-up keeps stale data out if the answer flips to "no".
-            if (v) a.copy(wearsGlasses = true) else a.copy(wearsGlasses = false, glassesAgeYears = null)
+            if (v) a.copy(wearsGlasses = true, firstTimeWearer = null) else a.copy(wearsGlasses = false, glassesAgeYears = null)
         }),
         Question.Number(GLASSES_AGE, S.qGlassesAge, S.yearsHint, 0..60, allowUnknown = true,
             get = { it.glassesAgeYears }, set = { a, v -> a.copy(glassesAgeYears = v) },
@@ -61,6 +64,11 @@ object Questions {
         Question.OldNumbers(KNOWN_RX, S.qKnownRx),
         Question.YesNo("distanceBlur", S.qDistanceBlur, { it.distanceBlur }, { a, v -> a.copy(distanceBlur = v) }),
         Question.YesNo("nearBlur", S.qNearBlur, { it.nearBlur }, { a, v -> a.copy(nearBlur = v) }),
+        // Addition 4: only asked when they don't wear glasses now
+        Question.YesNo("firstTimeWearer", S.qFirstTime, { it.firstTimeWearer }, { a, v -> a.copy(firstTimeWearer = v) },
+            visibleIf = { it.wearsGlasses == false }),
+        Question.Choice("readingFrequency", S.qReadingFreq, ReadingFrequency.entries.toList(), { v, _ -> S.readingFrequency(v) },
+            { it.readingFrequency }, { a, v -> a.copy(readingFrequency = v) }),
         Question.Choice("screenHours", S.qScreenHours, ScreenHours.entries.toList(), { v, _ -> S.screenHours(v) },
             { it.screenHours }, { a, v -> a.copy(screenHours = v) }),
         Question.YesNo("nightDriving", S.qNightDriving, { it.nightDriving }, { a, v -> a.copy(nightDriving = v) }),
@@ -75,6 +83,12 @@ object Questions {
             { it.budget }, { a, v -> a.copy(budget = v) }),
         Question.Choice("style", S.qStyle, StylePref.entries.toList(), { v, _ -> S.style(v) },
             { it.style }, { a, v -> a.copy(style = v) }),
+        // Addition 4: frame preferences
+        Question.Choice("colourPreference", S.qColour, ColourPref.entries.toList(), { v, _ -> S.colour(v) },
+            { it.colourPreference }, { a, v -> a.copy(colourPreference = v) }),
+        Question.Choice("lookPreference", S.qLook, LookPref.entries.toList(), { v, _ -> S.look(v) },
+            { it.lookPreference }, { a, v -> a.copy(lookPreference = v) }),
+        Question.YesNo("lightweightPreference", S.qLightweight, { it.lightweightPreference }, { a, v -> a.copy(lightweightPreference = v) }),
     )
 
     fun visible(a: InterviewAnswers): List<Question> = all.filter { it.visibleIf(a) }

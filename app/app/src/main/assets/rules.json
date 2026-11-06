@@ -62,7 +62,9 @@
   "lensTypeRules": {
     "progressiveOccupations": ["OFFICE_COMPUTER", "SHOP_BUSINESS"],
     "progressiveScreenHours": ["H4_PLUS"],
-    "lowBudgets": ["LOW"]
+    "lowBudgets": ["LOW"],
+    "progressiveReadingFrequencies": ["DAILY_LONG"],
+    "separatePairsReadingFrequencies": ["RARELY"]
   },
 
   "coatingRules": [
@@ -76,10 +78,13 @@
   },
 
   "frameScoring": {
-    "weightFit": 0.35,
-    "weightThinness": 0.30,
-    "weightStyle": 0.15,
-    "weightBudget": 0.20,
+    "weightFit": 0.28,
+    "weightThinness": 0.24,
+    "weightStyle": 0.10,
+    "weightBudget": 0.16,
+    "weightColour": 0.08,
+    "weightWeight": 0.07,
+    "weightLook": 0.07,
     "endpieceMmEachSide": 6.0,
     "idealFrameToFaceWidthRatio": 1.0,
     "fitToleranceMm": 15.0,
@@ -94,7 +99,14 @@
     "labelHighFrom": 0.85,
     "labelModerateFrom": 0.70,
     "thinPositiveFrom": 0.5,
-    "maxReasons": 4
+    "maxReasons": 4,
+    "colourMismatchScore": 0.3,
+    "lookMismatchScore": 0.4,
+    "lightestGrams": 10,
+    "heaviestGrams": 35,
+    "lightPositiveFrom": 0.5,
+    "progressiveMinLensHeightMm": 28,
+    "shortLensHeightPenalty": 0.15
   },
 
   "plausibility": {

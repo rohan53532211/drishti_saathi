@@ -62,6 +62,8 @@ enum class Note {
     PD_ASSUMED,
     PD_IMPLAUSIBLE,
     FACE_WIDTH_ASSUMED,
+    /** Addition 4: first pair of glasses; explain adaptation (more so for multifocals). */
+    FIRST_TIME_WEARER,
 }
 
 @Serializable
@@ -174,6 +176,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         if (a.headacheStrain == true && eyes.isEmpty()) notes += Note.HAND_TEST_NEEDED
 
         val lensType = lensType(a, eyes, notes)
+        if (a.firstTimeWearer == true && lensType.value != LensType.NONE_SUGGESTED) notes += Note.FIRST_TIME_WEARER
         val add = if (lensType.value in NEAR_TYPES) addBand(a, t, notes) else null
         return LensAdvice(eyes, add, lensType, material(a, eyes), coatings(a))
     }
@@ -235,7 +238,9 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
     private fun multifocal(a: InterviewAnswers): LensType {
         val r = rules.lensTypeRules
         if (a.budget in r.lowBudgets) return LensType.BIFOCAL_OR_SEPARATE_PAIRS
-        val screenUser = a.occupation in r.progressiveOccupations || a.screenHours in r.progressiveScreenHours
+        if (a.readingFrequency in r.separatePairsReadingFrequencies) return LensType.BIFOCAL_OR_SEPARATE_PAIRS
+        val screenUser = a.occupation in r.progressiveOccupations || a.screenHours in r.progressiveScreenHours ||
+            a.readingFrequency in r.progressiveReadingFrequencies
         return if (screenUser) LensType.PROGRESSIVE else LensType.BIFOCAL_OR_SEPARATE_PAIRS
     }
 

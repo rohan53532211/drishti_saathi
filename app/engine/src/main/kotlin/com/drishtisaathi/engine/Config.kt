@@ -41,11 +41,12 @@ data class RulesConfig(
         ).forEach { material(it) }
         require(addAgeTable.all { it.lowD <= it.highD && it.minAge <= it.maxAge }) { "Bad addAgeTable row" }
         with(frameScoring) {
-            val sum = weightFit + weightThinness + weightStyle + weightBudget
+            val sum = weightFit + weightThinness + weightStyle + weightBudget + weightColour + weightWeight + weightLook
             require(kotlin.math.abs(sum - 1.0) < 1e-6) { "frameScoring weights must sum to 1, got $sum" }
             require(thickestMm > thinnestMm)
             require(labelHighFrom > labelModerateFrom) { "labelHighFrom must exceed labelModerateFrom" }
             require(maxReasons >= 2)
+            require(heaviestGrams > lightestGrams)
         }
     }
 }
@@ -113,6 +114,10 @@ data class LensTypeRules(
     val progressiveOccupations: List<Occupation>,
     val progressiveScreenHours: List<ScreenHours>,
     val lowBudgets: List<Budget>,
+    /** Addition 4: reading this often favours a progressive (with screen/office use). */
+    val progressiveReadingFrequencies: List<ReadingFrequency>,
+    /** Addition 4: reading this rarely favours separate distance + reading pairs over a multifocal. */
+    val separatePairsReadingFrequencies: List<ReadingFrequency>,
 )
 
 /** A declarative rule: if every non-null field of [when] matches the answers, add [coatings]. */
@@ -163,6 +168,19 @@ data class FrameScoringConfig(
     /** Thinness component at or above this counts as a "thin lens" reason. */
     val thinPositiveFrom: Double,
     val maxReasons: Int,
+    // ---- Addition 4 ----
+    val weightColour: Double,
+    val weightWeight: Double,
+    val weightLook: Double,
+    val colourMismatchScore: Double,
+    val lookMismatchScore: Double,
+    val lightestGrams: Double,
+    val heaviestGrams: Double,
+    /** Weight component at or above this counts as a "light frame" reason. */
+    val lightPositiveFrom: Double,
+    val progressiveMinLensHeightMm: Double,
+    /** Subtracted from the total score when a progressive frame's lens is too short. */
+    val shortLensHeightPenalty: Double,
 )
 
 @Serializable

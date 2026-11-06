@@ -21,7 +21,7 @@ class ConfigAndAnthroTest {
     }
 
     @Test fun `frame weights must sum to 1`() {
-        val broken = TestAssets.text("rules.json").replace("\"weightFit\": 0.35", "\"weightFit\": 0.50")
+        val broken = TestAssets.text("rules.json").replace("\"weightFit\": 0.28", "\"weightFit\": 0.50")
         assertThrows(IllegalArgumentException::class.java) { RulesConfig.parse(broken) }
     }
 

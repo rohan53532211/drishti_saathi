@@ -1,6 +1,9 @@
 package com.drishtisaathi.i18n
 
 import com.drishtisaathi.engine.Budget
+import com.drishtisaathi.engine.ColourPref
+import com.drishtisaathi.engine.LookPref
+import com.drishtisaathi.engine.ReadingFrequency
 import com.drishtisaathi.engine.Coating
 import com.drishtisaathi.engine.Confidence
 import com.drishtisaathi.engine.FitVerdict
@@ -117,6 +120,33 @@ object S {
     )
     val qBudget = t("What is your budget for glasses?", "चश्मे के लिए आपका बजट कितना है?")
     val qStyle = t("What style do you like?", "आपको कौन सा स्टाइल पसंद है?")
+    // Addition 4
+    val qColour = t("What frame colour do you like?", "फ़्रेम का कौन सा रंग पसंद है?")
+    val qLook = t("Is this mainly for work / formal use, or casual everyday use?", "चश्मा ज़्यादातर काम / औपचारिक मौक़ों के लिए है या रोज़ आम पहनने के लिए?")
+    val qLightweight = t("Do you want a very light frame?", "क्या आपको बहुत हल्का फ़्रेम चाहिए?")
+    val qFirstTime = t("Will these be your first glasses?", "क्या यह आपका पहला चश्मा होगा?")
+    val qReadingFreq = t("How much do you read or do close work?", "आप कितना पढ़ते हैं या पास का काम करते हैं?")
+
+    fun colour(v: ColourPref) = COLOUR.getValue(v)
+    private val COLOUR = mapOf(
+        ColourPref.DARK to t("Black / dark", "काला / गहरा"),
+        ColourPref.BROWN_TORTOISE to t("Brown / tortoise", "भूरा / कछुआ डिज़ाइन"),
+        ColourPref.METALLIC to t("Gold / silver metal", "सुनहरा / चाँदी जैसा मेटल"),
+        ColourPref.COLOURFUL to t("Colourful", "रंग-बिरंगा"),
+        ColourPref.ANY to t("Any colour", "कोई भी रंग"),
+    )
+    fun look(v: LookPref) = LOOK.getValue(v)
+    private val LOOK = mapOf(
+        LookPref.PROFESSIONAL to t("Work / formal", "काम / औपचारिक"),
+        LookPref.CASUAL to t("Casual / everyday", "आम / रोज़ का"),
+        LookPref.BOTH to t("Both", "दोनों"),
+    )
+    fun readingFrequency(v: ReadingFrequency) = READING_FREQ.getValue(v)
+    private val READING_FREQ = mapOf(
+        ReadingFrequency.RARELY to t("Rarely", "कभी-कभार"),
+        ReadingFrequency.SOMETIMES to t("Sometimes, for short periods", "कभी-कभी, थोड़ी देर"),
+        ReadingFrequency.DAILY_LONG to t("Every day, for long periods", "रोज़, लंबे समय तक"),
+    )
 
     // ---- Old glasses numbers entry -----------------------------------------------------------
     val oldNumbersTitle = t("Old glasses numbers", "पुराने चश्मे के नंबर")
@@ -352,6 +382,10 @@ object S {
         Note.ADD_FROM_AGE_TABLE to t("Reading add is from the age table only", "पढ़ने का ऐड सिर्फ़ उम्र की तालिका से"),
         Note.PD_ASSUMED to t("PD not measured: average used. Measure with a PD ruler.", "PD नहीं मापा गया: औसत लिया गया। PD रूलर से मापें।"),
         Note.PD_IMPLAUSIBLE to t("PD looks unusual for this face: re-measure", "इस चेहरे के हिसाब से PD असामान्य है: दोबारा मापें"),
+        Note.FIRST_TIME_WEARER to t(
+            "First pair of glasses: explain that it takes 1–2 weeks to get used to them (longer for progressives)",
+            "पहला चश्मा: बताएँ कि आदत पड़ने में 1–2 हफ़्ते लगते हैं (प्रोग्रेसिव में ज़्यादा)",
+        ),
         Note.FACE_WIDTH_ASSUMED to t("Face width not measured: average used for frame fit", "चेहरे की चौड़ाई नहीं मापी: फ़्रेम फ़िट के लिए औसत लिया गया"),
     )
 
@@ -420,6 +454,14 @@ object S {
         ReasonCode.OVER_BUDGET to t("₹%,d over budget", "बजट से ₹%,d ज़्यादा"),
         ReasonCode.STYLE_MATCH to t("Matches your style", "आपके पसंद के स्टाइल जैसा"),
         ReasonCode.STYLE_MISMATCH to t("Different from your chosen style", "आपके चुने स्टाइल से अलग"),
+        ReasonCode.COLOUR_MATCH to t("Comes in your colour", "आपके पसंद के रंग में मिलता है"),
+        ReasonCode.COLOUR_MISMATCH to t("Not in your chosen colour", "आपके चुने रंग में नहीं"),
+        ReasonCode.LIGHTWEIGHT to t("Light: about %.0f g", "हल्का: लगभग %.0f ग्राम"),
+        ReasonCode.HEAVIER to t("Heavier: about %.0f g", "भारी: लगभग %.0f ग्राम"),
+        ReasonCode.LOOK_MATCH to t("Suits your work / casual choice", "आपकी काम / आम पसंद के अनुसार"),
+        ReasonCode.LOOK_MISMATCH to t("Less suited to your work / casual choice", "आपकी काम / आम पसंद से कम मेल"),
+        ReasonCode.LENS_HEIGHT_OK to t("Lens tall enough for progressive (%.0f mm)", "प्रोग्रेसिव के लिए लेंस की ऊँचाई ठीक (%.0f mm)"),
+        ReasonCode.LENS_HEIGHT_LOW to t("Lens too short for progressive (%.0f mm, needs %.0f mm)", "प्रोग्रेसिव के लिए लेंस छोटा (%.0f mm, चाहिए %.0f mm)"),
         ReasonCode.THIN_LENS to R_THIN_EDGE,
         ReasonCode.THICK_LENS to R_THICK_EDGE,
     )

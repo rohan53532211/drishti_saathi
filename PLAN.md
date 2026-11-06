@@ -18,7 +18,7 @@ Where they conflict, the brief wins unless an item here says it replaces a brief
 | 9 | **Consent screen** (addition 1) | Done |
 | 10 | **Ranking labels + reason bullets** (addition 2) | Done |
 | 11 | **Two-frame comparison screen** (addition 3) | Done |
-| 12 | **New interview fields → frame scoring** (addition 4) | Next |
+| 12 | **New interview fields → frame scoring** (addition 4) | Done |
 
 ### Addition 1: Consent screen
 - Shown before any capture: what is collected (answers, measurements; never name or face images), why (pre-consultation for the shop's own trial-lens test), where it stays (on this phone), how to delete it. Two buttons: **Continue** / **Cancel** (Cancel returns home, nothing stored).

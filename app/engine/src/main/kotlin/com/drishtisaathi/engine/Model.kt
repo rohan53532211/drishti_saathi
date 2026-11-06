@@ -29,6 +29,11 @@ enum class Occupation {
 
 @Serializable enum class StylePref { CLASSIC, MODERN, BOLD, MINIMAL, ANY }
 
+// Addition 4 preferences
+@Serializable enum class ColourPref { DARK, BROWN_TORTOISE, METALLIC, COLOURFUL, ANY }
+@Serializable enum class LookPref { PROFESSIONAL, CASUAL, BOTH }
+@Serializable enum class ReadingFrequency { RARELY, SOMETIMES, DAILY_LONG }
+
 @Serializable enum class Coating { ANTI_REFLECTIVE, BLUE_FILTER_OPTIONAL, PHOTOCHROMIC_OR_TINT }
 
 /** One eye of an existing spectacle record (the customer's old glasses numbers). */
@@ -64,6 +69,12 @@ data class InterviewAnswers(
     val redFlagOther: Boolean? = null,
     val budget: Budget? = null,
     val style: StylePref? = null,
+    // ---- Addition 4 ----
+    val colourPreference: ColourPref? = null,
+    val lightweightPreference: Boolean? = null,
+    val lookPreference: LookPref? = null,
+    val firstTimeWearer: Boolean? = null,
+    val readingFrequency: ReadingFrequency? = null,
 )
 
 /** Measurements typed in by staff (PD ruler, face width) until the camera flow exists. */

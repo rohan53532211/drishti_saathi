@@ -266,4 +266,24 @@ class RulesEngineTest {
         assertEquals(Confidence.MEDIUM, ok.pdMm.confidence)
         assertFalse(Note.PD_IMPLAUSIBLE in ok.notes)
     }
+
+    // ---- Addition 4: reading frequency and first-time wearer ----------------------------------
+
+    @Test fun `daily long reading makes a presbyope a progressive candidate`() {
+        val a = base(age = 50).copy(nearBlur = true, distanceBlur = true, occupation = Occupation.HOMEMAKER,
+            readingFrequency = ReadingFrequency.DAILY_LONG)
+        assertEquals(LensType.PROGRESSIVE, engine.assess(a).advice!!.lensType.value)
+        assertEquals(LensType.BIFOCAL_OR_SEPARATE_PAIRS, engine.assess(a.copy(readingFrequency = null)).advice!!.lensType.value)
+    }
+
+    @Test fun `rare reading favours separate pairs even for office users`() {
+        val a = base(age = 50).copy(nearBlur = true, distanceBlur = true, occupation = Occupation.OFFICE_COMPUTER,
+            readingFrequency = ReadingFrequency.RARELY)
+        assertEquals(LensType.BIFOCAL_OR_SEPARATE_PAIRS, engine.assess(a).advice!!.lensType.value)
+    }
+
+    @Test fun `first-time wearer note only when a lens is suggested`() {
+        assertTrue(Note.FIRST_TIME_WEARER in engine.assess(base(age = 45).copy(nearBlur = true, firstTimeWearer = true)).notes)
+        assertFalse(Note.FIRST_TIME_WEARER in engine.assess(base().copy(firstTimeWearer = true)).notes)
+    }
 }

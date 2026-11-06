@@ -31,6 +31,8 @@ object Fmt {
             ReasonCode.FITS_FACE, ReasonCode.NARROW_FOR_FACE, ReasonCode.WIDE_FOR_FACE -> tpl.format(r.a ?: 0.0, r.b ?: 0.0)
             ReasonCode.THIN_LENS, ReasonCode.THICK_LENS -> tpl.format(r.a ?: 0.0, S.materialShort(r.materialId ?: ""))
             ReasonCode.IN_BUDGET, ReasonCode.OVER_BUDGET -> tpl.format((r.a ?: 0.0).toInt())
+            ReasonCode.LIGHTWEIGHT, ReasonCode.HEAVIER, ReasonCode.LENS_HEIGHT_OK -> tpl.format(r.a ?: 0.0)
+            ReasonCode.LENS_HEIGHT_LOW -> tpl.format(r.a ?: 0.0, r.b ?: 0.0)
             else -> tpl
         }[l]
     }
