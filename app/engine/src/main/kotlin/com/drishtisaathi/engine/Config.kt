@@ -153,7 +153,8 @@ data class FrameScoringConfig(
     val styleMismatchScore: Double,
     val budgetMaxPriceInrLow: Int,
     val budgetMaxPriceInrMid: Int,
-    val overBudgetFalloffInr: Int,
+    /** Score falls to 0 at (cap × (1 + fraction)): ₹750 over a ₹1500 cap, ₹2000 over ₹4000. */
+    val overBudgetFalloffFraction: Double,
     val topN: Int,
 )
 

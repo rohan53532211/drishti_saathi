@@ -1,0 +1,15 @@
+{
+  "_comment": "PLACEHOLDER catalogue for Phase 1 (10 frames). Sizes are typical printed marks (A-DBL-temple), not measured. Prices in INR are illustrative. Phase 3 replaces this with 30 real frames; image paths point at the frames30 SKUs, but images are not bundled yet (Kaggle licence unknown, demo use only).",
+  "frames": [
+    { "id": "F01", "name": "Classic Rectangle Metal", "lensWidthMm": 52, "bridgeMm": 18, "templeMm": 140, "shape": "RECTANGLE", "rim": "FULL", "material": "METAL", "priceInr": 1200, "styles": ["CLASSIC", "MINIMAL"], "image": "frames/pm0569_0.jpg" },
+    { "id": "F02", "name": "Slim Oval Titanium", "lensWidthMm": 50, "bridgeMm": 19, "templeMm": 140, "shape": "OVAL", "rim": "HALF", "material": "TITANIUM", "priceInr": 3800, "styles": ["MINIMAL", "CLASSIC"], "image": "frames/pm0571_0.jpg" },
+    { "id": "F03", "name": "Bold Square Acetate", "lensWidthMm": 54, "bridgeMm": 18, "templeMm": 145, "shape": "SQUARE", "rim": "FULL", "material": "ACETATE", "priceInr": 2400, "styles": ["BOLD", "MODERN"], "image": "frames/pl8586_0.jpg" },
+    { "id": "F04", "name": "Round Wire", "lensWidthMm": 48, "bridgeMm": 20, "templeMm": 140, "shape": "ROUND", "rim": "FULL", "material": "METAL", "priceInr": 900, "styles": ["CLASSIC", "MODERN"], "image": "frames/mt6507_0.jpg" },
+    { "id": "F05", "name": "Wide Rectangle Acetate", "lensWidthMm": 56, "bridgeMm": 18, "templeMm": 145, "shape": "RECTANGLE", "rim": "FULL", "material": "ACETATE", "priceInr": 1600, "styles": ["BOLD", "CLASSIC"], "image": "frames/pl8587_0.jpg" },
+    { "id": "F06", "name": "Rimless Light", "lensWidthMm": 52, "bridgeMm": 17, "templeMm": 140, "shape": "RECTANGLE", "rim": "RIMLESS", "material": "TITANIUM", "priceInr": 5200, "styles": ["MINIMAL"], "image": "frames/lumt00834_0.jpg" },
+    { "id": "F07", "name": "Cat-eye Acetate", "lensWidthMm": 51, "bridgeMm": 17, "templeMm": 140, "shape": "CAT_EYE", "rim": "FULL", "material": "ACETATE", "priceInr": 2100, "styles": ["MODERN", "BOLD"], "image": "frames/pl8733_0.jpg" },
+    { "id": "F08", "name": "Compact Half-rim", "lensWidthMm": 49, "bridgeMm": 18, "templeMm": 135, "shape": "RECTANGLE", "rim": "HALF", "material": "METAL", "priceInr": 750, "styles": ["CLASSIC", "MINIMAL"], "image": "frames/mt6960_0.jpg" },
+    { "id": "F09", "name": "Large Aviator", "lensWidthMm": 58, "bridgeMm": 15, "templeMm": 145, "shape": "AVIATOR", "rim": "FULL", "material": "METAL", "priceInr": 3200, "styles": ["BOLD", "MODERN"], "image": "frames/hmt0239_0.jpg" },
+    { "id": "F10", "name": "Kids Flexi Round", "lensWidthMm": 46, "bridgeMm": 16, "templeMm": 130, "shape": "ROUND", "rim": "FULL", "material": "TR90", "priceInr": 650, "styles": ["MODERN", "CLASSIC"], "image": "frames/sp0100_0.jpg" }
+  ]
+}

@@ -89,7 +89,7 @@
     "styleMismatchScore": 0.3,
     "budgetMaxPriceInrLow": 1500,
     "budgetMaxPriceInrMid": 4000,
-    "overBudgetFalloffInr": 2000,
+    "overBudgetFalloffFraction": 0.5,
     "topN": 5
   },
 
