@@ -16,6 +16,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0-phase1"
+        // Track B: MediaPipe + OpenCV ship native code; phones only (keeps the APK reasonable).
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     buildTypes {
@@ -29,6 +31,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true }
+    // MediaPipe memory-maps the .task model from assets, so it must be stored uncompressed.
+    androidResources { noCompress += listOf("task", "tflite") }
+    // Compress native libs in the APK (OpenCV + MediaPipe are ~60 MB stored); Android extracts them on install.
+    packaging { jniLibs { useLegacyPackaging = true } }
 }
 
 kotlin {
@@ -59,6 +65,14 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.kotlinx.serialization.json)
+
+    // Track B: camera, face landmarks, image checks.
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
+    implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.opencv)
 
     testImplementation(libs.junit)
 }
