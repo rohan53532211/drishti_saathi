@@ -1,5 +1,6 @@
 package com.drishtisaathi.engine
 
+import com.drishtisaathi.engine.vision.BayesianBand
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
@@ -50,6 +51,12 @@ data class EyeAdvice(
     val startingTrialLens: Estimate<TrialLens>,
     /** Strongest meridian of the starting lens; drives the thickness estimate. */
     val thicknessPowerD: Double,
+    /**
+     * Posterior probability that the true SE lies in [band] (Bayesian band, innovation 10), e.g. 0.78 → "78 % likely".
+     * Null when the band did not come from the Bayesian model (old numbers, or bayes.enabled = false); null also for
+     * sessions stored before this field existed.
+     */
+    val bandProbability: Double? = null,
 )
 
 @Serializable
@@ -110,6 +117,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
     private val optics = Optics(rules.optics)
     private val priors = priors
     private val gate = PlausibilityGate(priors, rules.plausibility)
+    private val bayes = BayesianBand(rules)
 
     fun assess(
         answers: InterviewAnswers,
@@ -210,6 +218,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
     private fun eyeAdvice(eye: Eye, m: MeasuredEye?, old: EyeRx?, a: InterviewAnswers, notes: MutableSet<Note>): EyeAdvice? {
         val usableMeasure = m?.takeIf { it.seD != null && !it.noMyopiaAtArmsLength }
         if (usableMeasure != null && (usableMeasure.confidence != Confidence.LOW || old == null)) {
+            if (rules.bayes.enabled) return bayesianEyeAdvice(eye, usableMeasure, a.age)
             val se = optics.roundToStep(usableMeasure.seD!!)
             val hw = rules.optics.measuredBandHalfWidthD
             val c = usableMeasure.confidence
@@ -238,6 +247,24 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
             Estimate(PowerBand(se - hw, se + hw), conf, Source.OLD_GLASSES_NUMBERS),
             Estimate(TrialLens(old.sph, old.cyl, old.axis), conf, Source.OLD_GLASSES_NUMBERS),
             thicknessPowerD = old.strongestMeridian,
+        )
+    }
+
+    /**
+     * Measured eye → Bayesian band: age/prevalence prior × N(measured SE, σ from the measurement confidence).
+     * Band = most probable 1 D band, starting trial lens = its midpoint (rounded to 0.25 D). Confidence is the lower of
+     * the measurement's own confidence and the confidence implied by the band probability.
+     */
+    private fun bayesianEyeAdvice(eye: Eye, m: MeasuredEye, age: Int?): EyeAdvice {
+        val se = m.seD!!.coerceIn(rules.bayes.gridMinD, rules.bayes.gridMaxD)
+        val r = bayes.fromMeasurement(se, age, m.confidence)
+        val c = m.confidence.min(r.confidence)
+        return EyeAdvice(
+            eye,
+            Estimate(r.band, c, Source.MEASURED),
+            Estimate(TrialLens(r.startingLensD), c, Source.MEASURED),
+            thicknessPowerD = r.startingLensD,
+            bandProbability = r.probability,
         )
     }
 
