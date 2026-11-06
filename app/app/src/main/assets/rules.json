@@ -117,14 +117,121 @@
 
 
   "distance": {
+    "_comment": "Track A. Eye-to-camera distance d = f_px * irisMm / irisPx (MediaPipe Iris, 11.7 +/- 0.5 mm). Personal iris from the card photo when available. FOV fallback is a typical front camera along the image's long side; it makes the estimate LOW confidence.",
+    "irisDiameterPriorMm": 11.7,
+    "irisDiameterPriorSdMm": 0.5,
+    "personalIrisSdMm": 0.25,
+    "personalIrisMinMm": 10.0,
+    "personalIrisMaxMm": 13.5,
+    "fallbackLongSideFovDeg": 70.0,
+    "irisPixelSdPx": 0.5,
+    "minIrisPx": 5.0,
+    "irisPairMaxRatio": 1.15,
+    "highMaxRelativeSd": 0.035,
+    "mediumMaxRelativeSd": 0.07,
+    "smootherWindow": 7,
+    "smootherEmaAlpha": 0.5,
+    "smootherMaxAgeMs": 1000,
+    "applyScreenCentreOffset": false,
+    "screenCentreOffsetXMm": 0.0,
+    "screenCentreOffsetYMm": 70.0
   },
 
 
   "bayes": {
+    "_comment": "Track A. Innovation 10: posterior over SE = age prior (India prevalence) x Gaussian likelihood; most probable 1 D band. Adults 30+ prevalence from the Sightsavers review (myopia 27.7 %, hyperopia 22.9 %). Under-30 row and all shape parameters are DRAFT guesses for an optometrist to review.",
+    "enabled": true,
+    "gridMinD": -12.0,
+    "gridMaxD": 8.0,
+    "gridStepD": 0.25,
+    "bandWidthD": 1.0,
+    "sigmaHighD": 0.4,
+    "sigmaMediumD": 0.6,
+    "sigmaLowD": 0.8,
+    "priorWeight": 0.5,
+    "myopiaMaxD": -0.5,
+    "hyperopiaMinD": 0.5,
+    "assumedAgeWhenUnknown": 35,
+    "agePriors": [
+      { "_comment": "DRAFT: young adults, more myopia, little manifest hyperopia", "minAge": 0, "maxAge": 29,
+        "myopiaPrevalence": 0.35, "hyperopiaPrevalence": 0.08, "myopiaScaleD": 1.75, "hyperopiaScaleD": 0.75,
+        "emmetropiaMeanD": 0.0, "emmetropiaSdD": 0.35 },
+      { "_comment": "India adults 30+ (systematic review)", "minAge": 30, "maxAge": 150,
+        "myopiaPrevalence": 0.277, "hyperopiaPrevalence": 0.229, "myopiaScaleD": 1.5, "hyperopiaScaleD": 1.0,
+        "emmetropiaMeanD": 0.0, "emmetropiaSdD": 0.35 }
+    ],
+    "bandProbabilityHigh": 0.70,
+    "bandProbabilityMedium": 0.50,
+    "addFusion": {
+      "_comment": "Innovation 5. Hofstetter amplitude: min 15-0.25*age (optics), mean 18.5-0.30*age, max 25-0.40*age. Measured add and age-expected add are fused by inverse variance; an amplitude outside [min-tol, max+tol] inflates the measured sigma.",
+      "hofstetterMeanIntercept": 18.5,
+      "hofstetterMeanSlopePerYear": 0.30,
+      "hofstetterMaxIntercept": 25.0,
+      "hofstetterMaxSlopePerYear": 0.40,
+      "amplitudeToleranceD": 1.0,
+      "measuredAddSigmaD": 0.4,
+      "ageAddSigmaD": 0.6,
+      "implausibleSigmaMultiplier": 3.0
+    }
   },
 
 
   "faceGeometry": {
+    "_comment": "Track A. MediaPipe Face Landmarker (478 points) indices and face-shape thresholds. Face shape is for style suggestions only. Shape and pose ratios are first guesses; tune on pilot frames.",
+    "landmarks": {
+      "_comment": "468/473 iris centres with rings 469-472 / 474-477; 234/454 cheek contour (face width); 10/152 forehead top/chin (face length); 172/397 jaw angles; 54/284 upper forehead at temples; 122/351 nose sides beside bridge point 6 (frame pad height); 33/263 outer eye corners (roll); 1 nose tip (yaw/pitch).",
+      "irisRightCentre": 468,
+      "irisRightRing": [469, 470, 471, 472],
+      "irisLeftCentre": 473,
+      "irisLeftRing": [474, 475, 476, 477],
+      "faceWidthRight": 234,
+      "faceWidthLeft": 454,
+      "faceTop": 10,
+      "chin": 152,
+      "jawRight": 172,
+      "jawLeft": 397,
+      "foreheadRight": 54,
+      "foreheadLeft": 284,
+      "bridgeRight": 122,
+      "bridgeLeft": 351,
+      "eyeOuterRight": 33,
+      "eyeOuterLeft": 263,
+      "noseTip": 1
+    },
+    "shape": {
+      "longMaxWidthToLength": 0.75,
+      "squareMinJawToCheek": 0.85,
+      "roundMinWidthToLength": 0.90,
+      "heartMaxJawToCheek": 0.72,
+      "heartMinForeheadToCheek": 0.80,
+      "borderlineMargin": 0.02,
+      "suggestedFrames": {
+        "ROUND": ["RECTANGLE", "SQUARE", "WAYFARER"],
+        "SQUARE": ["ROUND", "OVAL", "AVIATOR"],
+        "OVAL": ["RECTANGLE", "WAYFARER", "AVIATOR", "SQUARE", "ROUND"],
+        "LONG": ["SQUARE", "WAYFARER", "AVIATOR"],
+        "HEART": ["AVIATOR", "OVAL", "ROUND"]
+      }
+    },
+    "pose": {
+      "_comment": "Used only when the transformation matrix is missing. Nose-tip depth ratios from the MediaPipe canonical face, approximate.",
+      "noseDepthToFaceWidth": 0.55,
+      "noseDepthToFaceLength": 0.45,
+      "noseTipNeutralFraction": 0.50
+    },
+    "aggregate": {
+      "targetFrames": 30,
+      "minFrames": 10,
+      "outlierMadK": 3.0,
+      "outlierMinAbsMm": 0.5,
+      "pdSpreadHighMaxMm": 0.5,
+      "pdSpreadMediumMaxMm": 1.0,
+      "widthSpreadHighMaxFraction": 0.01,
+      "widthSpreadMediumMaxFraction": 0.025,
+      "capCardScale": "HIGH",
+      "capPersonalIrisScale": "MEDIUM",
+      "capPriorIrisScale": "LOW"
+    }
   },
 
 

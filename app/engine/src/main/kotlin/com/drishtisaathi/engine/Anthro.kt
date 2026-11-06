@@ -31,27 +31,54 @@ data class AnthroPriors(
     }
 }
 
-/** M2 plausibility gate: catches a mis-measured PD or face width before it drives frame fit and thickness. */
+/**
+ * M2 plausibility gate: catches a mis-measured PD or face width before it drives frame fit and thickness.
+ * - PD/face-width ratio outside ANSUR p1–p99 → RESCAN (landmarks or scale inconsistent within the frame).
+ * - PD more than plausibility.pdResidualSdMultiplier × residual SD from the PD predicted by face width → LOW_CONFIDENCE.
+ * - PD or face width outside its own ANSUR p1–p99 → LOW_CONFIDENCE. This catches a wrong mm/px scale, which moves
+ *   PD and face width together and so leaves the ratio unchanged.
+ * - Non-positive or non-finite input → RESCAN.
+ * Use directly with FaceGeometry output via `gate.check(measurement)` (extensions in face/FaceGeometry.kt).
+ */
 class PlausibilityGate(private val priors: AnthroPriors, private val config: PlausibilityConfig) {
 
     enum class Verdict { OK, LOW_CONFIDENCE, RESCAN }
 
-    data class Result(val verdict: Verdict, val ratio: Double?, val predictedPdMm: Double?, val residualMm: Double?)
+    enum class Reason { INVALID_INPUT, RATIO_OUT_OF_RANGE, PD_RESIDUAL_HIGH, PD_OUT_OF_RANGE, FACE_WIDTH_OUT_OF_RANGE }
+
+    data class Result(
+        val verdict: Verdict,
+        val ratio: Double?,
+        val predictedPdMm: Double?,
+        val residualMm: Double?,
+        val reasons: List<Reason> = emptyList(),
+    ) {
+        /** Confidence the checked PD may carry at most. */
+        val confidenceCap: Confidence get() = if (verdict == Verdict.OK) Confidence.HIGH else Confidence.LOW
+    }
 
     fun check(pdMm: Double, faceWidthMm: Double?): Result {
+        val valid = pdMm > 0 && pdMm.isFinite() && (faceWidthMm == null || (faceWidthMm > 0 && faceWidthMm.isFinite()))
+        if (!valid) return Result(Verdict.RESCAN, null, null, null, listOf(Reason.INVALID_INPUT))
+        val pdInRange = pdMm in priors.pdMm.p1..priors.pdMm.p99
         if (faceWidthMm == null) {
             // Only PD known: compare with the population range.
-            val ok = pdMm in priors.pdMm.p1..priors.pdMm.p99
-            return Result(if (ok) Verdict.OK else Verdict.LOW_CONFIDENCE, null, null, null)
+            return if (pdInRange) Result(Verdict.OK, null, null, null)
+            else Result(Verdict.LOW_CONFIDENCE, null, null, null, listOf(Reason.PD_OUT_OF_RANGE))
         }
         val ratio = pdMm / faceWidthMm
         if (ratio < priors.pdToFaceRatio.p1 || ratio > priors.pdToFaceRatio.p99) {
-            return Result(Verdict.RESCAN, ratio, null, null)
+            return Result(Verdict.RESCAN, ratio, null, null, listOf(Reason.RATIO_OUT_OF_RANGE))
         }
         val reg = priors.pdFromFaceWidth
         val predicted = reg.slope * faceWidthMm + reg.intercept
         val residual = pdMm - predicted
-        val verdict = if (abs(residual) > config.pdResidualSdMultiplier * reg.residSdMm) Verdict.LOW_CONFIDENCE else Verdict.OK
-        return Result(verdict, ratio, predicted, residual)
+        val reasons = buildList {
+            if (abs(residual) > config.pdResidualSdMultiplier * reg.residSdMm) add(Reason.PD_RESIDUAL_HIGH)
+            if (!pdInRange) add(Reason.PD_OUT_OF_RANGE)
+            if (faceWidthMm !in priors.faceWidthMm.p1..priors.faceWidthMm.p99) add(Reason.FACE_WIDTH_OUT_OF_RANGE)
+        }
+        val verdict = if (reasons.isEmpty()) Verdict.OK else Verdict.LOW_CONFIDENCE
+        return Result(verdict, ratio, predicted, residual, reasons)
     }
 }
