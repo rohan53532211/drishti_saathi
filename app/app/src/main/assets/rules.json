@@ -278,6 +278,52 @@
 
 
   "visionTests": {
+    "_comment": "Track C: how the on-screen tests are run (sizes, distances, staircase, repeats). DRAFT, optometrist review needed. Distances in mm eye-to-screen; logMAR 0.0 = 5 arcmin (20/20) letter.",
+    "repeats": 2,
+    "maxRetriesWhenLow": 1,
+    "capByDistanceConfidence": true,
+    "fallbackScreenScaleCap": "MEDIUM",
+
+    "nearAcuityPerEye": true,
+    "nearAcuityMinMm": 300.0,
+    "nearAcuityMaxMm": 500.0,
+    "staircaseStartLogMar": 0.7,
+    "staircaseMinLogMar": -0.2,
+    "staircaseMaxLogMar": 1.0,
+    "staircaseInitialStepLogMar": 0.2,
+    "staircaseStepLogMar": 0.1,
+    "staircaseCorrectToStepDown": 2,
+    "staircaseReversals": 6,
+    "staircaseThresholdLastReversals": 4,
+    "staircaseMaxTrials": 40,
+    "staircaseBoundaryRuns": 3,
+    "nearAcuityReferAboveLogMar": 0.7,
+    "acuityRepeatHighMaxLogMar": 0.1,
+    "acuityRepeatMediumMaxLogMar": 0.2,
+
+    "farPointLetterLogMar": 0.2,
+    "farPointLetterCount": 3,
+    "farPointStartMaxMm": 150.0,
+    "farPointMinMm": 100.0,
+    "noBlurMinDistanceMm": 500.0,
+    "farPointBlueRgb": "#0000FF",
+    "farPointWhiteRgb": "#FFFFFF",
+
+    "clockDialBeyondFarPointMm": 100.0,
+    "clockDialToleranceMm": 60.0,
+    "clockDialNoFarPointMm": 600.0,
+    "clockDialLineArcmin": 2.0,
+    "clockDialAxisToleranceDeg": 30,
+
+    "nearPointLetterHeightMm": 1.0,
+    "nearPointStartMinMm": 350.0,
+    "nearPointMinMm": 70.0,
+    "nearPointMaxMm": 700.0,
+
+    "amslerMinMm": 250.0,
+    "amslerMaxMm": 400.0,
+    "amslerSquareDeg": 1.0,
+    "amslerYesCountForAbnormal": 1
   },
 
 
