@@ -10,6 +10,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.SessionResult
 import com.drishtisaathi.engine.StaffMeasurements
@@ -31,6 +33,8 @@ data class SessionEntity(
     val staffJson: String,
     val resultJson: String,
     val referralLevel: String,
+    /** When the customer tapped "I agree" on the consent screen (addition 1). */
+    val consentAt: Long? = null,
     // ---- Staff verification (paired record) ----
     val finalTrialRight: String? = null,
     val finalTrialLeft: String? = null,
@@ -48,14 +52,22 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :id") suspend fun delete(id: Long)
 }
 
-@Database(entities = [SessionEntity::class], version = 1, exportSchema = true)
+@Database(entities = [SessionEntity::class], version = 2, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun sessions(): SessionDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
+
+        /** v2 adds consentAt. Keeps sessions saved by earlier test builds. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sessions ADD COLUMN consentAt INTEGER")
+            }
+        }
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "drishti.db")
+                .addMigrations(MIGRATION_1_2)
                 .build().also { instance = it }
         }
     }

@@ -53,6 +53,7 @@ data class UiState(
     val sessionId: Long? = null,
     val createdAt: Long? = null,
     val verification: Verification = Verification(),
+    val consentAt: Long? = null,
 ) {
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
     val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
@@ -85,6 +86,9 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Fresh session; keeps language and staff mode. */
     fun startNew() = _state.update { UiState(lang = it.lang, staffMode = it.staffMode) }
+
+    /** Customer tapped "I agree": a fresh session starts with the consent time recorded. */
+    fun giveConsent() = _state.update { UiState(lang = it.lang, staffMode = it.staffMode, consentAt = System.currentTimeMillis()) }
 
     // ---- interview -------------------------------------------------------------------------
 
@@ -143,6 +147,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 staffJson = SessionCodec.encode(s.staff),
                 resultJson = SessionCodec.encode(result),
                 referralLevel = result.assessment.referral.level.name,
+                consentAt = s.consentAt,
                 finalTrialRight = s.verification.finalTrialRight.ifBlank { null },
                 finalTrialLeft = s.verification.finalTrialLeft.ifBlank { null },
                 finalAdd = s.verification.finalAdd.ifBlank { null },
@@ -211,6 +216,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 createdAt = e.createdAt,
                 questionIndex = 0,
                 editingFromConfirm = false,
+                consentAt = e.consentAt,
                 verification = Verification(
                     e.finalTrialRight.orEmpty(), e.finalTrialLeft.orEmpty(), e.finalAdd.orEmpty(), e.pdMeterMm, e.verifiedAt,
                 ),

@@ -12,6 +12,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.drishtisaathi.interview.Questions
 import com.drishtisaathi.ui.ConfirmScreen
+import com.drishtisaathi.ui.ConsentScreen
 import com.drishtisaathi.ui.DrishtiTheme
 import com.drishtisaathi.ui.HomeScreen
 import com.drishtisaathi.ui.InterviewScreen
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
 
 private object Routes {
     const val HOME = "home"
+    const val CONSENT = "consent"
     const val INTERVIEW = "interview"
     const val OLD_NUMBERS = "oldNumbers"
     const val CONFIRM = "confirm"
@@ -56,8 +58,15 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.HOME) {
             HomeScreen(
                 state, vm::setLang, vm::setStaffMode,
-                onStart = { vm.startNew(); nav.navigate(Routes.INTERVIEW) },
+                onStart = { vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onHistory = { nav.navigate(Routes.HISTORY) },
+            )
+        }
+        composable(Routes.CONSENT) {
+            ConsentScreen(
+                state.lang, vm::setLang,
+                onContinue = { vm.giveConsent(); nav.navigate(Routes.INTERVIEW) { popUpTo(Routes.HOME) } },
+                onCancel = { goHome() },
             )
         }
         composable(Routes.INTERVIEW) {

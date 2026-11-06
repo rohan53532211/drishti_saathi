@@ -65,6 +65,32 @@ object S {
         "कैमरा और स्क्रीन पर आँखों के टेस्ट अगले संस्करण में आएँगे। अभी: इंटरव्यू और पुराने चश्मे के नंबर।",
     )
 
+    // ---- Consent (addition 1) -----------------------------------------------------------------
+    val consentTitle = t("Before we start", "शुरू करने से पहले")
+    val consentWhatH = t("What we collect", "हम क्या लेते हैं")
+    val consentWhat = t(
+        "Your answers to a few questions, your age, and any old glasses numbers. No name, no phone number, no photo.",
+        "कुछ सवालों के जवाब, आपकी उम्र, और पुराने चश्मे के नंबर (अगर हों)। कोई नाम, फ़ोन नंबर या फ़ोटो नहीं।",
+    )
+    val consentWhyH = t("Why", "क्यों")
+    val consentWhy = t(
+        "To help the shop choose a starting trial lens, a lens type and frames for you. The shop still does its own trial-lens test.",
+        "ताकि दुकान आपके लिए शुरुआती ट्रायल लेंस, लेंस का प्रकार और फ़्रेम चुन सके। दुकान फिर भी अपना ट्रायल-लेंस टेस्ट करेगी।",
+    )
+    val consentWhereH = t("Where it stays", "जानकारी कहाँ रहती है")
+    val consentWhere = t(
+        "Only on this phone. Nothing is uploaded.",
+        "सिर्फ़ इसी फ़ोन में। कुछ भी अपलोड नहीं होता।",
+    )
+    val consentDeleteH = t("Deleting", "मिटाना")
+    val consentDelete = t(
+        "You can ask the shop to delete this session at any time.",
+        "आप कभी भी दुकान से यह सेशन मिटाने को कह सकते हैं।",
+    )
+    val consentContinue = t("I agree, continue", "मैं सहमत हूँ, आगे बढ़ें")
+    val consentCancel = t("Cancel", "रद्द करें")
+    val consentGiven = t("Consent given", "सहमति दी गई")
+
     // ---- M1 interview questions --------------------------------------------------------------
     val qAge = t("How old are you?", "आपकी उम्र क्या है?")
     val qWearsGlasses = t("Do you wear glasses now?", "क्या आप अभी चश्मा पहनते हैं?")
