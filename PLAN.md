@@ -13,8 +13,8 @@ Where they conflict, the brief wins unless an item here says it replaces a brief
 | 4 | M4 rules engine + Section 6 referral | Done |
 | 5 | M5 frame ranking + placeholder `frames.json` (10 frames) | Done |
 | 6 | Hindi/English interview, old-numbers entry, confirmation, wording test | Done |
-| 7 | Full summary + referral screens, staff verification, Room storage | Next |
-| 8 | PDF export + share (shop copy, Hindi customer copy), delete session, history | |
+| 7 | Full summary + referral screens, staff verification, Room storage | Done |
+| 8 | PDF export + share (shop copy, Hindi customer copy), delete session, history | Next |
 | 9 | **Consent screen** (addition 1) | |
 | 10 | **Ranking labels + reason bullets** (addition 2) | |
 | 11 | **Two-frame comparison screen** (addition 3) | |

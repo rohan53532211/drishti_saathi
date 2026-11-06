@@ -16,7 +16,9 @@ import com.drishtisaathi.ui.DrishtiTheme
 import com.drishtisaathi.ui.HomeScreen
 import com.drishtisaathi.ui.InterviewScreen
 import com.drishtisaathi.ui.OldNumbersScreen
+import com.drishtisaathi.ui.ReferralScreen
 import com.drishtisaathi.ui.ResultScreen
+import com.drishtisaathi.engine.ReferralLevel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,6 +32,7 @@ private object Routes {
     const val INTERVIEW = "interview"
     const val OLD_NUMBERS = "oldNumbers"
     const val CONFIRM = "confirm"
+    const val REFERRAL = "referral"
     const val RESULT = "result"
 }
 
@@ -81,12 +84,29 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 state, vm.choiceContext, vm::setLang,
                 onEdit = { id -> vm.editQuestion(id); nav.navigate(Routes.INTERVIEW) },
                 onStaffMeasurements = vm::setStaffMeasurements,
-                onSeeResults = { vm.computeResult(); nav.navigate(Routes.RESULT) },
+                onSeeResults = {
+                    val r = vm.computeResult()
+                    // Any referral trigger is shown on its own screen before the summary.
+                    nav.navigate(if (r.assessment.referral.level == ReferralLevel.NONE) Routes.RESULT else Routes.REFERRAL)
+                },
                 onBack = { goHome() },
             )
         }
+        composable(Routes.REFERRAL) {
+            ReferralScreen(
+                state, vm.rules.ages.childReferralUnder, vm::setLang,
+                onContinue = { nav.navigate(Routes.RESULT) { popUpTo(Routes.CONFIRM) } },
+                onBack = { nav.popBackStack() },
+            )
+        }
         composable(Routes.RESULT) {
-            ResultScreen(state, vm::setLang, onDone = { goHome() }, onBack = { nav.popBackStack() })
+            ResultScreen(
+                state, vm.rules, vm::setLang,
+                onSaveVerification = vm::saveVerification,
+                onDelete = { vm.deleteCurrentSession { goHome() } },
+                onDone = { goHome() },
+                onBack = { nav.popBackStack() },
+            )
         }
     }
 }

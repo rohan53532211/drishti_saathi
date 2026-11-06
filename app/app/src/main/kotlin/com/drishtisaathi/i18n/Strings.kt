@@ -146,6 +146,10 @@ object S {
     val centreAbout = t("centre about %.1f mm in %s", "%2\$s में बीच की मोटाई लगभग %1\$.1f mm")
     val overBudget = t("over budget", "बजट से ज़्यादा")
     val confidenceWord = t("confidence", "भरोसा")
+    val bandRange = t("%s to %s D", "%s से %s D")
+    val sessionNo = t("Session #%d", "सेशन #%d")
+    val staffOnly = t("Staff details", "स्टाफ़ विवरण")
+    val score = t("score", "स्कोर")
 
     // ---- Actions -----------------------------------------------------------------------------
     val exportShopPdf = t("Share shop PDF", "दुकान PDF शेयर करें")
