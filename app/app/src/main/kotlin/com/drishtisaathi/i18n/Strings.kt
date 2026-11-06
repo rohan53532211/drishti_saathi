@@ -355,6 +355,45 @@ object S {
         Note.FACE_WIDTH_ASSUMED to t("Face width not measured: average used for frame fit", "चेहरे की चौड़ाई नहीं मापी: फ़्रेम फ़िट के लिए औसत लिया गया"),
     )
 
+    // ---- Addition 3: comparison ---------------------------------------------------------------
+    val compareTick = t("Compare", "तुलना")
+    val compareTwo = t("Compare the 2 ticked frames", "चुने हुए 2 फ़्रेम की तुलना करें")
+    val compareHint = t("Tick 2 frames to compare them side by side.", "साथ-साथ तुलना के लिए 2 फ़्रेम चुनें।")
+    val compareTitle = t("Compare frames", "फ़्रेम की तुलना")
+    val rowLabel = t("Match", "मेल")
+    val rowSize = t("Size (lens-bridge-temple)", "साइज़ (लेंस-ब्रिज-डंडी)")
+    val rowWidth = t("Frame width (your face: %.0f mm)", "फ़्रेम की चौड़ाई (आपका चेहरा: %.0f mm)")
+    val rowShape = t("Shape · rim · material", "आकार · रिम · मटेरियल")
+    val rowThickness = t("Lens thickness in %s", "%s में लेंस की मोटाई")
+    val rowPrice = t("Price", "कीमत")
+    val rowWhy = t("Why", "क्यों")
+    val rowScores = t("Scores: total · fit · thin · style · budget", "स्कोर: कुल · फ़िट · पतलापन · स्टाइल · बजट")
+    val recommended = t("recommended", "सुझाया गया")
+
+    fun frameShape(v: com.drishtisaathi.engine.FrameShape) = SHAPE.getValue(v)
+    private val SHAPE = mapOf(
+        com.drishtisaathi.engine.FrameShape.RECTANGLE to t("Rectangle", "आयताकार"),
+        com.drishtisaathi.engine.FrameShape.SQUARE to t("Square", "चौकोर"),
+        com.drishtisaathi.engine.FrameShape.ROUND to t("Round", "गोल"),
+        com.drishtisaathi.engine.FrameShape.OVAL to t("Oval", "अंडाकार"),
+        com.drishtisaathi.engine.FrameShape.CAT_EYE to t("Cat-eye", "कैट-आई"),
+        com.drishtisaathi.engine.FrameShape.AVIATOR to t("Aviator", "एविएटर"),
+        com.drishtisaathi.engine.FrameShape.WAYFARER to t("Wayfarer", "वेफ़रर"),
+    )
+    fun rim(v: com.drishtisaathi.engine.RimType) = RIM.getValue(v)
+    private val RIM = mapOf(
+        com.drishtisaathi.engine.RimType.FULL to t("full rim", "पूरा रिम"),
+        com.drishtisaathi.engine.RimType.HALF to t("half rim", "आधा रिम"),
+        com.drishtisaathi.engine.RimType.RIMLESS to t("rimless", "बिना रिम"),
+    )
+    fun frameMaterial(id: String): Txt = FRAME_MATERIAL[id] ?: Txt(id.lowercase(), id.lowercase())
+    private val FRAME_MATERIAL = mapOf(
+        "METAL" to t("metal", "मेटल"),
+        "TITANIUM" to t("titanium", "टाइटेनियम"),
+        "ACETATE" to t("acetate", "एसीटेट"),
+        "TR90" to t("TR90 (flexible)", "TR90 (लचीला)"),
+    )
+
     // ---- Addition 2: match labels and reason bullets -----------------------------------------
     fun matchLabel(v: MatchLabel) = MATCH_LABEL.getValue(v)
     private val MATCH_LABEL = mapOf(

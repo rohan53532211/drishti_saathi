@@ -143,4 +143,20 @@ class FramesTest {
         assertEquals(ReasonCode.WIDE_FOR_FACE, r.reasons.first().code)
         assertTrue(r.reasons.none { it.code == ReasonCode.IN_BUDGET || it.code == ReasonCode.STYLE_MATCH }) // no prefs → no such bullets
     }
+
+    // ---- Addition 3: comparison helper ----------------------------------------------------------
+
+    @Test fun `thickness by material for comparison matches the brief check`() {
+        val a = InterviewAnswers(age = 30, glassesAgeYears = 1, knownRx = KnownRx(EyeRx(-4.0), EyeRx(-3.0)))
+        val res = engine.evaluate(a, StaffMeasurements(pdMm = 62.0))
+        val t = engine.thicknessByMaterial(frame("F01"), res.assessment)!!
+        assertEquals(5.6, t.getValue("CR39"), 0.05)   // thicker eye (−4.00) drives it
+        assertEquals(4.2, t.getValue("HI_167"), 0.05)
+        assertTrue(t.getValue("HI_167") < t.getValue("HI_160") && t.getValue("HI_160") < t.getValue("CR39"))
+    }
+
+    @Test fun `no power - no thickness table`() {
+        val res = engine.evaluate(InterviewAnswers(age = 30))
+        assertNull(engine.thicknessByMaterial(frame("F01"), res.assessment))
+    }
 }

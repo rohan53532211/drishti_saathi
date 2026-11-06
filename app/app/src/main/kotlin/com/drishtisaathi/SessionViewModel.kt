@@ -54,6 +54,8 @@ data class UiState(
     val createdAt: Long? = null,
     val verification: Verification = Verification(),
     val consentAt: Long? = null,
+    /** Addition 3: ids of up to 2 frames ticked for comparison. */
+    val compareIds: List<String> = emptyList(),
 ) {
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
     val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
@@ -80,6 +82,12 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    /** Tick/untick a frame for comparison; a third tick replaces the oldest. */
+    fun toggleCompare(frameId: String) = _state.update { s ->
+        val ids = if (frameId in s.compareIds) s.compareIds - frameId else (s.compareIds + frameId).takeLast(2)
+        s.copy(compareIds = ids)
+    }
 
     fun setLang(lang: Lang) = _state.update { it.copy(lang = lang) }
     fun setStaffMode(on: Boolean) = _state.update { it.copy(staffMode = on) }

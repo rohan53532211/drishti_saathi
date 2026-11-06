@@ -210,6 +210,20 @@ class DrishtiEngine(private val rules: RulesConfig, priors: AnthroPriors, privat
         return SessionResult(a, frames)
     }
 
+    /**
+     * Addition 3: thickest point of the thicker lens for [frame] in every material, for side-by-side comparison.
+     * Null when no power is known or advice was withheld.
+     */
+    fun thicknessByMaterial(frame: Frame, a: Assessment): Map<String, Double>? {
+        val adv = a.advice ?: return null
+        if (adv.eyes.isEmpty()) return null
+        return rules.materials.associate { m ->
+            m.id to adv.eyes.maxOf { e ->
+                Thickness.estimate(e.thicknessPowerD, frame.lensWidthMm, frame.bridgeMm, a.pdMm.value, m).maxMm
+            }
+        }
+    }
+
     companion object {
         fun fromJson(rulesJson: String, priorsJson: String, framesJson: String) =
             DrishtiEngine(RulesConfig.parse(rulesJson), AnthroPriors.parse(priorsJson), FrameCatalog.parse(framesJson))

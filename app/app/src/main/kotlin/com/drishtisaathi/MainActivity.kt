@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.drishtisaathi.interview.Questions
+import com.drishtisaathi.ui.CompareScreen
 import com.drishtisaathi.ui.ConfirmScreen
 import com.drishtisaathi.ui.ConsentScreen
 import com.drishtisaathi.ui.DrishtiTheme
@@ -44,6 +45,7 @@ private object Routes {
     const val REFERRAL = "referral"
     const val RESULT = "result"
     const val HISTORY = "history"
+    const val COMPARE = "compare"
 }
 
 @Composable
@@ -134,7 +136,12 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     BigButton(S.exportShopPdf[l], { export(customer = false) })
                     BigButton(S.exportCustomerPdf[l], { export(customer = true) })
                 },
+                onToggleCompare = vm::toggleCompare,
+                onCompare = { nav.navigate(Routes.COMPARE) },
             )
+        }
+        composable(Routes.COMPARE) {
+            CompareScreen(state, vm.engine, vm.rules, vm::setLang, onBack = { nav.popBackStack() })
         }
         composable(Routes.HISTORY) {
             val sessions by vm.sessions.collectAsState(initial = emptyList())

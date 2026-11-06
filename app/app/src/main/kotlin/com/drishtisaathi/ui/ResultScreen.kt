@@ -42,6 +42,8 @@ fun ResultScreen(
     onDone: () -> Unit,
     onBack: () -> Unit,
     extraActions: @Composable () -> Unit = {},
+    onToggleCompare: (String) -> Unit = {},
+    onCompare: () -> Unit = {},
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -102,13 +104,23 @@ fun ResultScreen(
                     r.frames.forEachIndexed { i, rf ->
                         if (i > 0) HorizontalDivider()
                         Text("${i + 1}. ${rf.frame.name}", style = MaterialTheme.typography.titleMedium)
-                        Fmt.label(rf, l)?.let { MatchChip(rf.label!!, it) }
+                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Fmt.label(rf, l)?.let { MatchChip(rf.label!!, it) }
+                            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                            androidx.compose.material3.Checkbox(checked = rf.frame.id in state.compareIds, onCheckedChange = { onToggleCompare(rf.frame.id) })
+                            Text(S.compareTick[l], style = MaterialTheme.typography.bodyMedium)
+                        }
                         Text(Fmt.frameLine(rf, l), style = MaterialTheme.typography.bodyMedium)
                         ReasonBullets(rf, l)
                         if (state.staffMode) Text(
                             "${S.score[l]} ${"%.2f".format(rf.score)} · ${S.confidence(rf.thicknessConfidence)[l]}",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary,
                         )
+                    }
+                    if (r.frames.size >= 2) {
+                        HorizontalDivider()
+                        if (state.compareIds.size == 2) BigButton(S.compareTwo[l], onCompare, container = Teal)
+                        else Text(S.compareHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }
                 }
             }
