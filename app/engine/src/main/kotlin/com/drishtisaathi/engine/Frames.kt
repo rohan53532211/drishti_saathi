@@ -86,6 +86,8 @@ data class FrameReason(
     val isEdge: Boolean = true,
     /** weight × how strongly this component pulled the score up (positive) or down (negative). */
     val impact: Double = 0.0,
+    /** Fit reasons only: face width or PD is a population average, not measured. */
+    val assumed: Boolean = false,
 )
 
 @Serializable
@@ -169,14 +171,29 @@ class FrameRanker(private val rules: RulesConfig) {
         val material = rules.material(materialId)
         val powerConf = lensPowersD.map { it.confidence }.fold(pdMm.confidence) { a, b -> a.min(b) }
         val faceW = faceWidthMm.value * c.idealFrameToFaceWidthRatio
+        val fitAssumed = faceWidthMm.source == Source.POPULATION_AVERAGE || pdMm.source == Source.POPULATION_AVERAGE
+        val cap = budgetCap(prefs.budget)
 
-        return frames.map { f -> score(f, faceW, pdMm, lensPowersD, material, powerConf, prefs) }
-            .sortedWith(compareByDescending<RankedFrame> { it.score }.thenBy { it.frame.priceInr }.thenBy { it.frame.id })
+        return frames
+            // Frames far over budget are not shown at all.
+            .filter { cap == Int.MAX_VALUE || it.priceInr <= cap * (1 + c.hideOverBudgetFraction) }
+            .map { f -> score(f, faceW, fitAssumed, pdMm, lensPowersD, material, powerConf, prefs) }
+            // In-budget frames always rank above over-budget ones; score decides within each group.
+            .sortedWith(
+                compareByDescending<RankedFrame> { it.withinBudget }
+                    .thenByDescending { it.score }.thenBy { it.frame.priceInr }.thenBy { it.frame.id },
+            )
             .take(topN)
     }
 
+    private fun budgetCap(budget: Budget?): Int = when (budget) {
+        Budget.LOW -> c.budgetMaxPriceInrLow
+        Budget.MID -> c.budgetMaxPriceInrMid
+        Budget.HIGH, null -> Int.MAX_VALUE
+    }
+
     private fun score(
-        f: Frame, faceW: Double, pdMm: Estimate<Double>, lensPowersD: List<Estimate<Double>>,
+        f: Frame, faceW: Double, fitAssumed: Boolean, pdMm: Estimate<Double>, lensPowersD: List<Estimate<Double>>,
         material: MaterialSpec, powerConf: Confidence, p: FramePrefs,
     ): RankedFrame {
         val reasons = mutableListOf<FrameReason>()
@@ -187,9 +204,9 @@ class FrameRanker(private val rules: RulesConfig) {
         val fitScore = (1.0 - abs(delta) / c.fitToleranceMm).coerceIn(0.0, 1.0)
         val fit = fitVerdict(delta)
         reasons += when {
-            fit == FitVerdict.GOOD -> FrameReason(ReasonCode.FITS_FACE, true, width, faceW, impact = c.weightFit * fitScore)
-            delta < 0 -> FrameReason(ReasonCode.NARROW_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - fitScore))
-            else -> FrameReason(ReasonCode.WIDE_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - fitScore))
+            fit == FitVerdict.GOOD -> FrameReason(ReasonCode.FITS_FACE, true, width, faceW, impact = c.weightFit * fitScore, assumed = fitAssumed)
+            delta < 0 -> FrameReason(ReasonCode.NARROW_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - fitScore), assumed = fitAssumed)
+            else -> FrameReason(ReasonCode.WIDE_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - fitScore), assumed = fitAssumed)
         }
 
         // ---- thinness ----
@@ -216,11 +233,7 @@ class FrameRanker(private val rules: RulesConfig) {
         )
 
         // ---- budget ----
-        val maxPrice = when (p.budget) {
-            Budget.LOW -> c.budgetMaxPriceInrLow
-            Budget.MID -> c.budgetMaxPriceInrMid
-            Budget.HIGH, null -> Int.MAX_VALUE
-        }
+        val maxPrice = budgetCap(p.budget)
         val within = f.priceInr <= maxPrice
         val budgetScore = if (within) 1.0
         else (1.0 - (f.priceInr - maxPrice).toDouble() / (maxPrice * c.overBudgetFalloffFraction)).coerceIn(0.0, 1.0)

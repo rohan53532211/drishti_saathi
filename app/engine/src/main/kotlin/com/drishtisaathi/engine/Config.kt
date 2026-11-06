@@ -143,7 +143,11 @@ data class Condition(
 }
 
 @Serializable
-data class ReferralConfig(val lowConfidenceCountForReferral: Int)
+data class ReferralConfig(
+    val lowConfidenceCountForReferral: Int,
+    /** Glasses older than this (years) plus headaches/tired eyes → routine full eye test. */
+    val oldGlassesStrainOlderThanYears: Int,
+)
 
 @Serializable
 data class FrameScoringConfig(
@@ -162,6 +166,8 @@ data class FrameScoringConfig(
     val budgetMaxPriceInrMid: Int,
     /** Score falls to 0 at (cap × (1 + fraction)): ₹750 over a ₹1500 cap, ₹2000 over ₹4000. */
     val overBudgetFalloffFraction: Double,
+    /** Frames priced more than this fraction above the budget cap are not shown at all (0.30 = 30 %). */
+    val hideOverBudgetFraction: Double,
     val topN: Int,
     val labelHighFrom: Double,
     val labelModerateFrom: Double,

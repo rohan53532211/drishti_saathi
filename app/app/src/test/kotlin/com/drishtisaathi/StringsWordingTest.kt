@@ -31,7 +31,9 @@ class StringsWordingTest {
     @Test fun `no banned wording anywhere in the string table`() {
         // Touch every formatter so lazily-built labels are covered too.
         ReferralLevel.entries.forEach { S.referralLevel(it) }
-        ReferralReason.entries.forEach { S.referralReason(it, 12) }
+        val rules = com.drishtisaathi.engine.RulesConfig.parse(java.io.File("src/main/assets/rules.json").readText())
+        ReferralReason.entries.forEach { S.referralReason(it, rules) }
+        com.drishtisaathi.engine.StartingHint.entries.forEach { S.startingHint(it) }
         LensType.entries.forEach { S.lensType(it) }
         Coating.entries.forEach { S.coating(it) }
         Confidence.entries.forEach { S.confidence(it) }
@@ -44,7 +46,7 @@ class StringsWordingTest {
         com.drishtisaathi.engine.ColourPref.entries.forEach { S.colour(it) }
         com.drishtisaathi.engine.LookPref.entries.forEach { S.look(it) }
         com.drishtisaathi.engine.ReadingFrequency.entries.forEach { S.readingFrequency(it) }
-        com.drishtisaathi.engine.ReasonCode.entries.forEach { S.reasonTemplate(it, true); S.reasonTemplate(it, false) }
+        com.drishtisaathi.engine.ReasonCode.entries.forEach { S.reasonTemplate(it, true); S.reasonTemplate(it, false); S.reasonTemplate(it, true, assumed = true) }
 
         assertTrue(S.all.size > 100)
         val bad = S.all.filter { it !in allowed }.associateWith { violations(it) }.filterValues { it.isNotEmpty() }

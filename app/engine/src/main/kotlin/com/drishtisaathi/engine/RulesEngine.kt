@@ -22,6 +22,8 @@ enum class ReferralReason(val urgent: Boolean) {
     LOW_CONFIDENCE_REPEATED(false),
     ASTIGMATISM_FLAG(false),
     DISTANCE_BLUR_NO_MYOPIA_FOUND(false),
+    /** Glasses older than the rules.json threshold plus headaches / tired eyes. */
+    OLD_GLASSES_WITH_STRAIN(false),
 }
 
 @Serializable
@@ -64,6 +66,17 @@ enum class Note {
     FACE_WIDTH_ASSUMED,
     /** Addition 4: first pair of glasses; explain adaptation (more so for multifocals). */
     FIRST_TIME_WEARER,
+    /** No power known: frame thickness appears once the trial-lens result is in. Shown once, not per frame. */
+    THICKNESS_AFTER_TRIAL_LENS,
+}
+
+/** How to start the shop's hand test when there is no measured or known power. */
+@Serializable
+enum class StartingHint {
+    /** Distance blur reported, near fine: most likely short-sight, start with minus lenses. */
+    DISTANCE_BLUR_START_MINUS,
+    /** Customer wears glasses: read their current power with a lens meter if the shop has one. */
+    CHECK_CURRENT_GLASSES_LENS_METER,
 }
 
 @Serializable
@@ -73,6 +86,8 @@ data class LensAdvice(
     val lensType: Estimate<LensType>,
     val materialId: Estimate<String>,
     val coatings: List<Coating>,
+    /** Only when no starting lens could be given (no measurement, no old numbers). */
+    val startingHints: List<StartingHint> = emptyList(),
 )
 
 @Serializable
@@ -124,6 +139,9 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         if (t.lowConfidenceCount >= rules.referral.lowConfidenceCountForReferral) reasons += ReferralReason.LOW_CONFIDENCE_REPEATED
         val measured = listOfNotNull(t.right, t.left)
         if (measured.any { it.astigmatismFlag }) reasons += ReferralReason.ASTIGMATISM_FLAG
+        if (a.headacheStrain == true && a.glassesAgeYears != null &&
+            a.glassesAgeYears > rules.referral.oldGlassesStrainOlderThanYears
+        ) reasons += ReferralReason.OLD_GLASSES_WITH_STRAIN
         if (a.distanceBlur == true && measured.isNotEmpty() && measured.all { it.noMyopiaAtArmsLength }) {
             reasons += ReferralReason.DISTANCE_BLUR_NO_MYOPIA_FOUND
         }
@@ -168,7 +186,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         val measured = listOfNotNull(t.right, t.left)
         if (measured.any { it.astigmatismFlag }) notes += Note.CHECK_CYLINDER
 
-        if (eyes.isEmpty()) notes += Note.NO_POWER_INFORMATION
+        if (eyes.isEmpty()) { notes += Note.NO_POWER_INFORMATION; notes += Note.THICKNESS_AFTER_TRIAL_LENS }
         if (a.distanceBlur == true && eyes.isEmpty()) notes += Note.HAND_TEST_NEEDED
         if (a.distanceBlur == true && measured.isNotEmpty() && measured.all { it.noMyopiaAtArmsLength }) {
             notes += Note.HYPEROPIA_POSSIBLE; notes += Note.HAND_TEST_NEEDED
@@ -178,7 +196,15 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         val lensType = lensType(a, eyes, notes)
         if (a.firstTimeWearer == true && lensType.value != LensType.NONE_SUGGESTED) notes += Note.FIRST_TIME_WEARER
         val add = if (lensType.value in NEAR_TYPES) addBand(a, t, notes) else null
-        return LensAdvice(eyes, add, lensType, material(a, eyes), coatings(a))
+        return LensAdvice(eyes, add, lensType, material(a, eyes), coatings(a), startingHints(a, eyes, measured))
+    }
+
+    private fun startingHints(a: InterviewAnswers, eyes: List<EyeAdvice>, measured: List<MeasuredEye>): List<StartingHint> {
+        if (eyes.isNotEmpty() || measured.isNotEmpty()) return emptyList()
+        return buildList {
+            if (a.distanceBlur == true && a.nearBlur != true) add(StartingHint.DISTANCE_BLUR_START_MINUS)
+            if (a.wearsGlasses == true) add(StartingHint.CHECK_CURRENT_GLASSES_LENS_METER)
+        }
     }
 
     private fun eyeAdvice(eye: Eye, m: MeasuredEye?, old: EyeRx?, a: InterviewAnswers, notes: MutableSet<Note>): EyeAdvice? {

@@ -46,14 +46,17 @@ object PdfContent {
 
         out += Block.Heading(S.referral[l])
         out += Block.Para(S.referralLevel(a.referral.level)[l], bold = true, tone = referralTone(a.referral.level))
-        a.referral.reasons.forEach { out += Block.Bullet(S.referralReason(it, rules.ages.childReferralUnder)[l], referralTone(a.referral.level)) }
+        a.referral.reasons.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], referralTone(a.referral.level)) }
 
         val adv = a.advice
         if (adv == null) {
             out += Block.Para(S.adviceWithheld[l], bold = true)
         } else {
             out += Block.Heading(S.startingTrialLens[l])
-            if (adv.eyes.isEmpty()) out += Block.Para(S.noStartingLens[l])
+            if (adv.eyes.isEmpty()) {
+                if (com.drishtisaathi.engine.StartingHint.DISTANCE_BLUR_START_MINUS !in adv.startingHints) out += Block.Para(S.noStartingLens[l])
+                adv.startingHints.forEach { out += Block.Bullet(S.startingHint(it)[l], Tone.ACCENT) }
+            }
             adv.eyes.forEach { e ->
                 val eye = if (e.eye == Eye.RIGHT) "R" else "L"
                 out += Block.Para("$eye  ${Fmt.trialLens(e.startingTrialLens.value)}", bold = true, tone = Tone.ACCENT)
@@ -122,7 +125,7 @@ object PdfContent {
             ReferralLevel.ROUTINE -> { out += Block.Heading(S.routineTitle[l]); out += Block.Para(S.routineBody[l], tone = tone) }
             ReferralLevel.NONE -> { out += Block.Heading(S.referral[l]); out += Block.Para(S.referralLevel(a.referral.level)[l], tone = tone) }
         }
-        a.referral.reasons.forEach { out += Block.Bullet(S.referralReason(it, rules.ages.childReferralUnder)[l], tone) }
+        a.referral.reasons.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], tone) }
 
         a.advice?.let { adv ->
             out += Block.Heading(S.lensPackage[l])

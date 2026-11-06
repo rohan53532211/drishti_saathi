@@ -55,9 +55,7 @@ class FramesTest {
 
     @Test fun `low budget pushes expensive frames down`() {
         val r = ranker.rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", StylePref.ANY, Budget.LOW, topN = 10)
-        val rimless = r.first { it.frame.id == "F06" } // ₹5200
-        assertTrue(!rimless.withinBudget)
-        assertEquals(0.0, rimless.budgetScore, 1e-9)
+        assertTrue(r.none { it.frame.id == "F06" }) // ₹5200: far over a ₹1500 cap, hidden
         assertTrue(r.take(3).all { it.withinBudget })
     }
 
@@ -233,5 +231,54 @@ class FramesTest {
         assertTrue(!old.contains("weightGrams"))
         val decoded = Json { ignoreUnknownKeys = true }.decodeFromString(SessionResult.serializer(), old)
         assertEquals(res.frames.map { it.frame.id }, decoded.frames.map { it.frame.id })
+    }
+
+    // ---- Review fix 1: budget ordering and hiding ----------------------------------------------
+
+    @Test fun `in-budget frames always rank above over-budget frames`() {
+        for (budget in listOf(Budget.LOW, Budget.MID)) {
+            for (power in listOf(emptyList(), listOf(est(-6.0)))) {
+                val r = ranker.rank(catalog.frames, est(140.0), est(64.0), power, "CR39", StylePref.BOLD, budget, topN = 10)
+                val firstOver = r.indexOfFirst { !it.withinBudget }
+                if (firstOver >= 0) assertTrue("$budget: in-budget frame after over-budget one", r.drop(firstOver).none { it.withinBudget })
+            }
+        }
+    }
+
+    @Test fun `PDF review case - low budget never puts a 1600 frame above the in-budget ones`() {
+        // Average face (not measured), low budget: the reported bug had ₹1,600 at #1 and ₹3,200 at #5.
+        val res = engine.evaluate(InterviewAnswers(age = 35, distanceBlur = true, budget = Budget.LOW, style = StylePref.ANY))
+        val prices = res.frames.map { it.frame.priceInr }
+        val cap = rules.frameScoring.budgetMaxPriceInrLow
+        val inBudget = res.frames.takeWhile { it.withinBudget }
+        assertEquals(res.frames.count { it.withinBudget }, inBudget.size)
+        assertTrue(res.frames.first().frame.priceInr <= cap)
+        assertTrue("prices $prices", prices.none { it > cap * (1 + rules.frameScoring.hideOverBudgetFraction) })
+    }
+
+    @Test fun `frames more than 30 percent over budget are hidden, threshold from rules json`() {
+        val low = ranker.rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", null, Budget.LOW, topN = 10)
+        val limit = rules.frameScoring.budgetMaxPriceInrLow * (1 + rules.frameScoring.hideOverBudgetFraction) // 1950
+        assertTrue(low.all { it.frame.priceInr <= limit })
+        assertTrue(low.any { it.frame.id == "F05" })          // ₹1600: 7 % over, still shown (below in-budget ones)
+        assertTrue(low.none { it.frame.id == "F07" })         // ₹2100: 40 % over, hidden
+        // No cap for premium budget: all 10 shown
+        assertEquals(10, ranker.rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", null, Budget.HIGH, topN = 10).size)
+        // Raising the threshold in rules.json brings ₹2100 back
+        val loose = RulesConfig.parse(TestAssets.text("rules.json").replace("\"hideOverBudgetFraction\": 0.30", "\"hideOverBudgetFraction\": 0.50"))
+        assertTrue(FrameRanker(loose).rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", null, Budget.LOW, topN = 10)
+            .any { it.frame.id == "F07" })
+    }
+
+    // ---- Review fix 2: fit against an assumed average face ----------------------------------------
+
+    @Test fun `fit reason is marked assumed when face width or PD is a population average`() {
+        val avg = engine.evaluate(InterviewAnswers(age = 35)).frames
+        assertTrue(avg.all { rf -> rf.reasons.first { it.code.name.endsWith("FACE") }.assumed })
+        val measured = engine.evaluate(InterviewAnswers(age = 35), StaffMeasurements(pdMm = 62.0, faceWidthMm = 136.0)).frames
+        assertTrue(measured.all { rf -> !rf.reasons.first { it.code.name.endsWith("FACE") }.assumed })
+        // PD measured but face width not → still assumed
+        val half = engine.evaluate(InterviewAnswers(age = 35), StaffMeasurements(pdMm = 62.0)).frames
+        assertTrue(half.all { rf -> rf.reasons.first { it.code.name.endsWith("FACE") }.assumed })
     }
 }

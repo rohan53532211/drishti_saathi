@@ -75,7 +75,10 @@ fun CompareScreen(state: UiState, engine: DrishtiEngine, rules: RulesConfig, onL
                     }
                 }
             } else {
-                Section(S.rowThickness.format("—")[l]) { TextPair(S.thicknessUnknown[l], S.thicknessUnknown[l]) }
+                // Said once for both frames, not repeated per frame
+                Section(S.rowThickness.format("—")[l]) {
+                    Text(S.note(com.drishtisaathi.engine.Note.THICKNESS_AFTER_TRIAL_LENS, rules.oldNumbers.freshMaxYears)[l])
+                }
             }
             Section(S.rowPrice[l]) {
                 TextPair(price(a, l), price(b, l), better = compareBy(a.frame.priceInr.toDouble(), b.frame.priceInr.toDouble()))

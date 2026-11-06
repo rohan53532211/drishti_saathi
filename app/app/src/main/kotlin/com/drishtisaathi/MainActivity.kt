@@ -113,7 +113,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         composable(Routes.REFERRAL) {
             ReferralScreen(
-                state, vm.rules.ages.childReferralUnder, vm::setLang,
+                state, vm.rules, vm::setLang,
                 onContinue = { nav.navigate(Routes.RESULT) { popUpTo(Routes.CONFIRM) } },
                 onBack = { nav.popBackStack() },
             )

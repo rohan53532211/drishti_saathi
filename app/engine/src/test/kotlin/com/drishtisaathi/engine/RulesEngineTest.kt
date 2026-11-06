@@ -286,4 +286,69 @@ class RulesEngineTest {
         assertTrue(Note.FIRST_TIME_WEARER in engine.assess(base(age = 45).copy(nearBlur = true, firstTimeWearer = true)).notes)
         assertFalse(Note.FIRST_TIME_WEARER in engine.assess(base().copy(firstTimeWearer = true)).notes)
     }
+
+    // ---- Review fix 3: thickness note once -----------------------------------------------------
+
+    @Test fun `no power - thickness note appears once, not when power is known`() {
+        assertEquals(1, engine.assess(base().copy(distanceBlur = true)).notes.count { it == Note.THICKNESS_AFTER_TRIAL_LENS })
+        val known = engine.assess(base().copy(glassesAgeYears = 1, knownRx = KnownRx(EyeRx(-2.0))))
+        assertFalse(Note.THICKNESS_AFTER_TRIAL_LENS in known.notes)
+    }
+
+    // ---- Review fix 4: starting hints without a measurement -------------------------------------
+
+    @Test fun `distance blur only, no measurement - start hand test with minus lenses`() {
+        val r = engine.assess(base().copy(distanceBlur = true, nearBlur = false, wearsGlasses = false))
+        assertEquals(listOf(StartingHint.DISTANCE_BLUR_START_MINUS), r.advice!!.startingHints)
+    }
+
+    @Test fun `wears glasses - also check current glasses with a lens meter`() {
+        val r = engine.assess(base().copy(distanceBlur = true, nearBlur = false, wearsGlasses = true, glassesAgeYears = 1))
+        assertEquals(
+            listOf(StartingHint.DISTANCE_BLUR_START_MINUS, StartingHint.CHECK_CURRENT_GLASSES_LENS_METER),
+            r.advice!!.startingHints,
+        )
+        // lens-meter hint alone when there is no distance blur
+        val noBlur = engine.assess(base().copy(wearsGlasses = true, glassesAgeYears = 1))
+        assertEquals(listOf(StartingHint.CHECK_CURRENT_GLASSES_LENS_METER), noBlur.advice!!.startingHints)
+    }
+
+    @Test fun `no minus hint when near blur is also reported`() {
+        val r = engine.assess(base(age = 50).copy(distanceBlur = true, nearBlur = true))
+        assertFalse(StartingHint.DISTANCE_BLUR_START_MINUS in r.advice!!.startingHints)
+    }
+
+    @Test fun `no hints once a starting lens exists or a measurement was made`() {
+        val known = engine.assess(base().copy(distanceBlur = true, wearsGlasses = true, glassesAgeYears = 1, knownRx = KnownRx(EyeRx(-1.5))))
+        assertTrue(known.advice!!.startingHints.isEmpty())
+        // measured "no myopia" must not be contradicted by a minus-lens hint
+        val noMyopia = MeasuredEye(seD = null, confidence = Confidence.MEDIUM, noMyopiaAtArmsLength = true)
+        val measured = engine.assess(base().copy(distanceBlur = true), tests = VisionTests(right = noMyopia, left = noMyopia))
+        assertTrue(measured.advice!!.startingHints.isEmpty())
+    }
+
+    // ---- Review fix 5: old glasses + strain ------------------------------------------------------
+
+    @Test fun `glasses older than 2 years with headaches - routine full eye test`() {
+        val r = engine.assess(base().copy(wearsGlasses = true, glassesAgeYears = 3, headacheStrain = true))
+        assertEquals(ReferralLevel.ROUTINE, r.referral.level)
+        assertTrue(ReferralReason.OLD_GLASSES_WITH_STRAIN in r.referral.reasons)
+        assertNotNull(r.advice) // routine: lens advice still given
+    }
+
+    @Test fun `old glasses rule boundaries`() {
+        fun reasons(years: Int?, strain: Boolean) =
+            engine.assess(base().copy(wearsGlasses = true, glassesAgeYears = years, headacheStrain = strain)).referral.reasons
+        assertFalse(ReferralReason.OLD_GLASSES_WITH_STRAIN in reasons(2, true))     // exactly 2: not older than 2
+        assertFalse(ReferralReason.OLD_GLASSES_WITH_STRAIN in reasons(5, false))    // no strain
+        assertFalse(ReferralReason.OLD_GLASSES_WITH_STRAIN in reasons(null, true))  // age unknown
+    }
+
+    @Test fun `old glasses threshold comes from rules json`() {
+        val edited = TestAssets.text("rules.json").replace("\"oldGlassesStrainOlderThanYears\": 2", "\"oldGlassesStrainOlderThanYears\": 4")
+        val e = RulesEngine(RulesConfig.parse(edited), TestAssets.anthro)
+        val a = base().copy(wearsGlasses = true, glassesAgeYears = 3, headacheStrain = true)
+        assertFalse(ReferralReason.OLD_GLASSES_WITH_STRAIN in e.assess(a).referral.reasons)
+        assertTrue(ReferralReason.OLD_GLASSES_WITH_STRAIN in e.assess(a.copy(glassesAgeYears = 5)).referral.reasons)
+    }
 }

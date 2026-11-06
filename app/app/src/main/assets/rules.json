@@ -74,7 +74,8 @@
   ],
 
   "referral": {
-    "lowConfidenceCountForReferral": 2
+    "lowConfidenceCountForReferral": 2,
+    "oldGlassesStrainOlderThanYears": 2
   },
 
   "frameScoring": {
@@ -95,6 +96,7 @@
     "budgetMaxPriceInrLow": 1500,
     "budgetMaxPriceInrMid": 4000,
     "overBudgetFalloffFraction": 0.5,
+    "hideOverBudgetFraction": 0.30,
     "topN": 5,
     "labelHighFrom": 0.85,
     "labelModerateFrom": 0.70,

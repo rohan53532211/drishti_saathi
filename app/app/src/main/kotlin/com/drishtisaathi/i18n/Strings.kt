@@ -182,6 +182,17 @@ object S {
         "A starting point for the shop's own trial-lens test. Staff must refine it by hand.",
         "यह दुकान के ट्रायल-लेंस टेस्ट के लिए सिर्फ़ शुरुआती बिंदु है। स्टाफ़ इसे हाथ से जाँचकर तय करें।",
     )
+    fun startingHint(v: com.drishtisaathi.engine.StartingHint) = STARTING_HINT.getValue(v)
+    private val STARTING_HINT = mapOf(
+        com.drishtisaathi.engine.StartingHint.DISTANCE_BLUR_START_MINUS to t(
+            "Distance blur reported: start the hand test with minus lenses.",
+            "दूर का धुंधलापन बताया गया: हाथ वाला टेस्ट माइनस लेंस से शुरू करें।",
+        ),
+        com.drishtisaathi.engine.StartingHint.CHECK_CURRENT_GLASSES_LENS_METER to t(
+            "Check the current glasses' power with a lens meter, if available.",
+            "मौजूदा चश्मे की पावर लेंस मीटर से जाँचें, अगर उपलब्ध हो।",
+        ),
+    )
     val noStartingLens = t("No starting band yet: start the hand test from plano.", "अभी कोई शुरुआती रेंज नहीं: हाथ वाला टेस्ट प्लेनो से शुरू करें।")
     val readingAdd = t("Reading add (estimated)", "पढ़ने का ऐड (अनुमानित)")
     val lensPackage = t("Lens package", "लेंस पैकेज")
@@ -305,8 +316,15 @@ object S {
         ReferralLevel.NONE to t("No warning signs reported", "कोई ख़तरे का संकेत नहीं बताया गया"),
     )
 
-    fun referralReason(v: ReferralReason, childAge: Int): Txt =
-        if (v == ReferralReason.CHILD_UNDER_AGE) CHILD.format(childAge) else REFERRAL_REASON.getValue(v)
+    fun referralReason(v: ReferralReason, rules: com.drishtisaathi.engine.RulesConfig): Txt = when (v) {
+        ReferralReason.CHILD_UNDER_AGE -> CHILD.format(rules.ages.childReferralUnder)
+        ReferralReason.OLD_GLASSES_WITH_STRAIN -> OLD_GLASSES_STRAIN.format(rules.referral.oldGlassesStrainOlderThanYears)
+        else -> REFERRAL_REASON.getValue(v)
+    }
+    private val OLD_GLASSES_STRAIN = t(
+        "Glasses older than %d years with headaches or tired eyes: routine full eye test recommended",
+        "%d साल से पुराना चश्मा और सिरदर्द या आँखों में थकान: आँखों की पूरी जाँच की सलाह",
+    )
     private val CHILD = t("Child under %d years", "%d साल से कम उम्र का बच्चा")
     private val REFERRAL_REASON = mapOf(
         ReferralReason.FLASHES_FLOATERS_CURTAIN to t("New flashes, floaters or a curtain over vision", "नई रोशनी की चमक, तैरते धब्बे या नज़र के आगे पर्दा"),
@@ -324,6 +342,7 @@ object S {
             "दूर का धुंधला दिखता है पर निकट-दृष्टि नहीं मिली: दूर-दृष्टि हो सकती है",
         ),
         ReferralReason.CHILD_UNDER_AGE to CHILD,
+        ReferralReason.OLD_GLASSES_WITH_STRAIN to OLD_GLASSES_STRAIN,
     )
 
     fun lensType(v: LensType) = LENS_TYPE.getValue(v)
@@ -382,6 +401,10 @@ object S {
         Note.ADD_FROM_AGE_TABLE to t("Reading add is from the age table only", "पढ़ने का ऐड सिर्फ़ उम्र की तालिका से"),
         Note.PD_ASSUMED to t("PD not measured: average used. Measure with a PD ruler.", "PD नहीं मापा गया: औसत लिया गया। PD रूलर से मापें।"),
         Note.PD_IMPLAUSIBLE to t("PD looks unusual for this face: re-measure", "इस चेहरे के हिसाब से PD असामान्य है: दोबारा मापें"),
+        Note.THICKNESS_AFTER_TRIAL_LENS to t(
+            "Lens thickness for each frame is shown after the trial-lens test",
+            "हर फ़्रेम के लेंस की मोटाई ट्रायल-लेंस टेस्ट के बाद दिखेगी",
+        ),
         Note.FIRST_TIME_WEARER to t(
             "First pair of glasses: explain that it takes 1–2 weeks to get used to them (longer for progressives)",
             "पहला चश्मा: बताएँ कि आदत पड़ने में 1–2 हफ़्ते लगते हैं (प्रोग्रेसिव में ज़्यादा)",
@@ -437,7 +460,18 @@ object S {
     )
 
     /** Raw templates; [com.drishtisaathi.ui.Fmt.reason] fills in the numbers. */
-    fun reasonTemplate(code: ReasonCode, isEdge: Boolean): Txt = when (code) {
+    fun reasonTemplate(code: ReasonCode, isEdge: Boolean, assumed: Boolean = false): Txt = when {
+        assumed && code == ReasonCode.FITS_FACE -> R_FITS_AVG
+        assumed && code == ReasonCode.NARROW_FOR_FACE -> R_NARROW_AVG
+        assumed && code == ReasonCode.WIDE_FOR_FACE -> R_WIDE_AVG
+        else -> reasonTemplateMeasured(code, isEdge)
+    }
+    /** Fit against the population average because face width / PD were not measured. */
+    private val R_FITS_AVG = t("Fits average face width (not measured; frame %.0f mm, average %.0f mm)", "औसत चेहरे की चौड़ाई पर ठीक (मापा नहीं गया; फ़्रेम %.0f mm, औसत %.0f mm)")
+    private val R_NARROW_AVG = t("Narrow for an average face (not measured; frame %.0f mm, average %.0f mm)", "औसत चेहरे के लिए छोटा (मापा नहीं गया; फ़्रेम %.0f mm, औसत %.0f mm)")
+    private val R_WIDE_AVG = t("Wide for an average face (not measured; frame %.0f mm, average %.0f mm)", "औसत चेहरे के लिए चौड़ा (मापा नहीं गया; फ़्रेम %.0f mm, औसत %.0f mm)")
+
+    private fun reasonTemplateMeasured(code: ReasonCode, isEdge: Boolean): Txt = when (code) {
         ReasonCode.THIN_LENS -> if (isEdge) R_THIN_EDGE else R_THIN_CENTRE
         ReasonCode.THICK_LENS -> if (isEdge) R_THICK_EDGE else R_THICK_CENTRE
         else -> REASON.getValue(code)

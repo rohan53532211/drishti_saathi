@@ -26,7 +26,7 @@ object Fmt {
 
     /** One bullet, e.g. "Thin lens: edge about 4.2 mm in 1.60". */
     fun reason(r: FrameReason, l: Lang): String {
-        val tpl = S.reasonTemplate(r.code, r.isEdge)
+        val tpl = S.reasonTemplate(r.code, r.isEdge, r.assumed)
         return when (r.code) {
             ReasonCode.FITS_FACE, ReasonCode.NARROW_FOR_FACE, ReasonCode.WIDE_FOR_FACE -> tpl.format(r.a ?: 0.0, r.b ?: 0.0)
             ReasonCode.THIN_LENS, ReasonCode.THICK_LENS -> tpl.format(r.a ?: 0.0, S.materialShort(r.materialId ?: ""))

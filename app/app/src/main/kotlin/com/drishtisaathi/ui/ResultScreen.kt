@@ -64,7 +64,7 @@ fun ResultScreen(
             }
             SectionCard(S.referral[l], container = bg) {
                 Text(S.referralLevel(a.referral.level)[l], color = fg, style = MaterialTheme.typography.titleMedium)
-                a.referral.reasons.forEach { Text("• " + S.referralReason(it, rules.ages.childReferralUnder)[l], color = fg) }
+                a.referral.reasons.forEach { Text("• " + S.referralReason(it, rules)[l], color = fg) }
             }
 
             val adv = a.advice
@@ -74,7 +74,10 @@ fun ResultScreen(
                 // ---- Estimated band + starting trial lens ----
                 SectionCard(S.startingTrialLens[l]) {
                     if (adv.eyes.isEmpty()) {
-                        Text(S.noStartingLens[l])
+                        if (com.drishtisaathi.engine.StartingHint.DISTANCE_BLUR_START_MINUS !in adv.startingHints) Text(S.noStartingLens[l])
+                        adv.startingHints.forEach {
+                            Text("• " + S.startingHint(it)[l], style = MaterialTheme.typography.titleMedium, color = Teal)
+                        }
                     } else {
                         adv.eyes.forEach { e ->
                             val eye = if (e.eye == Eye.RIGHT) "R" else "L"

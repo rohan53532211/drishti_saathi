@@ -20,7 +20,7 @@ import com.drishtisaathi.i18n.S
 
 /** Shown before the summary whenever any referral trigger fired (Section 6). */
 @Composable
-fun ReferralScreen(state: UiState, childAge: Int, onLang: (Lang) -> Unit, onContinue: () -> Unit, onBack: () -> Unit) {
+fun ReferralScreen(state: UiState, rules: com.drishtisaathi.engine.RulesConfig, onLang: (Lang) -> Unit, onContinue: () -> Unit, onBack: () -> Unit) {
     val l = state.lang
     val referral = state.result?.assessment?.referral ?: return
     val urgent = referral.level == ReferralLevel.URGENT
@@ -36,7 +36,7 @@ fun ReferralScreen(state: UiState, childAge: Int, onLang: (Lang) -> Unit, onCont
             Text((if (urgent) S.urgentBody else S.routineBody)[l], style = MaterialTheme.typography.bodyLarge)
             Text(S.reasons[l], style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             referral.reasons.forEach { r ->
-                Text("• " + S.referralReason(r, childAge)[l], style = MaterialTheme.typography.bodyLarge, color = fg)
+                Text("• " + S.referralReason(r, rules)[l], style = MaterialTheme.typography.bodyLarge, color = fg)
             }
             if (referral.adviceWithheld) Text(S.adviceWithheld[l], style = MaterialTheme.typography.titleMedium)
             BigButton(S.continueToSummary[l], onContinue, container = fg)
