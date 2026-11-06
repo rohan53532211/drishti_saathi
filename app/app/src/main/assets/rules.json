@@ -113,5 +113,29 @@
 
   "plausibility": {
     "pdResidualSdMultiplier": 3.0
+  },
+
+
+  "distance": {
+  },
+
+
+  "bayes": {
+  },
+
+
+  "faceGeometry": {
+  },
+
+
+  "camera": {
+  },
+
+
+  "visionTests": {
+  },
+
+
+  "tryOn": {
   }
 }

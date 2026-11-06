@@ -24,6 +24,13 @@ data class RulesConfig(
     val referral: ReferralConfig,
     val frameScoring: FrameScoringConfig,
     val plausibility: PlausibilityConfig,
+    // ---- Sections owned by the parallel tracks (see config/TrackConfigs.kt) ----
+    val distance: com.drishtisaathi.engine.config.DistanceConfig = com.drishtisaathi.engine.config.DistanceConfig(),
+    val bayes: com.drishtisaathi.engine.config.BayesConfig = com.drishtisaathi.engine.config.BayesConfig(),
+    val faceGeometry: com.drishtisaathi.engine.config.FaceGeometryConfig = com.drishtisaathi.engine.config.FaceGeometryConfig(),
+    val camera: com.drishtisaathi.engine.config.CameraConfig = com.drishtisaathi.engine.config.CameraConfig(),
+    val visionTests: com.drishtisaathi.engine.config.VisionTestConfig = com.drishtisaathi.engine.config.VisionTestConfig(),
+    val tryOn: com.drishtisaathi.engine.config.TryOnConfig = com.drishtisaathi.engine.config.TryOnConfig(),
 ) {
     fun material(id: String): MaterialSpec =
         materials.firstOrNull { it.id == id } ?: error("Material '$id' is not defined in rules.json")

@@ -49,7 +49,8 @@ class StringsWordingTest {
         com.drishtisaathi.engine.ReasonCode.entries.forEach { S.reasonTemplate(it, true); S.reasonTemplate(it, false); S.reasonTemplate(it, true, assumed = true) }
 
         assertTrue(S.all.size > 100)
-        val bad = S.all.filter { it !in allowed }.associateWith { violations(it) }.filterValues { it.isNotEmpty() }
+        val everything = S.all + com.drishtisaathi.i18n.TxtRegistry.loadAll()
+        val bad = everything.filter { it !in allowed }.associateWith { violations(it) }.filterValues { it.isNotEmpty() }
         assertTrue("Banned wording: $bad", bad.isEmpty())
     }
 
@@ -58,7 +59,7 @@ class StringsWordingTest {
     }
 
     @Test fun `every string has both languages`() {
-        assertTrue(S.all.all { it.en.isNotBlank() && it.hi.isNotBlank() })
+        assertTrue((S.all + com.drishtisaathi.i18n.TxtRegistry.loadAll()).all { it.en.isNotBlank() && it.hi.isNotBlank() })
     }
 
     @Test fun `dioptre formatting`() {
