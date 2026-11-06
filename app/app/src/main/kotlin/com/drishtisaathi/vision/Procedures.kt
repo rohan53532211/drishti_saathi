@@ -70,11 +70,13 @@ data class FarPointProcedure(
 }
 
 /**
- * Near point push-up: start with the letters clear at ≥ nearPointStartMinMm, move closer, tap when they blur
+ * Near point push-up: start with the letters clear at ≥ [startMinMm], move closer, tap when they blur
  * (recorded if within [nearPointMinMm, nearPointMaxMm]); or "blurry even at arm's length" (null) from the start position.
+ * Build with [start]: for an uncorrected myope the start is pulled inside the far point, where the letters are clear.
  */
 data class NearPointProcedure(
     val repeats: Int,
+    val startMinMm: Double,
     val marksMm: List<Double?> = emptyList(),
     val seenFar: Boolean = false,
     val worstConfidence: Confidence? = null,
@@ -84,7 +86,7 @@ data class NearPointProcedure(
 
     fun onReading(r: DistanceReading?, cfg: VisionTestConfig): NearPointProcedure {
         val u = r.usable() ?: return this
-        return if (!seenFar && u.distanceMm >= cfg.nearPointStartMinMm) copy(seenFar = true) else this
+        return if (!seenFar && u.distanceMm >= startMinMm) copy(seenFar = true) else this
     }
 
     fun canMarkBlur(r: DistanceReading?, cfg: VisionTestConfig): Boolean {
@@ -94,7 +96,7 @@ data class NearPointProcedure(
 
     fun canMarkOutOfReach(r: DistanceReading?, cfg: VisionTestConfig): Boolean {
         val u = r.usable() ?: return false
-        return !isDone && u.distanceMm >= cfg.nearPointStartMinMm
+        return !isDone && u.distanceMm >= startMinMm
     }
 
     fun markBlur(r: DistanceReading, cfg: VisionTestConfig): NearPointProcedure {
@@ -105,6 +107,16 @@ data class NearPointProcedure(
     fun markOutOfReach(r: DistanceReading, cfg: VisionTestConfig): NearPointProcedure {
         check(canMarkOutOfReach(r, cfg))
         return copy(marksMm = marksMm + null, seenFar = false, worstConfidence = worst(worstConfidence, r.confidence))
+    }
+
+    companion object {
+        /** Start distance: nearPointStartMinMm, or 90 % of the far point (1/|SE|) if that is nearer; never below min + 20 mm. */
+        fun start(cfg: VisionTestConfig, seD: Double?): NearPointProcedure {
+            val farPointMm = seD?.takeIf { it < -0.01 }?.let { 1000.0 / -it }
+            val start = minOf(cfg.nearPointStartMinMm, farPointMm?.times(0.9) ?: Double.MAX_VALUE)
+                .coerceAtLeast(cfg.nearPointMinMm + 20.0)
+            return NearPointProcedure(cfg.repeats, start)
+        }
     }
 }
 

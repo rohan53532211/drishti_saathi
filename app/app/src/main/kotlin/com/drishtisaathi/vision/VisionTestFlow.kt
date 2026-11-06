@@ -164,7 +164,7 @@ private fun RunStep(
         }
         VisionStep.NearPoint -> {
             val se = NearPointAnalysis.seForNearPoint(session.farPoint.values)
-            NearPointTestScreen(env, reading, seMeasured = se != null, onSkip = onSkip) { p ->
+            NearPointTestScreen(env, reading, seD = se, onSkip = onSkip) { p ->
                 val r = NearPointAnalysis.analyse(p.marksMm, se, workingDistanceM, age, rules, cap(p.worstConfidence))
                 onComplete(session.copy(nearPoint = r ?: session.nearPoint))
             }

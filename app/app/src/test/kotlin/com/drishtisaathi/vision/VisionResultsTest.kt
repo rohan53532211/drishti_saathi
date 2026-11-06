@@ -268,7 +268,8 @@ class NearPointTest {
     }
 
     @Test fun `procedure starts far, then accepts a blur tap in range`() {
-        var p = NearPointProcedure(2)
+        var p = NearPointProcedure.start(cfg, 0.0)
+        assertEquals(cfg.nearPointStartMinMm, p.startMinMm, 0.0)
         assertFalse(p.canMarkBlur(r(200.0), cfg))
         p = p.onReading(r(400.0), cfg)
         assertTrue(p.canMarkBlur(r(200.0), cfg))
@@ -279,6 +280,14 @@ class NearPointTest {
         p = p.markOutOfReach(r(500.0), cfg)
         assertTrue(p.isDone)
         assertEquals(listOf(200.0, null), p.marksMm)
+    }
+
+    @Test fun `uncorrected myope starts inside the far point`() {
+        val p = NearPointProcedure.start(cfg, -4.0) // far point 250 mm
+        assertEquals(225.0, p.startMinMm, 1e-9)
+        assertTrue(p.onReading(r(230.0), cfg).seenFar)
+        assertEquals(cfg.nearPointMinMm + 20.0, NearPointProcedure.start(cfg, -20.0).startMinMm, 1e-9)
+        assertEquals(cfg.nearPointStartMinMm, NearPointProcedure.start(cfg, null).startMinMm, 0.0)
     }
 }
 

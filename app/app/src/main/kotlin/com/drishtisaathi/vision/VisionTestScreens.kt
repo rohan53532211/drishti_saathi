@@ -259,10 +259,11 @@ fun ClockDialTestScreen(
 
 @Composable
 fun NearPointTestScreen(
-    env: TestEnv, reading: DistanceReading?, seMeasured: Boolean, onSkip: () -> Unit, onComplete: (NearPointProcedure) -> Unit,
+    env: TestEnv, reading: DistanceReading?, seD: Double?, onSkip: () -> Unit, onComplete: (NearPointProcedure) -> Unit,
 ) {
     val cfg = env.cfg
-    var proc by remember { mutableStateOf(NearPointProcedure(cfg.repeats)) }
+    val seMeasured = seD != null
+    var proc by remember { mutableStateOf(NearPointProcedure.start(cfg, seD)) }
     LaunchedEffect(reading) { proc = proc.onReading(reading, cfg) }
     val status = DistanceGate.check(reading, null, null)
     val rnd = remember { Random(System.nanoTime()) }
@@ -272,6 +273,7 @@ fun NearPointTestScreen(
         env, SVision.nearTitle, TestEye.BOTH, if (proc.seenFar) SVision.nearMoveIn else SVision.nearStartFar, reading, status,
         proc.repeatIndex, cfg.repeats, onSkip,
         subtitle = if (seMeasured) null else SVision.nearNoSe,
+        holdAtMm = if (proc.seenFar) null else proc.startMinMm,
         target = {
             Canvas(Modifier.fillMaxSize()) {
                 val h = Sizing.mmToPx(cfg.nearPointLetterHeightMm, env.scale).toFloat().coerceAtLeast(3f)
@@ -355,7 +357,7 @@ fun AmslerTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, onSk
         if (n.isDone) onComplete(n) else proc = n
     }
     // Grid side in px, shared between drawing and tap handling.
-    var gridPx by remember { mutableStateOf(0f) }
+    val gridPx = remember { FloatArray(1) }
     val currentMarking by rememberUpdatedState(marking)
 
     TestLayout(
@@ -365,9 +367,10 @@ fun AmslerTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, onSk
             Canvas(
                 Modifier.fillMaxSize().pointerInput(Unit) {
                     detectTapGestures { p ->
-                        if (!currentMarking || gridPx <= 0f) return@detectTapGestures
-                        val x = (p.x - size.width / 2f) / gridPx
-                        val y = (p.y - size.height / 2f) / gridPx
+                        val side = gridPx[0]
+                        if (!currentMarking || side <= 0f) return@detectTapGestures
+                        val x = (p.x - size.width / 2f) / side
+                        val y = (p.y - size.height / 2f) / side
                         if (x in -0.5f..0.5f && y in -0.5f..0.5f) proc = proc.mark(GridMark(x, y))
                     }
                 },
@@ -376,7 +379,7 @@ fun AmslerTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, onSk
                 val sq = Sizing.arcminPx(d, cfg.amslerSquareDeg * 60.0, env.scale).toFloat().coerceAtLeast(4f)
                 val n = (floor(min(size.width, size.height) / sq).toInt() / 2 * 2).coerceIn(2, 20)
                 val side = n * sq
-                gridPx = side
+                gridPx[0] = side
                 val left = center.x - side / 2f; val top = center.y - side / 2f
                 for (i in 0..n) {
                     drawLine(Color.Black, Offset(left + i * sq, top), Offset(left + i * sq, top + side), strokeWidth = 2f)
