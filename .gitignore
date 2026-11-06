@@ -1,0 +1,17 @@
+# datasets (large / licence unknown) - never commit
+glasses/
+frames30/
+ansur2.csv
+
+# build
+.gradle/
+build/
+**/build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+__pycache__/
