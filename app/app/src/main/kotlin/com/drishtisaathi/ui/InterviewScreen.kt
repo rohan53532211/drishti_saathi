@@ -13,7 +13,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -22,16 +25,24 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.drishtisaathi.UiState
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
 import com.drishtisaathi.interview.ChoiceContext
 import com.drishtisaathi.interview.Question
+import com.drishtisaathi.voice.VoiceAnswers
+import com.drishtisaathi.voice.VoiceController
+import com.drishtisaathi.voice.VoicePanel
 
 /**
- * One question per screen, big buttons. Typed/button input is always available
- * (voice comes in Phase 2 on top of this, never instead of it).
+ * One question per screen, big buttons. Typed/button input is always available; voice ([voice], optional)
+ * is an accelerator on top: it reads each question aloud, listens, reads the answer back for ✓ / ✗ and then
+ * calls the same [onAnswer] / [onOldNumbersYes] the buttons use. Pass the app's single controller from
+ * `rememberVoiceController()`; null = no voice strip.
  */
 @Composable
 fun InterviewScreen(
@@ -41,11 +52,14 @@ fun InterviewScreen(
     onAnswer: (questionId: String, update: (InterviewAnswers) -> InterviewAnswers) -> Unit,
     onOldNumbersYes: () -> Unit,
     onBack: () -> Unit,
+    voice: VoiceController? = null,
 ) {
     val l = state.lang
     val q = state.currentQuestion ?: return
     val total = state.visibleQuestions.size
     val idx = state.questionIndex
+
+    if (voice != null) VoiceEffects(voice, q, l, choiceContext, onAnswer, onOldNumbersYes)
 
     AppScaffold(l, onLang, onBack = onBack) { pad ->
         Column(
@@ -55,6 +69,7 @@ fun InterviewScreen(
             Text(S.questionOf.format(idx + 1, total)[l], style = MaterialTheme.typography.bodyMedium)
             LinearProgressIndicator(progress = { (idx + 1f) / total }, modifier = Modifier.fillMaxWidth())
             Text(q.text[l], style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 12.dp))
+            if (voice != null) VoicePanel(voice, l)
 
             when (q) {
                 is Question.YesNo -> {
@@ -109,5 +124,39 @@ private fun <T : Any> ChoiceAnswer(
     val current = q.get(state.answers)
     q.options.forEach { opt ->
         BigButton(q.label(opt, ctx)[l], { onAnswer(q.id) { a -> q.set(a, opt) } }, selected = opt == current)
+    }
+}
+
+/** Starts the voice dialogue for each question shown, and stops it when the screen pauses or leaves. */
+@Composable
+private fun VoiceEffects(
+    voice: VoiceController, q: Question, l: Lang, ctx: ChoiceContext,
+    onAnswer: (questionId: String, update: (InterviewAnswers) -> InterviewAnswers) -> Unit,
+    onOldNumbersYes: () -> Unit,
+) {
+    val answer by rememberUpdatedState(onAnswer)
+    val oldNumbersYes by rememberUpdatedState(onOldNumbersYes)
+    LaunchedEffect(voice, q.id, l) {
+        voice.begin(q, l, ctx) { action ->
+            when (action) {
+                is VoiceAnswers.Action.Answer -> answer(action.questionId, action.update)
+                VoiceAnswers.Action.OpenOldNumbers -> oldNumbersYes()
+            }
+        }
+    }
+    val owner = LocalLifecycleOwner.current
+    DisposableEffect(voice, owner) {
+        val obs = LifecycleEventObserver { _, e ->
+            when (e) {
+                Lifecycle.Event.ON_STOP -> voice.stop()
+                Lifecycle.Event.ON_START -> voice.resume()
+                else -> {}
+            }
+        }
+        owner.lifecycle.addObserver(obs)
+        onDispose {
+            owner.lifecycle.removeObserver(obs)
+            voice.detach()
+        }
     }
 }
