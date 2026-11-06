@@ -16,8 +16,8 @@ Where they conflict, the brief wins unless an item here says it replaces a brief
 | 7 | Full summary + referral screens, staff verification, Room storage | Done |
 | 8 | PDF export + share (shop copy, Hindi customer copy), delete session, history | Done |
 | 9 | **Consent screen** (addition 1) | Done |
-| 10 | **Ranking labels + reason bullets** (addition 2) | Next |
-| 11 | **Two-frame comparison screen** (addition 3) | |
+| 10 | **Ranking labels + reason bullets** (addition 2) | Done |
+| 11 | **Two-frame comparison screen** (addition 3) | Next |
 | 12 | **New interview fields → frame scoring** (addition 4) | |
 
 ### Addition 1: Consent screen

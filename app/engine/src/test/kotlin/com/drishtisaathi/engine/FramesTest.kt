@@ -99,4 +99,48 @@ class FramesTest {
         val json = Json.encodeToString(SessionResult.serializer(), res)
         assertEquals(res, Json.decodeFromString(SessionResult.serializer(), json))
     }
+
+    // ---- Addition 2: labels and reasons -------------------------------------------------------
+
+    @Test fun `labels follow score cut-offs from rules json`() {
+        val all = ranker.rank(catalog.frames, est(134.0), est(62.0), listOf(est(-4.0)), "CR39", StylePref.BOLD, Budget.LOW, topN = 10)
+        all.forEach { rf ->
+            val expected = when {
+                rf.score >= rules.frameScoring.labelHighFrom -> MatchLabel.HIGHLY_RECOMMENDED
+                rf.score >= rules.frameScoring.labelModerateFrom -> MatchLabel.MODERATE
+                else -> MatchLabel.LOWER
+            }
+            assertEquals(expected, rf.label)
+        }
+        // A good-fitting, in-budget, thin frame with no style constraint is highly recommended
+        val best = ranker.rank(listOf(frame("F01")), est(134.0), est(62.0), listOf(est(-1.0)), "CR39", StylePref.ANY, Budget.MID).single()
+        assertEquals(MatchLabel.HIGHLY_RECOMMENDED, best.label)
+    }
+
+    @Test fun `reasons come from components - fit first, numbers attached, 2 to 4 bullets`() {
+        val r = ranker.rank(listOf(frame("F01")), est(134.0), est(62.0), listOf(est(-4.0)), "CR39", StylePref.BOLD, Budget.MID).single()
+        assertTrue(r.reasons.size in 2..rules.frameScoring.maxReasons)
+        val fit = r.reasons.first { it.code == ReasonCode.FITS_FACE }
+        assertEquals(134.0, fit.a!!, 1e-9)
+        assertEquals(134.0, fit.b!!, 1e-9)
+        val thick = r.reasons.first { it.code == ReasonCode.THIN_LENS || it.code == ReasonCode.THICK_LENS }
+        assertEquals(5.6, thick.a!!, 0.05)
+        assertEquals("CR39", thick.materialId)
+        assertTrue(r.reasons.any { it.code == ReasonCode.STYLE_MISMATCH && !it.positive })
+        // positives listed before negatives
+        assertEquals(r.reasons.sortedByDescending { it.positive }, r.reasons)
+    }
+
+    @Test fun `over budget reason carries the amount over`() {
+        val r = ranker.rank(listOf(frame("F06")), est(134.0), est(62.0), emptyList(), "CR39", StylePref.ANY, Budget.MID).single()
+        val over = r.reasons.first { it.code == ReasonCode.OVER_BUDGET }
+        assertEquals(1200.0, over.a!!, 1e-9) // 5200 - 4000
+        assertTrue(!over.positive)
+    }
+
+    @Test fun `narrow face gets a wide-for-face reason`() {
+        val r = ranker.rank(listOf(frame("F09")), est(118.0), est(58.0), emptyList(), "CR39", null, null).single()
+        assertEquals(ReasonCode.WIDE_FOR_FACE, r.reasons.first().code)
+        assertTrue(r.reasons.none { it.code == ReasonCode.IN_BUDGET || it.code == ReasonCode.STYLE_MATCH }) // no prefs → no such bullets
+    }
 }

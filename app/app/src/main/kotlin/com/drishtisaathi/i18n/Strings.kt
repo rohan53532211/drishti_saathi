@@ -5,6 +5,8 @@ import com.drishtisaathi.engine.Coating
 import com.drishtisaathi.engine.Confidence
 import com.drishtisaathi.engine.FitVerdict
 import com.drishtisaathi.engine.LensType
+import com.drishtisaathi.engine.MatchLabel
+import com.drishtisaathi.engine.ReasonCode
 import com.drishtisaathi.engine.Note
 import com.drishtisaathi.engine.Occupation
 import com.drishtisaathi.engine.ReferralLevel
@@ -351,6 +353,36 @@ object S {
         Note.PD_ASSUMED to t("PD not measured: average used. Measure with a PD ruler.", "PD नहीं मापा गया: औसत लिया गया। PD रूलर से मापें।"),
         Note.PD_IMPLAUSIBLE to t("PD looks unusual for this face: re-measure", "इस चेहरे के हिसाब से PD असामान्य है: दोबारा मापें"),
         Note.FACE_WIDTH_ASSUMED to t("Face width not measured: average used for frame fit", "चेहरे की चौड़ाई नहीं मापी: फ़्रेम फ़िट के लिए औसत लिया गया"),
+    )
+
+    // ---- Addition 2: match labels and reason bullets -----------------------------------------
+    fun matchLabel(v: MatchLabel) = MATCH_LABEL.getValue(v)
+    private val MATCH_LABEL = mapOf(
+        MatchLabel.HIGHLY_RECOMMENDED to t("Highly recommended", "सबसे उपयुक्त"),
+        MatchLabel.MODERATE to t("Moderate match", "ठीक-ठाक मेल"),
+        MatchLabel.LOWER to t("Lower match", "कम मेल"),
+    )
+
+    /** Raw templates; [com.drishtisaathi.ui.Fmt.reason] fills in the numbers. */
+    fun reasonTemplate(code: ReasonCode, isEdge: Boolean): Txt = when (code) {
+        ReasonCode.THIN_LENS -> if (isEdge) R_THIN_EDGE else R_THIN_CENTRE
+        ReasonCode.THICK_LENS -> if (isEdge) R_THICK_EDGE else R_THICK_CENTRE
+        else -> REASON.getValue(code)
+    }
+    private val R_THIN_EDGE = t("Thin lens: edge about %.1f mm in %s", "पतला लेंस: %2${'$'}s में किनारा लगभग %1${'$'}.1f mm")
+    private val R_THIN_CENTRE = t("Thin lens: centre about %.1f mm in %s", "पतला लेंस: %2${'$'}s में बीच की मोटाई लगभग %1${'$'}.1f mm")
+    private val R_THICK_EDGE = t("Thicker lens: edge about %.1f mm in %s", "मोटा लेंस: %2${'$'}s में किनारा लगभग %1${'$'}.1f mm")
+    private val R_THICK_CENTRE = t("Thicker lens: centre about %.1f mm in %s", "मोटा लेंस: %2${'$'}s में बीच की मोटाई लगभग %1${'$'}.1f mm")
+    private val REASON = mapOf(
+        ReasonCode.FITS_FACE to t("Fits your face width (frame %.0f mm, face %.0f mm)", "चेहरे की चौड़ाई पर ठीक (फ़्रेम %.0f mm, चेहरा %.0f mm)"),
+        ReasonCode.NARROW_FOR_FACE to t("Narrow for your face (frame %.0f mm, face %.0f mm)", "चेहरे के लिए छोटा (फ़्रेम %.0f mm, चेहरा %.0f mm)"),
+        ReasonCode.WIDE_FOR_FACE to t("Wide for your face (frame %.0f mm, face %.0f mm)", "चेहरे के लिए चौड़ा (फ़्रेम %.0f mm, चेहरा %.0f mm)"),
+        ReasonCode.IN_BUDGET to t("Within budget (₹%,d)", "बजट के अंदर (₹%,d)"),
+        ReasonCode.OVER_BUDGET to t("₹%,d over budget", "बजट से ₹%,d ज़्यादा"),
+        ReasonCode.STYLE_MATCH to t("Matches your style", "आपके पसंद के स्टाइल जैसा"),
+        ReasonCode.STYLE_MISMATCH to t("Different from your chosen style", "आपके चुने स्टाइल से अलग"),
+        ReasonCode.THIN_LENS to R_THIN_EDGE,
+        ReasonCode.THICK_LENS to R_THICK_EDGE,
     )
 
     fun fit(v: FitVerdict) = FIT.getValue(v)

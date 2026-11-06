@@ -44,6 +44,8 @@ data class RulesConfig(
             val sum = weightFit + weightThinness + weightStyle + weightBudget
             require(kotlin.math.abs(sum - 1.0) < 1e-6) { "frameScoring weights must sum to 1, got $sum" }
             require(thickestMm > thinnestMm)
+            require(labelHighFrom > labelModerateFrom) { "labelHighFrom must exceed labelModerateFrom" }
+            require(maxReasons >= 2)
         }
     }
 }
@@ -156,6 +158,11 @@ data class FrameScoringConfig(
     /** Score falls to 0 at (cap × (1 + fraction)): ₹750 over a ₹1500 cap, ₹2000 over ₹4000. */
     val overBudgetFalloffFraction: Double,
     val topN: Int,
+    val labelHighFrom: Double,
+    val labelModerateFrom: Double,
+    /** Thinness component at or above this counts as a "thin lens" reason. */
+    val thinPositiveFrom: Double,
+    val maxReasons: Int,
 )
 
 @Serializable

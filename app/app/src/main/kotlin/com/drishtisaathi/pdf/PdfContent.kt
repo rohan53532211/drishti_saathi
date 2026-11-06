@@ -71,7 +71,8 @@ object PdfContent {
             out += Block.Heading(S.suggestedFrames[l])
             r.frames.forEachIndexed { i, rf ->
                 out += Block.Para("${i + 1}. ${rf.frame.name} (${rf.frame.id}) · ${Fmt.frameLine(rf, l)}", bold = true)
-                out += Block.Bullet(Fmt.frameReason(rf, l), Tone.ACCENT)
+                Fmt.label(rf, l)?.let { out += Block.Para(it, bold = true, tone = Tone.ACCENT) }
+                Fmt.reasons(rf, l).forEach { (pos, txt) -> out += Block.Bullet((if (pos) "+ " else "− ") + txt, if (pos) Tone.NORMAL else Tone.ROUTINE) }
             }
         }
 
@@ -132,7 +133,8 @@ object PdfContent {
                 out += Block.Heading(S.suggestedFrames[l])
                 r.frames.take(3).forEachIndexed { i, rf ->
                     out += Block.Para("${i + 1}. ${rf.frame.name} · ₹${"%,d".format(rf.frame.priceInr)}", bold = true)
-                    out += Block.Bullet(Fmt.frameReason(rf, l), Tone.ACCENT)
+                    Fmt.label(rf, l)?.let { out += Block.Para(it, bold = true, tone = Tone.ACCENT) }
+                    Fmt.reasons(rf, l).forEach { (pos, txt) -> out += Block.Bullet((if (pos) "+ " else "− ") + txt, if (pos) Tone.NORMAL else Tone.ROUTINE) }
                 }
             }
         }

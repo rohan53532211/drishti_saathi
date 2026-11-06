@@ -102,8 +102,9 @@ fun ResultScreen(
                     r.frames.forEachIndexed { i, rf ->
                         if (i > 0) HorizontalDivider()
                         Text("${i + 1}. ${rf.frame.name}", style = MaterialTheme.typography.titleMedium)
+                        Fmt.label(rf, l)?.let { MatchChip(rf.label!!, it) }
                         Text(Fmt.frameLine(rf, l), style = MaterialTheme.typography.bodyMedium)
-                        Text(Fmt.frameReason(rf, l), style = MaterialTheme.typography.bodyMedium, color = Teal)
+                        ReasonBullets(rf, l)
                         if (state.staffMode) Text(
                             "${S.score[l]} ${"%.2f".format(rf.score)} · ${S.confidence(rf.thicknessConfidence)[l]}",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary,

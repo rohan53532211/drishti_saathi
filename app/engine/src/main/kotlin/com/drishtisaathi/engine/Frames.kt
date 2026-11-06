@@ -38,6 +38,28 @@ data class FrameCatalog(@SerialName("_comment") val comment: String? = null, val
 
 @Serializable enum class FitVerdict { GOOD, SLIGHTLY_NARROW, SLIGHTLY_WIDE, TOO_NARROW, TOO_WIDE }
 
+/** Addition 2: label from the total score; cut-offs in rules.json. */
+@Serializable enum class MatchLabel { HIGHLY_RECOMMENDED, MODERATE, LOWER }
+
+@Serializable
+enum class ReasonCode { FITS_FACE, NARROW_FOR_FACE, WIDE_FOR_FACE, THIN_LENS, THICK_LENS, IN_BUDGET, OVER_BUDGET, STYLE_MATCH, STYLE_MISMATCH }
+
+/**
+ * One bullet explaining a ranking, generated from a score component. Numbers only; the app owns the wording.
+ * [a]/[b] meaning depends on [code]: fit → frame width, face width; thickness → mm; budget → price or amount over.
+ */
+@Serializable
+data class FrameReason(
+    val code: ReasonCode,
+    val positive: Boolean,
+    val a: Double? = null,
+    val b: Double? = null,
+    val materialId: String? = null,
+    val isEdge: Boolean = true,
+    /** weight × how strongly this component pulled the score up (positive) or down (negative). */
+    val impact: Double = 0.0,
+)
+
 @Serializable
 data class RankedFrame(
     val frame: Frame,
@@ -58,6 +80,9 @@ data class RankedFrame(
     val thicknessConfidence: Confidence,
     val withinBudget: Boolean,
     val styleMatch: Boolean,
+    /** Null only for sessions stored before labels existed. */
+    val label: MatchLabel? = null,
+    val reasons: List<FrameReason> = emptyList(),
 )
 
 /** M5 frame ranking: weighted fit + thinness + style + budget, weights from rules.json. */
@@ -104,17 +129,57 @@ class FrameRanker(private val rules: RulesConfig) {
 
             val score = c.weightFit * fitScore + c.weightThinness * thinScore + c.weightStyle * styleScore + c.weightBudget * budgetScore
 
+            // ---- Addition 2: reasons from the score components ----
+            val fit = fitVerdict(delta)
+            val reasons = mutableListOf<FrameReason>()
+            val faceW = faceWidthMm.value * c.idealFrameToFaceWidthRatio
+            reasons += when {
+                fit == FitVerdict.GOOD -> FrameReason(ReasonCode.FITS_FACE, true, width, faceW, impact = c.weightFit * fitScore)
+                delta < 0 -> FrameReason(ReasonCode.NARROW_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - fitScore))
+                else -> FrameReason(ReasonCode.WIDE_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - fitScore))
+            }
+            thick?.let {
+                val thin = thinScore >= c.thinPositiveFrom
+                reasons += FrameReason(
+                    if (thin) ReasonCode.THIN_LENS else ReasonCode.THICK_LENS, thin, it.maxMm,
+                    materialId = material.id, isEdge = !it.isPlus,
+                    impact = c.weightThinness * if (thin) thinScore else 1 - thinScore,
+                )
+            }
+            if (budget != null) reasons += if (within) {
+                FrameReason(ReasonCode.IN_BUDGET, true, f.priceInr.toDouble(), impact = c.weightBudget * budgetScore)
+            } else {
+                FrameReason(ReasonCode.OVER_BUDGET, false, (f.priceInr - maxPrice).toDouble(), impact = c.weightBudget * (1 - budgetScore))
+            }
+            if (style != null && style != StylePref.ANY) reasons += FrameReason(
+                if (styleMatch) ReasonCode.STYLE_MATCH else ReasonCode.STYLE_MISMATCH, styleMatch,
+                impact = c.weightStyle * if (styleMatch) 1.0 else 1 - styleScore,
+            )
+            val label = when {
+                score >= c.labelHighFrom -> MatchLabel.HIGHLY_RECOMMENDED
+                score >= c.labelModerateFrom -> MatchLabel.MODERATE
+                else -> MatchLabel.LOWER
+            }
+
             RankedFrame(
                 frame = f, score = score, fitScore = fitScore, thinScore = thinScore,
                 styleScore = styleScore, budgetScore = budgetScore,
-                frameWidthMm = width, fitDeltaMm = delta, fit = fitVerdict(delta),
+                frameWidthMm = width, fitDeltaMm = delta, fit = fit,
                 thickestMm = thick?.maxMm, thickestIsEdge = thick?.isPlus == false,
                 materialId = material.id, thicknessConfidence = powerConf,
                 withinBudget = within, styleMatch = styleMatch,
+                label = label, reasons = pickReasons(reasons),
             )
         }
             .sortedWith(compareByDescending<RankedFrame> { it.score }.thenBy { it.frame.priceInr }.thenBy { it.frame.id })
             .take(topN)
+    }
+
+    /** Strongest [FrameRanker] reasons (fit always kept), positives first. */
+    private fun pickReasons(all: List<FrameReason>): List<FrameReason> {
+        val fit = all.first()
+        val rest = all.drop(1).sortedByDescending { it.impact }.take(c.maxReasons - 1)
+        return (listOf(fit) + rest).sortedByDescending { it.positive }
     }
 
     private fun fitVerdict(delta: Double): FitVerdict = when {

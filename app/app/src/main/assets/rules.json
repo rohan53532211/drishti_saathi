@@ -90,7 +90,11 @@
     "budgetMaxPriceInrLow": 1500,
     "budgetMaxPriceInrMid": 4000,
     "overBudgetFalloffFraction": 0.5,
-    "topN": 5
+    "topN": 5,
+    "labelHighFrom": 0.85,
+    "labelModerateFrom": 0.70,
+    "thinPositiveFrom": 0.5,
+    "maxReasons": 4
   },
 
   "plausibility": {

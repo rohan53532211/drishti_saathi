@@ -1,6 +1,7 @@
 package com.drishtisaathi.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -131,3 +132,35 @@ fun Disclaimer(modifier: Modifier = Modifier) {
 @Composable
 fun CenteredBox(content: @Composable () -> Unit) =
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
+
+/** Addition 2: coloured label chip for a ranked frame. */
+@Composable
+fun MatchChip(label: com.drishtisaathi.engine.MatchLabel, text: String) {
+    val (fg, bg) = when (label) {
+        com.drishtisaathi.engine.MatchLabel.HIGHLY_RECOMMENDED -> OkGreen to OkBg
+        com.drishtisaathi.engine.MatchLabel.MODERATE -> Teal to TealLight
+        com.drishtisaathi.engine.MatchLabel.LOWER -> RoutineAmber to RoutineBg
+    }
+    Text(
+        text,
+        color = fg,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .padding(vertical = 2.dp)
+            .background(bg, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+    )
+}
+
+/** Addition 2: "+" / "−" bullets generated from the score components. */
+@Composable
+fun ReasonBullets(rf: com.drishtisaathi.engine.RankedFrame, l: Lang) {
+    Fmt.reasons(rf, l).forEach { (positive, text) ->
+        Text(
+            (if (positive) "+  " else "−  ") + text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (positive) OkGreen else RoutineAmber,
+        )
+    }
+}

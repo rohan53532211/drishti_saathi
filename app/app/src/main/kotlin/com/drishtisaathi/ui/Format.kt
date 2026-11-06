@@ -1,6 +1,8 @@
 package com.drishtisaathi.ui
 
 import com.drishtisaathi.engine.Estimate
+import com.drishtisaathi.engine.FrameReason
+import com.drishtisaathi.engine.ReasonCode
 import com.drishtisaathi.engine.PowerBand
 import com.drishtisaathi.engine.RankedFrame
 import com.drishtisaathi.engine.TrialLens
@@ -22,16 +24,23 @@ object Fmt {
 
     fun mm(v: Double): String = String.format(Locale.US, "%.1f mm", v)
 
-    /** Numeric reason line, e.g. "fits your face width, edge about 4.2 mm in 1.60". */
-    fun frameReason(rf: RankedFrame, l: Lang): String {
-        val parts = mutableListOf(S.fit(rf.fit)[l])
-        val mat = S.materialShort(rf.materialId)
-        parts += rf.thickestMm?.let { t ->
-            (if (rf.thickestIsEdge) S.edgeAbout else S.centreAbout).format(t, mat)[l]
-        } ?: S.thicknessUnknown[l]
-        if (!rf.withinBudget) parts += S.overBudget[l]
-        return parts.joinToString(", ")
+    /** One bullet, e.g. "Thin lens: edge about 4.2 mm in 1.60". */
+    fun reason(r: FrameReason, l: Lang): String {
+        val tpl = S.reasonTemplate(r.code, r.isEdge)
+        return when (r.code) {
+            ReasonCode.FITS_FACE, ReasonCode.NARROW_FOR_FACE, ReasonCode.WIDE_FOR_FACE -> tpl.format(r.a ?: 0.0, r.b ?: 0.0)
+            ReasonCode.THIN_LENS, ReasonCode.THICK_LENS -> tpl.format(r.a ?: 0.0, S.materialShort(r.materialId ?: ""))
+            ReasonCode.IN_BUDGET, ReasonCode.OVER_BUDGET -> tpl.format((r.a ?: 0.0).toInt())
+            else -> tpl
+        }[l]
     }
+
+    /** Bullets for a ranked frame, with "+"/"−" marks; falls back to the old one-line reason for stored sessions. */
+    fun reasons(rf: RankedFrame, l: Lang): List<Pair<Boolean, String>> =
+        if (rf.reasons.isNotEmpty()) rf.reasons.map { it.positive to reason(it, l) }
+        else listOf(true to S.fit(rf.fit)[l])
+
+    fun label(rf: RankedFrame, l: Lang): String? = rf.label?.let { S.matchLabel(it)[l] }
 
     fun frameLine(rf: RankedFrame, l: Lang): String =
         S.frameLine.format(rf.frame.sizeMark, String.format(Locale.US, "%.0f mm", rf.frameWidthMm), rf.frame.priceInr)[l]
