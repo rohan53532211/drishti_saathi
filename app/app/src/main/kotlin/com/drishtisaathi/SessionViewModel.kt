@@ -17,7 +17,12 @@ import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.interview.ChoiceContext
 import com.drishtisaathi.interview.Question
 import com.drishtisaathi.interview.Questions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
+import com.drishtisaathi.pdf.PdfContent
+import com.drishtisaathi.pdf.PdfExporter
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -175,14 +180,20 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteCurrentSession(onDone: () -> Unit) {
         viewModelScope.launch {
             saveJob?.join()
-            _state.value.sessionId?.let { dao.delete(it) }
+            _state.value.sessionId?.let { removeSession(it) }
             startNew()
             onDone()
         }
     }
 
-    fun deleteSession(id: Long) = viewModelScope.launch {
+    /** Deletes the stored row and any PDFs exported for it. */
+    private suspend fun removeSession(id: Long) {
         dao.delete(id)
+        withContext(Dispatchers.IO) { PdfExporter.deleteFor(getApplication(), id) }
+    }
+
+    fun deleteSession(id: Long) = viewModelScope.launch {
+        removeSession(id)
         if (_state.value.sessionId == id) startNew()
     }
 
@@ -206,5 +217,21 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         onLoaded()
+    }
+
+    // ---- PDF ---------------------------------------------------------------------------------
+
+    /** Builds the shop copy (current language) or the Hindi customer copy, off the main thread. */
+    fun exportPdf(customer: Boolean, onReady: (File) -> Unit, onError: () -> Unit) = viewModelScope.launch {
+        saveJob?.join() // make sure the session id exists, so delete can find the file later
+        val st = _state.value
+        val app = getApplication<Application>()
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val blocks = if (customer) PdfContent.customerCopy(st, rules) else PdfContent.shopCopy(st, rules, choiceContext, st.lang)
+                val name = PdfExporter.prefix(st.sessionId) + (if (customer) "customer_hi" else "shop_${st.lang.name.lowercase()}") + ".pdf"
+                PdfExporter.write(app, blocks, File(PdfExporter.dir(app), name))
+            }
+        }.onSuccess(onReady).onFailure { onError() }
     }
 }

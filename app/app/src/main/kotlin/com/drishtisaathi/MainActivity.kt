@@ -19,6 +19,13 @@ import com.drishtisaathi.ui.OldNumbersScreen
 import com.drishtisaathi.ui.ReferralScreen
 import com.drishtisaathi.ui.ResultScreen
 import com.drishtisaathi.engine.ReferralLevel
+import com.drishtisaathi.i18n.S
+import com.drishtisaathi.pdf.PdfExporter
+import com.drishtisaathi.ui.BigButton
+import com.drishtisaathi.ui.HistoryScreen
+import android.widget.Toast
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,6 +41,7 @@ private object Routes {
     const val CONFIRM = "confirm"
     const val REFERRAL = "referral"
     const val RESULT = "result"
+    const val HISTORY = "history"
 }
 
 @Composable
@@ -49,7 +57,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             HomeScreen(
                 state, vm::setLang, vm::setStaffMode,
                 onStart = { vm.startNew(); nav.navigate(Routes.INTERVIEW) },
-                onHistory = { /* step 8 */ },
+                onHistory = { nav.navigate(Routes.HISTORY) },
             )
         }
         composable(Routes.INTERVIEW) {
@@ -105,6 +113,26 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onSaveVerification = vm::saveVerification,
                 onDelete = { vm.deleteCurrentSession { goHome() } },
                 onDone = { goHome() },
+                onBack = { nav.popBackStack() },
+                extraActions = {
+                    val context = LocalContext.current
+                    val l = state.lang
+                    fun export(customer: Boolean) = vm.exportPdf(
+                        customer,
+                        onReady = { file -> PdfExporter.share(context, file, (if (customer) S.customerCopy else S.shopSummary)[l]) },
+                        onError = { Toast.makeText(context, S.pdfFailed[l], Toast.LENGTH_LONG).show() },
+                    )
+                    BigButton(S.exportShopPdf[l], { export(customer = false) })
+                    BigButton(S.exportCustomerPdf[l], { export(customer = true) })
+                },
+            )
+        }
+        composable(Routes.HISTORY) {
+            val sessions by vm.sessions.collectAsState(initial = emptyList())
+            HistoryScreen(
+                state.lang, sessions, vm::setLang,
+                onOpen = { id -> vm.openSession(id) { nav.navigate(Routes.RESULT) } },
+                onDelete = { id -> vm.deleteSession(id) },
                 onBack = { nav.popBackStack() },
             )
         }
