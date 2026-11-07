@@ -23,6 +23,7 @@ import kotlin.math.sqrt
 enum class FaceShape { ROUND, OVAL, SQUARE, LONG, HEART }
 
 /** How the face-plane mm/px scale was obtained; caps the confidence of every mm measure. */
+@kotlinx.serialization.Serializable
 enum class ScaleSource { CARD, IRIS_PERSONAL, IRIS_PRIOR }
 
 /** Face-plane scale in mm per image pixel. */
@@ -346,6 +347,7 @@ fun FaceAggregator.AggregatedFace.toMeasuredFace(): com.drishtisaathi.engine.Mea
         pdMm = pdMm, faceWidthMm = faceWidthMm, bridgeWidthMm = bridgeWidth.estimate,
         faceShape = shape, suggestedFrameShapes = suggestedFrameShapes, framesUsed = framesUsed,
         lowPlausibility = plausibility.verdict != PlausibilityGate.Verdict.OK,
+        scaleSource = scaleSource,
     )
 
 fun PlausibilityGate.check(face: FaceAggregator.AggregatedFace): PlausibilityGate.Result = check(face.pd.mm, face.faceWidth.mm)

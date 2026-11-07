@@ -142,29 +142,28 @@
 
 
   "bayes": {
-    "_comment": "Track A. Innovation 10: posterior over SE = age prior (India prevalence) x Gaussian likelihood; most probable 1 D band. Adults 30+ prevalence from the Sightsavers review (myopia 27.7 %, hyperopia 22.9 %). Under-30 row and all shape parameters are DRAFT guesses for an optometrist to review.",
+    "_comment": "Innovation 10: posterior over SE = age prior (India prevalence) ^ priorWeight x Gaussian likelihood (sigma 0.80 D from the real studies, not the simulated value); most probable 1 D band. Adults 30+ prevalence from the Sightsavers review (myopia 27.7 %, hyperopia 22.9 %, emmetropia 49.4 %). Under-30 row and all shape parameters are DRAFT for an optometrist to review. priorWeight 0.5 softens a whole-population prior for people who come because of blur.",
     "enabled": true,
     "gridMinD": -12.0,
     "gridMaxD": 8.0,
     "gridStepD": 0.25,
     "bandWidthD": 1.0,
-    "sigmaHighD": 0.4,
-    "sigmaMediumD": 0.6,
-    "sigmaLowD": 0.8,
+    "likelihoodSigmaD": 0.80,
     "priorWeight": 0.5,
     "myopiaMaxD": -0.5,
     "hyperopiaMinD": 0.5,
+    "myopiaMagnitudePrior": { "type": "EXPONENTIAL", "meanD": 1.5, "note": "assumption, replace with pilot data" },
     "assumedAgeWhenUnknown": 35,
     "agePriors": [
       { "_comment": "DRAFT: young adults, more myopia, little manifest hyperopia", "minAge": 0, "maxAge": 29,
-        "myopiaPrevalence": 0.35, "hyperopiaPrevalence": 0.08, "myopiaScaleD": 1.75, "hyperopiaScaleD": 0.75,
+        "myopiaPrevalence": 0.35, "hyperopiaPrevalence": 0.08, "emmetropiaPrevalence": 0.57, "hyperopiaScaleD": 0.75,
         "emmetropiaMeanD": 0.0, "emmetropiaSdD": 0.35 },
       { "_comment": "India adults 30+ (systematic review)", "minAge": 30, "maxAge": 150,
-        "myopiaPrevalence": 0.277, "hyperopiaPrevalence": 0.229, "myopiaScaleD": 1.5, "hyperopiaScaleD": 1.0,
+        "myopiaPrevalence": 0.277, "hyperopiaPrevalence": 0.229, "emmetropiaPrevalence": 0.494, "hyperopiaScaleD": 1.0,
         "emmetropiaMeanD": 0.0, "emmetropiaSdD": 0.35 }
     ],
-    "bandProbabilityHigh": 0.70,
-    "bandProbabilityMedium": 0.50,
+    "bandProbabilityHigh": 0.80,
+    "minBandProbabilityToShow": 0.60,
     "addFusion": {
       "_comment": "Innovation 5. Hofstetter amplitude: min 15-0.25*age (optics), mean 18.5-0.30*age, max 25-0.40*age. Measured add and age-expected add are fused by inverse variance; an amplitude outside [min-tol, max+tol] inflates the measured sigma.",
       "hofstetterMeanIntercept": 18.5,
@@ -308,7 +307,6 @@
     "farPointLetterCount": 3,
     "farPointStartMaxMm": 150.0,
     "farPointMinMm": 100.0,
-    "noBlurMinDistanceMm": 500.0,
     "farPointBlueRgb": "#0000FF",
     "farPointWhiteRgb": "#FFFFFF",
 
@@ -344,5 +342,29 @@
     "widthScale": 1.0,
     "smoothingAlpha": 0.5,
     "smoothingResetFraction": 0.35
+  },
+
+
+  "farPoint": {
+    "_comment": "Simulation-tuned far-point rules (rules_update.md, tools/far_point_simulation.py). The blue LCA offset (doc blueLcaD), white limit (whiteMaxDistanceM) and blue/white threshold (consistencyThresholdD) are optics.lcaBlueOffsetD / whiteFarPointMaxM / farPointAgreementMaxD; the repeat threshold (repeatSpreadThresholdD) is optics.repeatSpreadMediumMaxD.",
+    "selfHeldReachM": 0.60,
+    "staffHeldMaxM": 2.0,
+    "irisDistanceMaxM": 0.60,
+    "beyondIrisUse": "CARD_CALIBRATED_PD",
+    "consistencyAction": "RETAKE_ONCE_THEN_LOW_CONFIDENCE",
+    "repeatSpreadAction": "THIRD_READING_MEDIAN"
+  },
+
+
+  "pdMeasurement": {
+    "_comment": "PD shown as 'about X mm (+/- sd)'. Card-calibrated = scale from the forehead card or the card-measured iris. Without the card no frame-fit claims.",
+    "sdNoCardMm": 3.3,
+    "sdCardMm": 1.2,
+    "frameFitClaimsRequireCard": true
+  },
+
+
+  "readingAdd": {
+    "verifyWithReadyReader": true
   }
 }

@@ -57,6 +57,11 @@ data class EyeAdvice(
      * sessions stored before this field existed.
      */
     val bandProbability: Double? = null,
+    /**
+     * True when [bandProbability] is below bayes.minBandProbabilityToShow: the band must not be shown as an estimated
+     * band (the starting trial lens is still given; staff refine it with the hand test). Band confidence is LOW.
+     */
+    val bandUncertain: Boolean = false,
 )
 
 @Serializable
@@ -75,6 +80,10 @@ enum class Note {
     FIRST_TIME_WEARER,
     /** No power known: frame thickness appears once the trial-lens result is in. Shown once, not per frame. */
     THICKNESS_AFTER_TRIAL_LENS,
+    /** A measured band was below bayes.minBandProbabilityToShow: use the starting trial lens and refine by hand. */
+    BAND_UNCERTAIN_REFINE_BY_HAND,
+    /** PD / face width came from the camera without the card: shown with ±3 mm, no frame-fit claims. */
+    MEASUREMENTS_NOT_CARD_CALIBRATED,
 }
 
 /** How to start the shop's hand test when there is no measured or known power. */
@@ -95,6 +104,8 @@ data class LensAdvice(
     val coatings: List<Coating>,
     /** Only when no starting lens could be given (no measurement, no old numbers). */
     val startingHints: List<StartingHint> = emptyList(),
+    /** Rule 7 (readingAdd.verifyWithReadyReader): the reading add must be confirmed with a ready-reader at the counter. */
+    val confirmAddWithReadyReader: Boolean = false,
 )
 
 @Serializable
@@ -105,6 +116,16 @@ data class Assessment(
     val notes: List<Note>,
     val pdMm: Estimate<Double>,
     val faceWidthMm: Estimate<Double>,
+    /**
+     * ± for showing a measured PD ("about 63 mm (±3 mm)"): pdMeasurement.sdCardMm when card-calibrated (or a staff
+     * ruler), sdNoCardMm for a camera PD without the card; null for the population average or older sessions.
+     */
+    val pdUncertaintyMm: Double? = null,
+    /**
+     * True when face width (and bridge) came from a camera capture that was not card-calibrated and
+     * pdMeasurement.frameFitClaimsRequireCard is on: frames must not be said to "fit".
+     */
+    val fitMeasurementsUncalibrated: Boolean = false,
 )
 
 // ---------------------------------------------------------------------------------------------
@@ -130,7 +151,16 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         val (pd, faceWidth) = anatomy(staff, face, notes)
 
         val advice = if (referral.adviceWithheld) null else lensAdvice(answers, tests, notes)
-        return Assessment(referral, advice, notes.toList(), pd, faceWidth)
+        val pm = rules.pdMeasurement
+        val pdSd = when (pd.source) {
+            Source.STAFF_ENTRY -> pm.sdCardMm
+            Source.MEASURED -> if (face?.cardCalibrated == true) pm.sdCardMm else pm.sdNoCardMm
+            else -> null
+        }
+        val faceUncal = face != null && !face.cardCalibrated
+        val fitUncal = pm.frameFitClaimsRequireCard && faceUncal && faceWidth.source == Source.MEASURED
+        if (faceUncal && (pd.source == Source.MEASURED || faceWidth.source == Source.MEASURED)) notes += Note.MEASUREMENTS_NOT_CARD_CALIBRATED
+        return Assessment(referral, advice, notes.toList(), pd, faceWidth, pdSd, fitUncal)
     }
 
     // ---- Section 6 referral ------------------------------------------------------------------
@@ -213,7 +243,10 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         val lensType = lensType(a, eyes, notes)
         if (a.firstTimeWearer == true && lensType.value != LensType.NONE_SUGGESTED) notes += Note.FIRST_TIME_WEARER
         val add = if (lensType.value in NEAR_TYPES) addBand(a, t, notes) else null
-        return LensAdvice(eyes, add, lensType, material(a, eyes), coatings(a), startingHints(a, eyes, measured))
+        return LensAdvice(
+            eyes, add, lensType, material(a, eyes), coatings(a), startingHints(a, eyes, measured),
+            confirmAddWithReadyReader = add != null && rules.readingAdd.verifyWithReadyReader,
+        )
     }
 
     private fun startingHints(a: InterviewAnswers, eyes: List<EyeAdvice>, measured: List<MeasuredEye>): List<StartingHint> {
@@ -227,7 +260,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
     private fun eyeAdvice(eye: Eye, m: MeasuredEye?, old: EyeRx?, a: InterviewAnswers, notes: MutableSet<Note>): EyeAdvice? {
         val usableMeasure = m?.takeIf { it.seD != null && !it.noMyopiaAtArmsLength }
         if (usableMeasure != null && (usableMeasure.confidence != Confidence.LOW || old == null)) {
-            if (rules.bayes.enabled) return bayesianEyeAdvice(eye, usableMeasure, a.age)
+            if (rules.bayes.enabled) return bayesianEyeAdvice(eye, usableMeasure, a.age, notes)
             val se = optics.roundToStep(usableMeasure.seD!!)
             val hw = rules.optics.measuredBandHalfWidthD
             val c = usableMeasure.confidence
@@ -260,20 +293,24 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
     }
 
     /**
-     * Measured eye → Bayesian band: age/prevalence prior × N(measured SE, σ from the measurement confidence).
+     * Measured eye → Bayesian band: age/prevalence prior × N(measured SE, bayes.likelihoodSigmaD = 0.80 D).
      * Band = most probable 1 D band, starting trial lens = its midpoint (rounded to 0.25 D). Confidence is the lower of
-     * the measurement's own confidence and the confidence implied by the band probability.
+     * the measurement's own confidence and the confidence implied by the band probability. A band below
+     * bayes.minBandProbabilityToShow is flagged [EyeAdvice.bandUncertain] (LOW) with a refine-by-hand note; the starting
+     * trial lens is still given because the shop's hand test starts from it.
      */
-    private fun bayesianEyeAdvice(eye: Eye, m: MeasuredEye, age: Int?): EyeAdvice {
+    private fun bayesianEyeAdvice(eye: Eye, m: MeasuredEye, age: Int?, notes: MutableSet<Note>): EyeAdvice {
         val se = m.seD!!.coerceIn(rules.bayes.gridMinD, rules.bayes.gridMaxD)
-        val r = bayes.fromMeasurement(se, age, m.confidence)
+        val r = bayes.fromMeasurement(se, age)
         val c = m.confidence.min(r.confidence)
+        if (!r.shown) notes += Note.BAND_UNCERTAIN_REFINE_BY_HAND
         return EyeAdvice(
             eye,
             Estimate(r.band, c, Source.MEASURED),
             Estimate(TrialLens(r.startingLensD), c, Source.MEASURED),
             thicknessPowerD = r.startingLensD,
             bandProbability = r.probability,
+            bandUncertain = !r.shown,
         )
     }
 

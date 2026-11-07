@@ -94,7 +94,14 @@ data class MeasuredFace(
     val framesUsed: Int = 0,
     /** The plausibility gate flagged the numbers: kept, but at LOW confidence. */
     val lowPlausibility: Boolean = false,
-)
+    /** How the mm scale was obtained; null for sessions stored before this field (treated as not card-calibrated). */
+    val scaleSource: com.drishtisaathi.engine.face.ScaleSource? = null,
+) {
+    /** Scale from the forehead card or the card-measured iris (rules_update.md rule 6), not the 11.7 mm prior. */
+    val cardCalibrated: Boolean
+        get() = scaleSource == com.drishtisaathi.engine.face.ScaleSource.CARD ||
+            scaleSource == com.drishtisaathi.engine.face.ScaleSource.IRIS_PERSONAL
+}
 
 /** Phase 3 on-screen test results for one eye. Unused in Phase 1 but the rules already handle them. */
 @Serializable

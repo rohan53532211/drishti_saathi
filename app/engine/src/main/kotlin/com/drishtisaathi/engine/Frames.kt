@@ -126,6 +126,11 @@ data class FrameReason(
     val impact: Double = 0.0,
     /** Fit reasons only: face width or PD is a population average, not measured. */
     val assumed: Boolean = false,
+    /**
+     * Fit and bridge reasons only (rules_update.md rule 6): measured by the camera without the card, so the app must
+     * use neutral wording and never say the frame "fits". Ignored when [assumed] (population-average wording wins).
+     */
+    val uncalibrated: Boolean = false,
 )
 
 @Serializable
@@ -207,6 +212,8 @@ class FrameRanker(private val rules: RulesConfig) {
         topN: Int = c.topN,
         /** Addition 5: measured nose width at the bridge; null = bridge not scored. */
         bridgeWidthMm: Double? = null,
+        /** Rule 6: face width / bridge are camera measures without the card → neutral fit wording. */
+        fitUncalibrated: Boolean = false,
     ): List<RankedFrame> {
         val material = rules.material(materialId)
         val powerConf = lensPowersD.map { it.confidence }.fold(pdMm.confidence) { a, b -> a.min(b) }
@@ -217,7 +224,7 @@ class FrameRanker(private val rules: RulesConfig) {
         return frames
             // Frames far over budget are not shown at all.
             .filter { cap == Int.MAX_VALUE || it.priceInr <= cap * (1 + c.hideOverBudgetFraction) }
-            .map { f -> score(f, faceW, fitAssumed, pdMm, lensPowersD, material, powerConf, prefs, bridgeWidthMm) }
+            .map { f -> score(f, faceW, fitAssumed, pdMm, lensPowersD, material, powerConf, prefs, bridgeWidthMm, fitUncalibrated && !fitAssumed) }
             // In-budget frames always rank above over-budget ones; score decides within each group.
             .sortedWith(
                 compareByDescending<RankedFrame> { it.withinBudget }
@@ -235,6 +242,7 @@ class FrameRanker(private val rules: RulesConfig) {
     private fun score(
         f: Frame, faceW: Double, fitAssumed: Boolean, pdMm: Estimate<Double>, lensPowersD: List<Estimate<Double>>,
         material: MaterialSpec, powerConf: Confidence, p: FramePrefs, bridgeWidthMm: Double? = null,
+        uncal: Boolean = false,
     ): RankedFrame {
         val reasons = mutableListOf<FrameReason>()
 
@@ -244,9 +252,9 @@ class FrameRanker(private val rules: RulesConfig) {
         val widthFit = (1.0 - abs(delta) / c.fitToleranceMm).coerceIn(0.0, 1.0)
         val fit = fitVerdict(delta)
         reasons += when {
-            fit == FitVerdict.GOOD -> FrameReason(ReasonCode.FITS_FACE, true, width, faceW, impact = c.weightFit * widthFit, assumed = fitAssumed)
-            delta < 0 -> FrameReason(ReasonCode.NARROW_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - widthFit), assumed = fitAssumed)
-            else -> FrameReason(ReasonCode.WIDE_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - widthFit), assumed = fitAssumed)
+            fit == FitVerdict.GOOD -> FrameReason(ReasonCode.FITS_FACE, true, width, faceW, impact = c.weightFit * widthFit, assumed = fitAssumed, uncalibrated = uncal)
+            delta < 0 -> FrameReason(ReasonCode.NARROW_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - widthFit), assumed = fitAssumed, uncalibrated = uncal)
+            else -> FrameReason(ReasonCode.WIDE_FOR_FACE, false, width, faceW, impact = c.weightFit * (1 - widthFit), assumed = fitAssumed, uncalibrated = uncal)
         }
         // Addition 5: when the nose bridge was measured, part of the fit score is bridge (DBL) vs nose width.
         val fitScore = if (bridgeWidthMm == null) widthFit else {
@@ -256,6 +264,7 @@ class FrameRanker(private val rules: RulesConfig) {
             reasons += FrameReason(
                 if (ok) ReasonCode.BRIDGE_FITS else ReasonCode.BRIDGE_MISMATCH, ok, f.bridgeMm, bridgeWidthMm,
                 impact = c.weightFit * c.bridgeFitShare * if (ok) bridgeFit else 1 - bridgeFit,
+                uncalibrated = uncal,
             )
             (1 - c.bridgeFitShare) * widthFit + c.bridgeFitShare * bridgeFit
         }
@@ -394,6 +403,7 @@ class DrishtiEngine(private val rules: RulesConfig, priors: AnthroPriors, privat
         val frames = ranker.rank(
             catalog.frames, a.faceWidthMm, a.pdMm, powers, advice.materialId.value, prefs,
             bridgeWidthMm = face?.bridgeWidthMm?.value,
+            fitUncalibrated = a.fitMeasurementsUncalibrated,
         )
         return SessionResult(a, frames)
     }

@@ -31,6 +31,10 @@ data class RulesConfig(
     val camera: com.drishtisaathi.engine.config.CameraConfig = com.drishtisaathi.engine.config.CameraConfig(),
     val visionTests: com.drishtisaathi.engine.config.VisionTestConfig = com.drishtisaathi.engine.config.VisionTestConfig(),
     val tryOn: com.drishtisaathi.engine.config.TryOnConfig = com.drishtisaathi.engine.config.TryOnConfig(),
+    // ---- Simulation-tuned rules (rules_update.md); a missing section throws ----
+    val farPoint: com.drishtisaathi.engine.config.FarPointConfig = com.drishtisaathi.engine.config.FarPointConfig(),
+    val pdMeasurement: com.drishtisaathi.engine.config.PdMeasurementConfig = com.drishtisaathi.engine.config.PdMeasurementConfig(),
+    val readingAdd: com.drishtisaathi.engine.config.ReadingAddConfig = com.drishtisaathi.engine.config.ReadingAddConfig(),
 ) {
     fun material(id: String): MaterialSpec =
         materials.firstOrNull { it.id == id } ?: error("Material '$id' is not defined in rules.json")

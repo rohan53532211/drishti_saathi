@@ -13,6 +13,7 @@ import com.drishtisaathi.engine.TestAssets
 import com.drishtisaathi.engine.VisionTests
 import com.drishtisaathi.engine.config.BayesConfig
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -45,7 +46,7 @@ class BayesianBandTest {
     // ---- measured SE -------------------------------------------------------------------------------
 
     @Test fun `band is 1 D wide, holds the measurement, probability matches the posterior`() {
-        val r = bayes.fromMeasurement(-3.0, 45, Confidence.HIGH)
+        val r = bayes.fromMeasurement(-3.0, 45)
         assertEquals(1.0, r.band.highD - r.band.lowD, 1e-9)
         assertTrue(-3.0 in r.band.lowD..r.band.highD)
         assertEquals(1.0, r.posterior.sum(), 1e-9)
@@ -57,36 +58,56 @@ class BayesianBandTest {
         assertEquals(0.0, (r.startingLensD / step) % 1.0, 1e-9)
     }
 
+    @Test fun `likelihood sigma is 0_80 D from rules json`() {
+        assertEquals(0.80, rules.bayes.likelihoodSigmaD, 1e-9)
+        assertEquals(0.80, bayes.fromMeasurement(-2.0, 45).sigmaD!!, 1e-9)
+        // Myopia magnitude prior: exponential with mean 1.5 D → scale 1.0 D beyond the −0.50 D boundary
+        assertEquals(1.0, rules.bayes.myopiaScaleD, 1e-9)
+    }
+
     @Test fun `prior shrinks a mild measurement towards emmetropia`() {
-        val r = bayes.fromMeasurement(-2.0, 45, Confidence.MEDIUM)
+        val r = bayes.fromMeasurement(-2.0, 45)
         assertTrue(r.posteriorMeanD > -2.0 && r.posteriorMeanD < 0.0)
     }
 
-    @Test fun `noisier measurement - lower band probability and confidence`() {
-        val high = bayes.fromMeasurement(-2.5, 45, Confidence.HIGH)
-        val low = bayes.fromMeasurement(-2.5, 45, Confidence.LOW)
-        assertTrue(high.probability > low.probability)
-        assertEquals(Confidence.HIGH, high.confidence)
-        assertEquals(Confidence.LOW, low.confidence)
-        assertEquals(rules.bayes.sigmaHighD, high.sigmaD!!, 1e-9)
+    @Test fun `rule 5 - with sigma 0_8 a 1 D band stays below 0_60 and is not shown`() {
+        // The table reported to the lead: typical measurements at ages 35 and 55.
+        for (age in listOf(35, 55)) for (se in listOf(-1.4, -3.0, -5.0)) {
+            val r = bayes.fromMeasurement(se, age)
+            assertTrue("P=${r.probability} for $se at $age", r.probability in 0.40..0.55)
+            assertFalse(r.shown)
+            assertEquals(Confidence.LOW, r.confidence)
+        }
+        // A 1 D band cannot reach 0.60 with σ 0.8 even under a flat prior (max ≈ 0.47).
+        val flat = BayesianBand(rules.bayes.copy(priorWeight = 0.0), rules.optics)
+        assertTrue(flat.fromMeasurement(-3.0, 45).probability < 0.48)
+    }
+
+    @Test fun `a tighter measurement clears the show threshold`() {
+        val r = bayes.fromMeasurement(-3.0, 45, sigmaD = 0.4)
+        assertTrue(r.probability >= rules.bayes.minBandProbabilityToShow)
+        assertTrue(r.shown)
+        assertTrue(r.confidence != Confidence.LOW)
     }
 
     @Test fun `flat prior centres the band on the measurement`() {
         val flat = BayesianBand(rules.bayes.copy(priorWeight = 0.0), rules.optics)
-        val r = flat.fromMeasurement(-2.0, 45, Confidence.MEDIUM)
+        val r = flat.fromMeasurement(-2.0, 45)
         assertEquals(PowerBand(-2.5, -1.5), r.band)
         assertEquals(-2.0, r.mapD, 1e-9)
     }
 
     @Test fun `confidence thresholds come from rules json`() {
-        val strict = BayesianBand(rules.bayes.copy(bandProbabilityHigh = 0.99, bandProbabilityMedium = 0.98), rules.optics)
-        assertEquals(Confidence.LOW, strict.fromMeasurement(-3.0, 45, Confidence.HIGH).confidence)
+        val lax = BayesianBand(rules.bayes.copy(bandProbabilityHigh = 0.45, minBandProbabilityToShow = 0.40), rules.optics)
+        val r = lax.fromMeasurement(-3.0, 45)
+        assertEquals(Confidence.HIGH, r.confidence)
+        assertTrue(r.shown)
     }
 
     @Test fun `sigma from repeats widens only when the repeats disagree`() {
-        assertEquals(rules.bayes.sigmaHighD, bayes.sigmaFromRepeats(listOf(-2.0, -2.1), Confidence.HIGH), 1e-9)
-        assertEquals(1.4142, bayes.sigmaFromRepeats(listOf(-1.0, -3.0), Confidence.HIGH), 1e-3)
-        assertEquals(rules.bayes.sigmaMediumD, bayes.sigmaFromRepeats(listOf(-2.0), Confidence.MEDIUM), 1e-9)
+        assertEquals(0.80, bayes.sigmaFromRepeats(listOf(-2.0, -2.1)), 1e-9)
+        assertEquals(1.4142, bayes.sigmaFromRepeats(listOf(-1.0, -3.0)), 1e-3)
+        assertEquals(0.80, bayes.sigmaFromRepeats(listOf(-2.0)), 1e-9)
     }
 
     // ---- censored: no blur within arm's length ------------------------------------------------------
@@ -113,7 +134,7 @@ class BayesianBandTest {
     @Test fun `rules engine carries the band probability for measured eyes`() {
         val m = MeasuredEye(seD = -3.1, confidence = Confidence.HIGH)
         val eye = engine.assess(adult, tests = VisionTests(right = m)).advice!!.eyes.single { it.eye == Eye.RIGHT }
-        val direct = bayes.fromMeasurement(-3.1, 45, Confidence.HIGH)
+        val direct = bayes.fromMeasurement(-3.1, 45)
         assertEquals(direct.band, eye.band.value)
         assertEquals(direct.probability, eye.bandProbability!!, 1e-12)
         assertEquals(direct.startingLensD, eye.startingTrialLens.value.sph, 1e-9)
@@ -124,6 +145,16 @@ class BayesianBandTest {
         val m = MeasuredEye(seD = -3.0, confidence = Confidence.MEDIUM)
         val eye = engine.assess(adult, tests = VisionTests(right = m)).advice!!.eyes.single()
         assertTrue(eye.band.confidence != Confidence.HIGH)
+    }
+
+    @Test fun `uncertain band keeps the starting trial lens, flags the band and tells staff to refine by hand`() {
+        val m = MeasuredEye(seD = -3.0, confidence = Confidence.HIGH)
+        val r = engine.assess(adult, tests = VisionTests(right = m))
+        val eye = r.advice!!.eyes.single()
+        assertTrue(eye.bandUncertain)
+        assertEquals(Confidence.LOW, eye.band.confidence)
+        assertEquals(eye.band.value.midD, eye.startingTrialLens.value.sph, 1e-9)
+        assertTrue(com.drishtisaathi.engine.Note.BAND_UNCERTAIN_REFINE_BY_HAND in r.notes)
     }
 
     @Test fun `old numbers have no band probability`() {

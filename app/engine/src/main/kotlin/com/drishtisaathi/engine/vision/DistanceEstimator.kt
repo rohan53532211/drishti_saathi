@@ -6,6 +6,7 @@ import com.drishtisaathi.engine.Optics
 import com.drishtisaathi.engine.RulesConfig
 import com.drishtisaathi.engine.Source
 import com.drishtisaathi.engine.config.DistanceConfig
+import com.drishtisaathi.engine.config.FarPointConfig
 import com.drishtisaathi.engine.config.FaceGeometryConfig
 import com.drishtisaathi.engine.face.FaceFrame
 import kotlin.math.hypot
@@ -24,11 +25,22 @@ import kotlin.math.tan
  * - Iris mm: personal value from card calibration when given, else the 11.7 mm prior.
  * Confidence comes from the propagated relative SD: (σ_iris/iris)² + (σ_px/px)².
  */
-class DistanceEstimator(private val c: DistanceConfig, private val lm: FaceGeometryConfig.LandmarkIndices) {
+class DistanceEstimator(
+    private val c: DistanceConfig,
+    private val lm: FaceGeometryConfig.LandmarkIndices,
+    /** Rule 2 (beyond farPoint.irisDistanceMaxM use the card PD); null = iris only, as before. */
+    private val farPoint: FarPointConfig? = null,
+    /** SD of a card-calibrated PD (pdMeasurement.sdCardMm), for the PD method's confidence. */
+    private val cardPdSdMm: Double = 1.2,
+) {
 
-    constructor(rules: RulesConfig) : this(rules.distance, rules.faceGeometry.landmarks)
+    constructor(rules: RulesConfig) :
+        this(rules.distance, rules.faceGeometry.landmarks, rules.farPoint, rules.pdMeasurement.sdCardMm)
 
     enum class IrisSource { PERSONAL_CARD, POPULATION_PRIOR }
+
+    /** IRIS: f·irisMm/irisPx. CARD_PD: f·PD/interpupillary px (beyond irisDistanceMaxM, where the iris is too small). */
+    enum class DistanceMethod { IRIS, CARD_PD }
     enum class FocalSource { CAMERA_INTRINSICS, FOV_FALLBACK }
 
     data class IrisMeasure(
@@ -59,6 +71,10 @@ class DistanceEstimator(private val c: DistanceConfig, private val lm: FaceGeome
         val focalPx: Double,
         val irisDiameterMm: Double,
         val irisesUsed: Int,
+        val method: DistanceMethod = DistanceMethod.IRIS,
+        /** CARD_PD only: interpupillary distance in px and the card-calibrated PD used. */
+        val interpupillaryPx: Double? = null,
+        val pdMm: Double? = null,
     ) {
         val distanceM: Double get() = distanceMm / 1000.0
 
@@ -117,7 +133,51 @@ class DistanceEstimator(private val c: DistanceConfig, private val lm: FaceGeome
      * Distance for one frame, or null when no usable iris is visible.
      * @param personalIrisMm from [personalIrisDiameterMm] after card calibration; ignored if outside the plausible range.
      */
-    fun estimate(frame: FaceFrame, personalIrisMm: Double? = null): DistanceEstimate? {
+    /**
+     * Distance for one frame, or null when nothing usable is visible.
+     *
+     * Rule 2 (farPoint): when the iris estimate is beyond farPoint.irisDistanceMaxM (or the iris is too small to
+     * measure) and [cardPdMm] — the PD from a card-calibrated capture — is known, the distance comes from
+     * d = f_px × PD_mm / interpupillary px instead. Without a card PD the iris estimate is kept at LOW confidence.
+     */
+    fun estimate(frame: FaceFrame, personalIrisMm: Double? = null, cardPdMm: Double? = null): DistanceEstimate? {
+        val iris = irisEstimate(frame, personalIrisMm)
+        val fp = farPoint ?: return iris
+        val limitMm = fp.irisDistanceMaxM * 1000.0
+        if (iris != null && iris.depthMm <= limitMm) return iris
+        if (fp.beyondIrisUse == FarPointConfig.BeyondIris.CARD_CALIBRATED_PD && cardPdMm != null) {
+            pdEstimate(frame, cardPdMm, personalIrisMm)?.let { return it }
+        }
+        return iris?.copy(confidence = Confidence.LOW)
+    }
+
+    /** d = f_px × PD_mm / interpupillary px (iris centres); null without landmarks or with an implausible PD. */
+    fun pdEstimate(frame: FaceFrame, cardPdMm: Double, personalIrisMm: Double? = null): DistanceEstimate? {
+        if (!hasLandmarks(frame) || cardPdMm <= 0) return null
+        val ipPx = dist(frame, lm.irisRightCentre, lm.irisLeftCentre)
+        if (!ipPx.isFinite() || ipPx < c.minIrisPx) return null
+        val (f, focalSource) = focalLengthPx(frame)
+        val depth = f * cardPdMm / ipPx
+        val pxSd = c.irisPixelSdPx * sqrt(2.0)
+        val rel = sqrt((cardPdSdMm / cardPdMm).let { it * it } + (pxSd / ipPx).let { it * it })
+        var conf = when {
+            rel <= c.highMaxRelativeSd -> Confidence.HIGH
+            rel <= c.mediumMaxRelativeSd -> Confidence.MEDIUM
+            else -> Confidence.LOW
+        }
+        if (focalSource == FocalSource.FOV_FALLBACK) conf = Confidence.LOW
+        val (cx1, cy1) = frame.px(lm.irisRightCentre)
+        val (cx2, cy2) = frame.px(lm.irisLeftCentre)
+        val iris = irisDiameterPx(frame)
+        return build(
+            frame, (cx1 + cx2) / 2.0, (cy1 + cy2) / 2.0, depth, f, conf, rel,
+            if (personalIrisMm != null) IrisSource.PERSONAL_CARD else IrisSource.POPULATION_PRIOR, focalSource,
+            irisPx = iris?.diameterPx ?: 0.0, irisMm = personalIrisMm ?: c.irisDiameterPriorMm, irisesUsed = iris?.irisesUsed ?: 0,
+            method = DistanceMethod.CARD_PD, interpupillaryPx = ipPx, pdMm = cardPdMm,
+        )
+    }
+
+    private fun irisEstimate(frame: FaceFrame, personalIrisMm: Double?): DistanceEstimate? {
         val iris = irisDiameterPx(frame) ?: return null
         val (f, focalSource) = focalLengthPx(frame)
         val personal = personalIrisMm?.takeIf { it in c.personalIrisMinMm..c.personalIrisMaxMm }
@@ -137,12 +197,20 @@ class DistanceEstimator(private val c: DistanceConfig, private val lm: FaceGeome
         if (iris.pairDisagreed) conf = conf.min(Confidence.MEDIUM)
         if (focalSource == FocalSource.FOV_FALLBACK) conf = Confidence.LOW
 
+        return build(frame, iris.centreXPx, iris.centreYPx, depth, f, conf, rel, irisSource, focalSource,
+            iris.diameterPx, irisMm, iris.irisesUsed)
+    }
+
+    private fun build(
+        frame: FaceFrame, eyeXPx: Double, eyeYPx: Double, depth: Double, f: Double, conf: Confidence, rel: Double,
+        irisSource: IrisSource, focalSource: FocalSource, irisPx: Double, irisMm: Double, irisesUsed: Int,
+        method: DistanceMethod = DistanceMethod.IRIS, interpupillaryPx: Double? = null, pdMm: Double? = null,
+    ): DistanceEstimate {
         // Eye position in camera coordinates (principal point assumed at the image centre).
-        val ex = (iris.centreXPx - frame.imageWidthPx / 2.0) * depth / f
-        val ey = (iris.centreYPx - frame.imageHeightPx / 2.0) * depth / f
+        val ex = (eyeXPx - frame.imageWidthPx / 2.0) * depth / f
+        val ey = (eyeYPx - frame.imageHeightPx / 2.0) * depth / f
         val ox = if (frame.mirrored) -c.screenCentreOffsetXMm else c.screenCentreOffsetXMm
         val toScreen = sqrt((ex - ox) * (ex - ox) + (ey - c.screenCentreOffsetYMm).let { it * it } + depth * depth)
-
         return DistanceEstimate(
             distanceMm = if (c.applyScreenCentreOffset) toScreen else depth,
             depthMm = depth,
@@ -151,10 +219,13 @@ class DistanceEstimator(private val c: DistanceConfig, private val lm: FaceGeome
             relativeSd = rel,
             irisSource = irisSource,
             focalSource = focalSource,
-            irisPx = iris.diameterPx,
+            irisPx = irisPx,
             focalPx = f,
             irisDiameterMm = irisMm,
-            irisesUsed = iris.irisesUsed,
+            irisesUsed = irisesUsed,
+            method = method,
+            interpupillaryPx = interpupillaryPx,
+            pdMm = pdMm,
         )
     }
 

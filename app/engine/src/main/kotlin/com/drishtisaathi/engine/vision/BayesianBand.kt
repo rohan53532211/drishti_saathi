@@ -20,16 +20,19 @@ import kotlin.math.sqrt
  * prior(age, India prevalence)^priorWeight × likelihood.
  *
  * Prior per age band (bayes.agePriors): three classes with the prevalence masses
- * - myopia (SE ≤ myopiaMaxD): falls off as exp(−(myopiaMaxD − SE)/myopiaScaleD),
+ * - myopia (SE ≤ myopiaMaxD): exponential magnitude, exp(−(myopiaMaxD − SE)/scale) with
+ *   scale = myopiaMagnitudePrior.meanD − |myopiaMaxD| (mean myopic magnitude = meanD),
  * - hyperopia (SE ≥ hyperopiaMinD): exp(−(SE − hyperopiaMinD)/hyperopiaScaleD),
  * - emmetropia (in between): Gaussian(emmetropiaMeanD, emmetropiaSdD),
  * each normalised on the grid so the class masses equal the prevalence figures exactly.
  *
  * Likelihoods: measured SE → N(measured, σ); "no blur within arm's length" → censored,
- * P(measured far point beyond L | SE) = Φ((SE + 1/L)/σ).
+ * P(measured far point beyond L | SE) = Φ((SE + 1/L)/σ). σ = bayes.likelihoodSigmaD (0.80 D).
  *
  * Output: the 1 D band (bandWidthD) holding the most posterior mass (grid points are bins of width gridStepD, so
- * the band endpoints count half), its probability, the MAP, and a confidence from bandProbabilityHigh/Medium.
+ * the band endpoints count half), its probability, the MAP, and a confidence: ≥ bandProbabilityHigh → HIGH,
+ * ≥ minBandProbabilityToShow → MEDIUM, else LOW with [Result.shown] = false (not shown as an estimated band).
+ * Note: with σ = 0.80 D a 1 D band can hold at most P(|z| < 0.625) ≈ 0.47 under a flat prior.
  */
 class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig) {
 
@@ -50,6 +53,8 @@ class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig)
         /** Band midpoint rounded to the power step: the starting trial lens sphere. */
         val startingLensD: Double,
         val confidence: Confidence,
+        /** False when [probability] < bayes.minBandProbabilityToShow: do not present the band as an estimated band. */
+        val shown: Boolean,
         val sigmaD: Double?,
         val grid: DoubleArray,
         val posterior: DoubleArray,
@@ -72,7 +77,7 @@ class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig)
     fun prior(age: Int?): DoubleArray {
         val p = agePrior(age)
         val eps = 1e-9
-        val myo = DoubleArray(grid.size) { i -> val g = grid[i]; if (g <= c.myopiaMaxD + eps) exp(-(c.myopiaMaxD - g) / p.myopiaScaleD) else 0.0 }
+        val myo = DoubleArray(grid.size) { i -> val g = grid[i]; if (g <= c.myopiaMaxD + eps) exp(-(c.myopiaMaxD - g) / c.myopiaScaleD) else 0.0 }
         val hyp = DoubleArray(grid.size) { i -> val g = grid[i]; if (g >= c.hyperopiaMinD - eps) exp(-(g - c.hyperopiaMinD) / p.hyperopiaScaleD) else 0.0 }
         val emm = DoubleArray(grid.size) { i ->
             val g = grid[i]
@@ -81,7 +86,7 @@ class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig)
             } else 0.0
         }
         val parts = listOf(myo to p.myopiaPrevalence, hyp to p.hyperopiaPrevalence,
-            emm to (1.0 - p.myopiaPrevalence - p.hyperopiaPrevalence))
+            emm to p.emmetropiaPrevalence)
         val out = DoubleArray(grid.size)
         for ((shape, mass) in parts) {
             val s = shape.sum()
@@ -93,29 +98,30 @@ class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig)
 
     // ---- likelihoods ----------------------------------------------------------------------------
 
-    fun sigmaFor(measurementConfidence: Confidence): Double = c.sigmaFor(measurementConfidence)
+    /** The likelihood σ from rules.json (0.80 D). */
+    val sigmaD: Double get() = c.likelihoodSigmaD
 
-    /** σ for repeated measures: the confidence's σ, widened to the repeats' sample SD when that is larger. */
-    fun sigmaFromRepeats(values: List<Double>, measurementConfidence: Confidence): Double {
-        val base = sigmaFor(measurementConfidence)
+    /** σ for repeated measures: likelihoodSigmaD, widened to the repeats' sample SD when that is larger. */
+    fun sigmaFromRepeats(values: List<Double>): Double {
+        val base = c.likelihoodSigmaD
         if (values.size < 2) return base
         val mean = values.average()
         val sd = sqrt(values.sumOf { (it - mean) * (it - mean) } / (values.size - 1))
         return max(base, sd)
     }
 
-    /** Measured SE with Gaussian error σ (default from the measurement confidence). */
-    fun fromMeasurement(seD: Double, age: Int?, sigmaD: Double): Result {
+    /** Measured SE with Gaussian error σ (default bayes.likelihoodSigmaD). */
+    fun fromMeasurement(seD: Double, age: Int?, sigmaD: Double = c.likelihoodSigmaD): Result {
         require(sigmaD > 0)
         val like = DoubleArray(grid.size) { i -> val z = (grid[i] - seD) / sigmaD; exp(-0.5 * z * z) }
         return summarise(posterior(age, like), sigmaD)
     }
 
-    fun fromMeasurement(seD: Double, age: Int?, measurementConfidence: Confidence): Result =
-        fromMeasurement(seD, age, sigmaFor(measurementConfidence))
-
-    /** No blur found within arm's length (optics.armsLengthM): censored likelihood SE > −1/L, softened by σ. */
-    fun fromNoBlurAtArmsLength(age: Int?, sigmaD: Double = c.sigmaMediumD, armsLengthM: Double = optics.armsLengthM): Result {
+    /**
+     * No blur found up to [armsLengthM] (pass farPoint.staffHeldMaxM after a staff-held test): censored likelihood
+     * SE > −1/L, softened by σ.
+     */
+    fun fromNoBlurAtArmsLength(age: Int?, sigmaD: Double = c.likelihoodSigmaD, armsLengthM: Double = optics.armsLengthM): Result {
         require(sigmaD > 0 && armsLengthM > 0)
         val limit = -1.0 / armsLengthM
         val like = DoubleArray(grid.size) { i -> normalCdf((grid[i] - limit) / sigmaD) }
@@ -152,11 +158,11 @@ class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig)
         val sd = sqrt(grid.indices.sumOf { (grid[it] - mean) * (grid[it] - mean) * post[it] })
         val conf = when {
             bestMass >= c.bandProbabilityHigh -> Confidence.HIGH
-            bestMass >= c.bandProbabilityMedium -> Confidence.MEDIUM
+            bestMass >= c.minBandProbabilityToShow -> Confidence.MEDIUM
             else -> Confidence.LOW
         }
         val lens = (band.midD / optics.powerStepD).roundToLong() * optics.powerStepD
-        return Result(band, bestMass, grid[mapIdx], mean, sd, lens, conf, sigma, grid, post)
+        return Result(band, bestMass, grid[mapIdx], mean, sd, lens, conf, bestMass >= c.minBandProbabilityToShow, sigma, grid, post)
     }
 
     companion object {

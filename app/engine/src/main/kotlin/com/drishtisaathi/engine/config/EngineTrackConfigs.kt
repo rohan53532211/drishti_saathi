@@ -89,33 +89,50 @@ data class BayesConfig(
     val gridStepD: Double,
     /** Width of the reported band ("−1.00 to −2.00 D"). */
     val bandWidthD: Double,
-    /** Likelihood σ by the measurement's own confidence (repeat spread). Brief: σ ≈ 0.8 D for a typical far point. */
-    val sigmaHighD: Double,
-    val sigmaMediumD: Double,
-    val sigmaLowD: Double,
+    /**
+     * Likelihood σ of a measured far-point SE: 0.80 D from the real studies (Luo 2022, MAE 0.65 D), not the optimistic
+     * simulated value. Repeats that disagree more widen it ([com.drishtisaathi.engine.vision.BayesianBand.sigmaFromRepeats]).
+     */
+    val likelihoodSigmaD: Double,
     /** Exponent on the prior: 1 = full Bayes, 0 = flat prior (likelihood only). Lets an optometrist soften the prior. */
     val priorWeight: Double,
     /** Class boundaries used by the prevalence figures: myopia SE ≤ myopiaMaxD, hyperopia SE ≥ hyperopiaMinD. */
     val myopiaMaxD: Double,
     val hyperopiaMinD: Double,
+    /** Shape of the myopic part of the prior (all age bands). */
+    val myopiaMagnitudePrior: MagnitudePrior,
     /** Age used to pick the prior band when the age is unknown. */
     val assumedAgeWhenUnknown: Int,
     val agePriors: List<AgePrior>,
-    /** Posterior probability of the reported band: ≥ high → HIGH, ≥ medium → MEDIUM, else LOW. */
+    /** Band probability at or above this → HIGH confidence. */
     val bandProbabilityHigh: Double,
-    val bandProbabilityMedium: Double,
+    /**
+     * Below this the most probable band is not shown as an estimated band: the starting trial lens is kept, the band
+     * is flagged uncertain (LOW) and staff are told to refine with the hand test. At or above it (below high) → MEDIUM.
+     */
+    val minBandProbabilityToShow: Double,
     val addFusion: AddFusionConfig,
 ) {
+    enum class MagnitudeShape { EXPONENTIAL }
+
+    /** Myopic |SE| = |myopiaMaxD| + Exp(scale), scale = meanD − |myopiaMaxD|, so the mean myopic magnitude is meanD. */
+    @Serializable
+    data class MagnitudePrior(
+        val type: MagnitudeShape,
+        val meanD: Double,
+        val note: String? = null,
+    )
+
     @Serializable
     data class AgePrior(
         @SerialName("_comment") val comment: String? = null,
         val minAge: Int,
         val maxAge: Int,
-        /** Fractions of the age band that are myopic / hyperopic; the rest is emmetropic. */
+        /** Fractions of the age band that are myopic / hyperopic / emmetropic; must sum to 1. */
         val myopiaPrevalence: Double,
         val hyperopiaPrevalence: Double,
-        /** Myopic SE falls off as exp(−(|SE| − |myopiaMaxD|)/scale) beyond the class boundary. */
-        val myopiaScaleD: Double,
+        val emmetropiaPrevalence: Double,
+        /** Hyperopic SE falls off as exp(−(SE − hyperopiaMinD)/scale). */
         val hyperopiaScaleD: Double,
         /** Emmetropic part: Gaussian on the open interval between the class boundaries. */
         val emmetropiaMeanD: Double,
@@ -123,27 +140,28 @@ data class BayesConfig(
     ) {
         init {
             require(minAge <= maxAge)
-            require(myopiaPrevalence >= 0 && hyperopiaPrevalence >= 0 && myopiaPrevalence + hyperopiaPrevalence < 1.0)
-            require(myopiaScaleD > 0 && hyperopiaScaleD > 0 && emmetropiaSdD > 0)
+            require(myopiaPrevalence >= 0 && hyperopiaPrevalence >= 0 && emmetropiaPrevalence >= 0)
+            require(kotlin.math.abs(myopiaPrevalence + hyperopiaPrevalence + emmetropiaPrevalence - 1.0) < 0.005) {
+                "agePriors: myopia + hyperopia + emmetropia must sum to 1"
+            }
+            require(hyperopiaScaleD > 0 && emmetropiaSdD > 0)
         }
     }
 
     init {
         require(gridMinD < gridMaxD && gridStepD > 0)
         require(bandWidthD > 0 && bandWidthD < gridMaxD - gridMinD)
-        require(sigmaHighD > 0 && sigmaMediumD > 0 && sigmaLowD > 0)
+        require(likelihoodSigmaD > 0)
         require(priorWeight in 0.0..1.0)
         require(myopiaMaxD < hyperopiaMinD)
+        require(myopiaMagnitudePrior.meanD > -myopiaMaxD) { "myopia mean magnitude must exceed the class boundary" }
         require(agePriors.isNotEmpty())
         require(agePriors.any { assumedAgeWhenUnknown in it.minAge..it.maxAge }) { "assumedAgeWhenUnknown not covered" }
-        require(bandProbabilityHigh >= bandProbabilityMedium)
+        require(minBandProbabilityToShow in 0.0..bandProbabilityHigh)
     }
 
-    fun sigmaFor(c: Confidence): Double = when (c) {
-        Confidence.HIGH -> sigmaHighD
-        Confidence.MEDIUM -> sigmaMediumD
-        Confidence.LOW -> sigmaLowD
-    }
+    /** Exponential scale of the myopic magnitude beyond the class boundary. */
+    val myopiaScaleD: Double get() = myopiaMagnitudePrior.meanD + myopiaMaxD
 
     companion object {
         operator fun invoke(): BayesConfig = missingSection("bayes")
@@ -298,5 +316,86 @@ data class FaceGeometryConfig(
 
     companion object {
         operator fun invoke(): FaceGeometryConfig = missingSection("faceGeometry")
+    }
+}
+
+// =============================================================================================
+// farPoint: how the far point is taken (simulation-tuned rules, rules_update.md).
+// The LCA offset, white limit and blue/white agreement stay in "optics" (lcaBlueOffsetD, whiteFarPointMaxM,
+// farPointAgreementMaxD) and the repeat-disagreement threshold is optics.repeatSpreadMediumMaxD: one source each.
+// =============================================================================================
+
+@Serializable
+data class FarPointConfig(
+    @SerialName("_comment") val comment: String? = null,
+    /** Customer still sees clearly with the phone this far (arm's reach): offer the staff-held mode. */
+    val selfHeldReachM: Double,
+    /** Staff-held mode (Luo method): blur taps valid up to here; "still clear" only counts beyond it. */
+    val staffHeldMaxM: Double,
+    /** Beyond this the iris is only a few pixels wide: use [beyondIrisUse] for the distance. */
+    val irisDistanceMaxM: Double,
+    val beyondIrisUse: BeyondIris,
+    /** Blue vs white SE differ by more than optics.farPointAgreementMaxD. */
+    val consistencyAction: ConsistencyAction,
+    /** Two repeats of one colour differ by more than optics.repeatSpreadMediumMaxD. */
+    val repeatSpreadAction: RepeatSpreadAction,
+) {
+    enum class BeyondIris {
+        /** d = f_px × PD_mm / interpupillary px with the card-calibrated PD; without one, iris at LOW confidence. */
+        CARD_CALIBRATED_PD,
+        /** Keep the iris estimate, LOW confidence beyond irisDistanceMaxM. */
+        IRIS_LOW_CONFIDENCE,
+    }
+
+    enum class ConsistencyAction {
+        /** Retake both colours once; still disagreeing → blue SE at LOW confidence. */
+        RETAKE_ONCE_THEN_LOW_CONFIDENCE,
+        /** No retake: blue SE at LOW confidence straight away. */
+        LOW_CONFIDENCE,
+    }
+
+    enum class RepeatSpreadAction {
+        /** Take a third reading of that colour and use the median of the three. */
+        THIRD_READING_MEDIAN,
+        /** No third reading: the median of two at LOW confidence. */
+        LOW_CONFIDENCE,
+    }
+
+    init {
+        require(selfHeldReachM > 0 && staffHeldMaxM > selfHeldReachM && irisDistanceMaxM > 0)
+    }
+
+    companion object {
+        operator fun invoke(): FarPointConfig = missingSection("farPoint")
+    }
+}
+
+/** How PD (and face width) may be presented and used, by calibration (rules_update.md rule 6). */
+@Serializable
+data class PdMeasurementConfig(
+    @SerialName("_comment") val comment: String? = null,
+    /** SD of a camera PD without the card (11.7 mm iris prior scale): shown as "about X mm (±3 mm)". */
+    val sdNoCardMm: Double,
+    /** SD of a card-calibrated PD: "±1 mm". */
+    val sdCardMm: Double,
+    /** True: never say a frame "fits" from measurements that are not card-calibrated. */
+    val frameFitClaimsRequireCard: Boolean,
+) {
+    init { require(sdNoCardMm > 0 && sdCardMm > 0) }
+
+    companion object {
+        operator fun invoke(): PdMeasurementConfig = missingSection("pdMeasurement")
+    }
+}
+
+/** Reading-add suggestions (rules_update.md rule 7). */
+@Serializable
+data class ReadingAddConfig(
+    @SerialName("_comment") val comment: String? = null,
+    /** Every reading-add suggestion says "confirm with a ready-reader at the counter". */
+    val verifyWithReadyReader: Boolean,
+) {
+    companion object {
+        operator fun invoke(): ReadingAddConfig = missingSection("readingAdd")
     }
 }

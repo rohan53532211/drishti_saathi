@@ -61,8 +61,7 @@ data class VisionTestConfig(
     val farPointStartMaxMm: Double = 150.0,
     /** A blur tap closer than this is rejected (too close to be a far point). */
     val farPointMinMm: Double = 100.0,
-    /** "Still clear at arm's length" is accepted only at or beyond this distance. */
-    val noBlurMinDistanceMm: Double = 500.0,
+    // "Still clear" is now governed by farPoint.selfHeldReachM (switch to staff-held) and farPoint.staffHeldMaxM.
     /** Background colours as #RRGGBB; letters are black. Blue must be pure blue for the LCA offset to hold. */
     val farPointBlueRgb: String = "#0000FF",
     val farPointWhiteRgb: String = "#FFFFFF",
