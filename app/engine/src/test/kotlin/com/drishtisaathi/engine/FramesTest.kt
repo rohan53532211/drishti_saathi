@@ -35,7 +35,7 @@ class FramesTest {
 
     @Test fun `high minus favours smaller lens width`() {
         val ranked = ranker.rank(catalog.frames, est(134.0), est(62.0), listOf(est(-6.0)), "CR39", StylePref.ANY, Budget.HIGH, topN = 10)
-        val f09 = ranked.first { it.frame.id == "F09" } // 58 mm aviator
+        val f09 = ranked.first { it.frame.id == "F09" } // 58 mm half-rim
         val f08 = ranked.first { it.frame.id == "F08" } // 49 mm compact
         assertTrue(f09.thickestMm!! > f08.thickestMm!!)
         assertTrue(f08.thinScore > f09.thinScore)
@@ -209,7 +209,7 @@ class FramesTest {
     }
 
     @Test fun `catalogue rejects ANY as a frame colour`() {
-        val bad = TestAssets.text("frames.json").replaceFirst("\"colours\": [\"METALLIC\", \"DARK\"]", "\"colours\": [\"ANY\"]")
+        val bad = TestAssets.text("frames.json").replaceFirst("\"colours\": [\"COLOURFUL\"]", "\"colours\": [\"ANY\"]")
         assertThrows(IllegalArgumentException::class.java) { FrameCatalog.parse(bad) }
     }
 
