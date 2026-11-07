@@ -64,12 +64,22 @@ private fun hasMic(context: Context) =
 
 /** Voice strip for the interview: read-aloud switch, mic button, listening/read-back status, ✓ / ✗. */
 @Composable
-fun VoicePanel(voice: VoiceController, lang: Lang, modifier: Modifier = Modifier) {
+fun VoicePanel(voice: VoiceController, lang: Lang, modifier: Modifier = Modifier, showDiagnostics: Boolean = false) {
     val st by voice.state.collectAsState()
     val tts by voice.ttsStatus.collectAsState()
     val mode by voice.recognitionMode.collectAsState()
     val context = LocalContext.current
     var askConsent by remember { mutableStateOf(false) }
+
+    // Fallback when no recogniser service is visible: the system voice dialog, result parsed like any other.
+    val androidInput = voice.speechInput as? AndroidSpeechInput
+    val dialogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        androidInput?.onDialogResult(r.resultCode, r.data)
+    }
+    DisposableEffect(androidInput, dialogLauncher) {
+        androidInput?.dialogLauncher = { dialogLauncher.launch(it) }
+        onDispose { androidInput?.dialogLauncher = null }
+    }
 
     LaunchedEffect(tts, mode) { voice.refreshAvailability() }
     // Permission can change in system settings while we are away.
@@ -137,9 +147,27 @@ fun VoicePanel(voice: VoiceController, lang: Lang, modifier: Modifier = Modifier
                 Text(SVoice.noHindiVoice[lang], style = MaterialTheme.typography.bodySmall)
             }
             if (st.readAloud && tts == TtsStatus.UNAVAILABLE) Text(SVoice.ttsUnavailable[lang], style = MaterialTheme.typography.bodySmall)
+            if (showDiagnostics) {
+                val diag = voice.diagnostics?.collectAsState()?.value
+                Text(
+                    SVoice.diagnosticsLine.format(
+                        if (diag?.recognitionAvailable == true) "yes" else "no",
+                        diag?.recognizerPackage ?: "-",
+                        diag?.dialogPackage ?: "-",
+                        mode.name,
+                        diag?.lastError ?: "-",
+                    )[lang],
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
             if (st.listenEnabled) {
                 Text(
-                    (if (mode == RecognitionMode.ON_DEVICE) SVoice.onDeviceNote else SVoice.onlineNote)[lang],
+                    when (mode) {
+                        RecognitionMode.ON_DEVICE -> SVoice.onDeviceNote
+                        RecognitionMode.SYSTEM_DIALOG -> SVoice.systemDialogNote
+                        else -> SVoice.onlineNote
+                    }[lang],
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(SVoice.buttonsAlways[lang], style = MaterialTheme.typography.bodySmall)

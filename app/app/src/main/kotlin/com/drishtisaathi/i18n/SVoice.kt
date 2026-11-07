@@ -55,6 +55,15 @@ object SVoice {
         "Online voice recognition is on. Nothing is recorded or saved by this app.",
         "ऑनलाइन आवाज़ पहचान चालू है। यह ऐप कुछ भी रिकॉर्ड या सेव नहीं करता।",
     )
+    val systemDialogNote = tx(
+        "The phone's voice-typing window opens for each answer (it may work online). Nothing is recorded or saved by this app.",
+        "हर जवाब के लिए फ़ोन की वॉइस-टाइपिंग विंडो खुलेगी (यह ऑनलाइन काम कर सकती है)। यह ऐप कुछ भी रिकॉर्ड या सेव नहीं करता।",
+    )
+    /** Staff mode only. %1 yes/no, %2 recogniser package, %3 voice-dialog package, %4 mode, %5 last error. */
+    val diagnosticsLine = tx(
+        "Staff voice check: recognition available %1${'$'}s · recogniser %2${'$'}s · voice dialog %3${'$'}s · mode %4${'$'}s · last error %5${'$'}s",
+        "स्टाफ़ जाँच: आवाज़ पहचान उपलब्ध %1${'$'}s · पहचान सेवा %2${'$'}s · वॉइस विंडो %3${'$'}s · मोड %4${'$'}s · आख़िरी गड़बड़ी %5${'$'}s",
+    )
     val onlineConsentTitle = tx("Allow online voice recognition?", "ऑनलाइन आवाज़ पहचान की अनुमति दें?")
     /** Shown before voice input is turned on when on-device recognition cannot be confirmed. */
     val onlineConsentBody = tx(

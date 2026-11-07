@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import android.speech.RecognitionService
 import android.speech.RecognitionListener
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
@@ -35,6 +37,18 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
     private var session = 0
     private var watchdog: Runnable? = null
 
+    private val _diag = MutableStateFlow(SpeechDiagnostics(false, null, null, null))
+    override val diagnostics: StateFlow<SpeechDiagnostics> = _diag.asStateFlow()
+
+    /**
+     * Set by the voice UI (an ActivityResult launcher) so [RecognitionMode.SYSTEM_DIALOG] can open the system
+     * voice dialog; null when no screen can host it. Results come back through [onDialogResult].
+     */
+    var dialogLauncher: ((Intent) -> Unit)? = null
+    private var dialogListener: SpeechInput.Listener? = null
+    private var dialogSession = 0
+    override val externalUiActive: Boolean get() = dialogListener != null
+
     init {
         main.post { detectMode() }
     }
@@ -49,9 +63,30 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, app.packageName)
     }
 
+    /** Default recognition service (Settings), else the first service that answers the RecognitionService intent. */
+    private fun recognizerPackage(): String? =
+        runCatching { Settings.Secure.getString(app.contentResolver, "voice_recognition_service") }.getOrNull()
+            ?.takeIf { it.isNotBlank() }?.substringBefore('/')
+            ?: runCatching {
+                app.packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+                    .firstOrNull()?.serviceInfo?.packageName
+            }.getOrNull()
+
+    private fun dialogPackage(): String? = runCatching {
+        app.packageManager.resolveActivity(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH), 0)?.activityInfo?.packageName
+    }.getOrNull()
+
+    private fun lastError(name: String?) { _diag.value = _diag.value.copy(lastError = name) }
+
     private fun detectMode() {
         val anyRecognizer = SpeechRecognizer.isRecognitionAvailable(app)
-        val fallback = if (anyRecognizer) RecognitionMode.NETWORK_POSSIBLE else RecognitionMode.UNAVAILABLE
+        val dialog = dialogPackage()
+        _diag.value = _diag.value.copy(recognitionAvailable = anyRecognizer, recognizerPackage = recognizerPackage(), dialogPackage = dialog)
+        val fallback = when {
+            anyRecognizer -> RecognitionMode.NETWORK_POSSIBLE
+            dialog != null -> RecognitionMode.SYSTEM_DIALOG
+            else -> RecognitionMode.UNAVAILABLE
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SpeechRecognizer.isOnDeviceRecognitionAvailable(app)) {
             checkOnDevice(fallback)
         } else {
@@ -91,6 +126,7 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
 
     override fun start(allowNetwork: Boolean, listener: SpeechInput.Listener) {
         stop()
+        if (_mode.value == RecognitionMode.SYSTEM_DIALOG) { startDialog(allowNetwork, listener); return }
         val s = ++session
         val onDevice = _mode.value == RecognitionMode.ON_DEVICE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         if (!onDevice && !allowNetwork) {
@@ -115,6 +151,7 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
 
             override fun onError(error: Int) {
                 if (s != session) return
+                lastError(errorName(error))
                 finishSession()
                 listener.onError(RecognitionErrors.kind(error))
             }
@@ -157,7 +194,46 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
         if (r != null) main.post { r.destroy() }
     }
 
+    // ---- fallback: system voice dialog (RecognizerIntent.ACTION_RECOGNIZE_SPEECH) -------------------
+
+    private fun dialogIntent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, LANGUAGE)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, LANGUAGE)
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+    }
+
+    private fun startDialog(allowNetwork: Boolean, listener: SpeechInput.Listener) {
+        val launch = dialogLauncher
+        if (!allowNetwork || launch == null) {
+            main.post { listener.onError(RecognitionErrorKind.UNAVAILABLE) }
+            return
+        }
+        dialogListener = listener
+        val s = ++dialogSession
+        runCatching { launch(dialogIntent()) }.onFailure {
+            if (s == dialogSession) dialogListener = null
+            lastError("DIALOG_LAUNCH_FAILED")
+            main.post { listener.onError(RecognitionErrorKind.UNAVAILABLE) }
+        }
+    }
+
+    /** Result of the system voice dialog; parsed by the controller exactly like SpeechRecognizer results. */
+    fun onDialogResult(resultCode: Int, data: Intent?) {
+        val listener = dialogListener ?: return
+        dialogListener = null
+        val texts = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
+        val conf = data?.getFloatArrayExtra(RecognizerIntent.EXTRA_CONFIDENCE_SCORES)?.toList()
+        when {
+            resultCode == android.app.Activity.RESULT_OK && texts.isNotEmpty() -> listener.onResults(texts, conf)
+            resultCode == android.app.Activity.RESULT_OK -> { lastError("ERROR_NO_MATCH"); listener.onError(RecognitionErrorKind.NO_MATCH) }
+            else -> { lastError(dialogErrorName(resultCode)); listener.onError(RecognitionErrorKind.NO_SPEECH) }
+        }
+    }
+
     override fun stop() {
+        dialogListener = null // a dialog already on screen cannot be closed; its result is ignored
         session++
         watchdog?.let(main::removeCallbacks)
         watchdog = null
@@ -170,6 +246,37 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
     override fun release() = stop()
 
     companion object {
+        /** SpeechRecognizer.ERROR_* constant name for the staff diagnostics line. */
+        fun errorName(code: Int): String = when (code) {
+            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "ERROR_NETWORK_TIMEOUT"
+            SpeechRecognizer.ERROR_NETWORK -> "ERROR_NETWORK"
+            SpeechRecognizer.ERROR_AUDIO -> "ERROR_AUDIO"
+            SpeechRecognizer.ERROR_SERVER -> "ERROR_SERVER"
+            SpeechRecognizer.ERROR_CLIENT -> "ERROR_CLIENT"
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "ERROR_SPEECH_TIMEOUT"
+            SpeechRecognizer.ERROR_NO_MATCH -> "ERROR_NO_MATCH"
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "ERROR_RECOGNIZER_BUSY"
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "ERROR_INSUFFICIENT_PERMISSIONS"
+            10 -> "ERROR_TOO_MANY_REQUESTS"
+            11 -> "ERROR_SERVER_DISCONNECTED"
+            12 -> "ERROR_LANGUAGE_NOT_SUPPORTED"
+            13 -> "ERROR_LANGUAGE_UNAVAILABLE"
+            14 -> "ERROR_CANNOT_CHECK_SUPPORT"
+            15 -> "ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS"
+            else -> "ERROR_$code"
+        }
+
+        /** Result codes of the system voice dialog (RecognizerIntent.RESULT_*). */
+        fun dialogErrorName(resultCode: Int): String = when (resultCode) {
+            android.app.Activity.RESULT_CANCELED -> "DIALOG_CANCELLED"
+            RecognizerIntent.RESULT_NO_MATCH -> "DIALOG_NO_MATCH"
+            RecognizerIntent.RESULT_CLIENT_ERROR -> "DIALOG_CLIENT_ERROR"
+            RecognizerIntent.RESULT_SERVER_ERROR -> "DIALOG_SERVER_ERROR"
+            RecognizerIntent.RESULT_NETWORK_ERROR -> "DIALOG_NETWORK_ERROR"
+            RecognizerIntent.RESULT_AUDIO_ERROR -> "DIALOG_AUDIO_ERROR"
+            else -> "DIALOG_RESULT_$resultCode"
+        }
+
         const val LANGUAGE = "hi-IN"
         /** Safety net if the recogniser never reports back. */
         const val TIMEOUT_MS = 15_000L

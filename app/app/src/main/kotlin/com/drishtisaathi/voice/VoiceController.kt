@@ -17,9 +17,22 @@ enum class TtsStatus { INITIALISING, HINDI, ENGLISH_ONLY, UNAVAILABLE }
  * - [ON_DEVICE]: the platform on-device recogniser has Hindi installed; audio never leaves the phone.
  * - [NETWORK_POSSIBLE]: a recogniser exists but on-device Hindi cannot be confirmed (API < 33, or the
  *   offline pack is missing); it may send audio to the speech service, so voice input needs explicit consent.
- * - [UNAVAILABLE]: no recogniser.
+ * - [SYSTEM_DIALOG]: no recogniser service is visible to apps, but the system voice-typing dialog
+ *   (RecognizerIntent.ACTION_RECOGNIZE_SPEECH) exists; it may use the network, so it needs the same consent.
+ * - [UNAVAILABLE]: neither.
  */
-enum class RecognitionMode { CHECKING, ON_DEVICE, NETWORK_POSSIBLE, UNAVAILABLE }
+enum class RecognitionMode { CHECKING, ON_DEVICE, NETWORK_POSSIBLE, SYSTEM_DIALOG, UNAVAILABLE }
+
+/** Staff-mode diagnostics line for the voice strip. */
+data class SpeechDiagnostics(
+    val recognitionAvailable: Boolean,
+    /** Default recognition service package (or the first one found), null when none is visible. */
+    val recognizerPackage: String?,
+    /** Package of the system voice dialog, when one exists. */
+    val dialogPackage: String?,
+    /** SpeechRecognizer error constant name of the last failure, e.g. ERROR_NO_MATCH. */
+    val lastError: String?,
+)
 
 /** Text-to-speech. Implementations call `onDone` on the main thread once the utterance ends or fails. */
 interface VoiceSpeaker {
@@ -38,6 +51,15 @@ interface SpeechInput {
     /** Cancels the current recognition; no further callbacks for it. */
     fun stop()
     fun release()
+
+    /** Staff diagnostics; null for test fakes. */
+    val diagnostics: StateFlow<SpeechDiagnostics>? get() = null
+
+    /**
+     * True while an external screen (the system voice dialog) is collecting the answer: our activity may be
+     * stopped meanwhile, which must not cancel the question.
+     */
+    val externalUiActive: Boolean get() = false
 
     interface Listener {
         fun onPartial(text: String)
@@ -62,7 +84,7 @@ data class VoiceUiState(
 ) {
     val recognitionAllowed: Boolean
         get() = recognition == RecognitionMode.ON_DEVICE ||
-            (recognition == RecognitionMode.NETWORK_POSSIBLE && networkConsent)
+            ((recognition == RecognitionMode.NETWORK_POSSIBLE || recognition == RecognitionMode.SYSTEM_DIALOG) && networkConsent)
 
     /** Mic actually in use for the next question. */
     val canListen: Boolean get() = listenEnabled && micPermission && recognitionAllowed
@@ -98,6 +120,9 @@ class VoiceController(
     /** Live engine availability (also copied into [state] by [refreshAvailability] and on every question). */
     val ttsStatus: StateFlow<TtsStatus> get() = speaker.status
     val recognitionMode: StateFlow<RecognitionMode> get() = input.mode
+    val diagnostics: StateFlow<SpeechDiagnostics>? get() = input.diagnostics
+    /** For the UI to hook the system voice dialog (see [AndroidSpeechInput.dialogLauncher]). */
+    val speechInput: SpeechInput get() = input
 
     /**
      * The same TTS engine behind the camera track's [InstructionSpeaker] interface, so camera screens do not
@@ -144,10 +169,13 @@ class VoiceController(
     }
 
     /** Stop talking/listening (screen paused). The current question can be resumed with [resume]. */
-    fun stop() = post { stopDialogue() }
+    fun stop() = post { if (!input.externalUiActive) stopDialogue() }
 
     /** Re-run the current question (after [stop], e.g. when the app comes back to the foreground). */
-    fun resume() = post { if (session != null && dialogue?.state.let { it == null || it == DialogueState.Idle }) restart() }
+    fun resume() = post {
+        if (input.externalUiActive) return@post // the system voice dialog is still answering this question
+        if (session != null && dialogue?.state.let { it == null || it == DialogueState.Idle }) restart()
+    }
 
     /** The interview screen is gone: stop and forget the question. */
     fun detach() = post {

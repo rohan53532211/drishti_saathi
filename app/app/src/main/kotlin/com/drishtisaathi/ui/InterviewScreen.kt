@@ -69,7 +69,7 @@ fun InterviewScreen(
             Text(S.questionOf.format(idx + 1, total)[l], style = MaterialTheme.typography.bodyMedium)
             LinearProgressIndicator(progress = { (idx + 1f) / total }, modifier = Modifier.fillMaxWidth())
             Text(q.text[l], style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 12.dp))
-            if (voice != null) VoicePanel(voice, l)
+            if (voice != null) VoicePanel(voice, l, showDiagnostics = state.staffMode)
 
             when (q) {
                 is Question.YesNo -> {
