@@ -56,3 +56,10 @@ Distance-locked tests, fusion, Bayesian band, 30-frame catalogue, try-on.
 **Addition 7: Temple length (experimental).** Optional ~45° side capture; estimate ear-to-frame-front distance → snap to 135 / 140 / 145 mm. Labelled **Experimental** everywhere it appears; never used to drop a frame, only as a staff hint.
 
 **Addition 8: Live try-on.** Frame PNG overlay on the live front camera, posed with the Face Landmarker facial transformation matrix so it follows head turns (yaw/pitch/roll) and scales with distance. 2D overlay with perspective transform; no 3D avatar.
+
+## Parallel build status (2026-11-07)
+All tracks merged into `main`: A engine, B camera/calibration, C screen tests, D voice, E try-on. Integration done:
+consent → interview → confirm → forehead card (optional) → face capture → screen tests → fusion → referral/result →
+try-on → comparison → PDFs. 387 unit tests pass; debug APK ~54 MB. Not yet run on a phone.
+Open: on-device checks (camera debug screen, distance vs tape, card calibration, Hindi TTS/ASR offline, letter size,
+try-on yaw direction), simulation thresholds into rules.json, Hindi proofread, Room encryption, APK size (drop armeabi-v7a?).
