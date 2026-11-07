@@ -32,6 +32,10 @@ data class SpeechDiagnostics(
     val dialogPackage: String?,
     /** SpeechRecognizer error constant name of the last failure, e.g. ERROR_NO_MATCH. */
     val lastError: String?,
+    /** Recogniser in use (Google component, DEFAULT, ON_DEVICE, DIALOG), null = none. */
+    val backend: String? = null,
+    /** Every android.speech.RecognitionService component visible to the app. */
+    val services: List<String> = emptyList(),
 )
 
 /** Text-to-speech. Implementations call `onDone` on the main thread once the utterance ends or fails. */

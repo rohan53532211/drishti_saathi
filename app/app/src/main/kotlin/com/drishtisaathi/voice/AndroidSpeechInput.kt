@@ -1,5 +1,6 @@
 package com.drishtisaathi.voice
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -7,25 +8,25 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.speech.RecognitionService
 import android.speech.RecognitionListener
-import android.speech.RecognitionSupport
-import android.speech.RecognitionSupportCallback
+import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import androidx.annotation.RequiresApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Android SpeechRecognizer in hi-IN (the lexicon also covers English and romanised Hindi, which the hi-IN
- * model transcribes too).
+ * Android speech recognition in hi-IN (the lexicon also covers English and romanised Hindi).
  *
- * Privacy: audio is streamed to the recogniser only while listening and is never recorded or stored by the
- * app; only the recognised text is used. On Android 13+ the on-device recogniser is used when it has Hindi
- * installed ([RecognitionMode.ON_DEVICE]). Otherwise the default recogniser is used with EXTRA_PREFER_OFFLINE,
- * which may still go online, so the controller only uses it after explicit consent ([RecognitionMode.NETWORK_POSSIBLE]).
+ * Recogniser order ([RecognizerChoice]): a Google RecognitionService component → the system default →
+ * Android 13+ on-device → the system voice dialog → none (buttons). A recogniser that fails because it cannot
+ * serve us (bind failure, Hindi not supported) is dropped and the next one is tried in the same tap.
+ *
+ * Privacy: audio goes to the recogniser only while listening and is never recorded or stored by the app; only
+ * the recognised text is used. EXTRA_PREFER_OFFLINE is false, so every recogniser except the on-device one may
+ * use the network: the controller asks for the online consent first ([RecognitionMode.NETWORK_POSSIBLE] /
+ * [RecognitionMode.SYSTEM_DIALOG]).
  */
 class AndroidSpeechInput(context: Context) : SpeechInput {
     private val app = context.applicationContext
@@ -37,12 +38,16 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
     private var session = 0
     private var watchdog: Runnable? = null
 
+    /** Remaining backends, best first; the head is the one in use. */
+    private var candidates: List<RecognizerBackend> = emptyList()
+    private val current: RecognizerBackend? get() = candidates.firstOrNull()
+
     private val _diag = MutableStateFlow(SpeechDiagnostics(false, null, null, null))
     override val diagnostics: StateFlow<SpeechDiagnostics> = _diag.asStateFlow()
 
     /**
-     * Set by the voice UI (an ActivityResult launcher) so [RecognitionMode.SYSTEM_DIALOG] can open the system
-     * voice dialog; null when no screen can host it. Results come back through [onDialogResult].
+     * Set by the voice UI (an ActivityResult launcher) so the dialog backend can open the system voice dialog;
+     * null when no screen can host it. Results come back through [onDialogResult].
      */
     var dialogLauncher: ((Intent) -> Unit)? = null
     private var dialogListener: SpeechInput.Listener? = null
@@ -50,7 +55,7 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
     override val externalUiActive: Boolean get() = dialogListener != null
 
     init {
-        main.post { detectMode() }
+        main.post { detect() }
     }
 
     private fun intent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -59,85 +64,103 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, LANGUAGE)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, app.packageName)
     }
 
-    /** Default recognition service (Settings), else the first service that answers the RecognitionService intent. */
-    private fun recognizerPackage(): String? =
+    // ---- discovery -----------------------------------------------------------------------------------
+
+    /** Every RecognitionService component visible to the app (needs the manifest <queries> entry). */
+    private fun services(): List<ServiceComponent> = runCatching {
+        app.packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+            .mapNotNull { it.serviceInfo?.let { si -> ServiceComponent(si.packageName, si.name) } }
+    }.getOrDefault(emptyList())
+
+    private fun defaultServicePackage(): String? =
         runCatching { Settings.Secure.getString(app.contentResolver, "voice_recognition_service") }.getOrNull()
             ?.takeIf { it.isNotBlank() }?.substringBefore('/')
-            ?: runCatching {
-                app.packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
-                    .firstOrNull()?.serviceInfo?.packageName
-            }.getOrNull()
 
     private fun dialogPackage(): String? = runCatching {
         app.packageManager.resolveActivity(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH), 0)?.activityInfo?.packageName
     }.getOrNull()
 
-    private fun lastError(name: String?) { _diag.value = _diag.value.copy(lastError = name) }
+    private fun onDeviceAvailable(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(app) }.getOrDefault(false)
 
-    private fun detectMode() {
-        val anyRecognizer = SpeechRecognizer.isRecognitionAvailable(app)
+    private fun detect() {
+        val services = services()
+        val defaultAvailable = runCatching { SpeechRecognizer.isRecognitionAvailable(app) }.getOrDefault(false)
         val dialog = dialogPackage()
-        _diag.value = _diag.value.copy(recognitionAvailable = anyRecognizer, recognizerPackage = recognizerPackage(), dialogPackage = dialog)
-        val fallback = when {
-            anyRecognizer -> RecognitionMode.NETWORK_POSSIBLE
-            dialog != null -> RecognitionMode.SYSTEM_DIALOG
-            else -> RecognitionMode.UNAVAILABLE
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SpeechRecognizer.isOnDeviceRecognitionAvailable(app)) {
-            checkOnDevice(fallback)
-        } else {
-            _mode.value = fallback
-        }
+        candidates = RecognizerChoice.order(services, defaultAvailable, onDeviceAvailable(), dialog != null)
+        _diag.value = SpeechDiagnostics(
+            recognitionAvailable = defaultAvailable,
+            recognizerPackage = defaultServicePackage(),
+            dialogPackage = dialog,
+            lastError = _diag.value.lastError,
+            backend = current?.label,
+            services = services.map { "${it.packageName}/${it.className.removePrefix(it.packageName)}" },
+        )
+        publishMode()
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private fun checkOnDevice(fallback: RecognitionMode) {
-        val r = runCatching { SpeechRecognizer.createOnDeviceSpeechRecognizer(app) }.getOrNull()
-        if (r == null) { _mode.value = fallback; return }
-        runCatching {
-            r.checkRecognitionSupport(intent(), { main.post(it) }, object : RecognitionSupportCallback {
-                override fun onSupportResult(support: RecognitionSupport) {
-                    val installed = support.installedOnDeviceLanguages.any { it.startsWith("hi") }
-                    _mode.value = if (installed) RecognitionMode.ON_DEVICE else fallback
-                    r.destroy()
-                }
-                override fun onError(error: Int) {
-                    _mode.value = fallback
-                    r.destroy()
-                }
-            })
-        }.onFailure { _mode.value = fallback; r.destroy() }
+    private fun publishMode() {
+        _mode.value = current?.mode ?: RecognitionMode.UNAVAILABLE
+        _diag.value = _diag.value.copy(backend = current?.label)
     }
+
+    /** The backend in use cannot serve us: drop it and move on to the next one. */
+    private fun demote(reason: String) {
+        lastError(reason)
+        if (candidates.isNotEmpty()) candidates = candidates.drop(1)
+        publishMode()
+    }
+
+    private fun lastError(name: String?) { _diag.value = _diag.value.copy(lastError = name) }
 
     /**
      * Asks the on-device recogniser to download its Hindi model (Android 13+). Downloads only the language
-     * model; no user data. Not called automatically: the lead decides whether to offer it.
+     * model; no user data. Not called automatically.
      */
     fun requestOfflineHindiModel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !SpeechRecognizer.isOnDeviceRecognitionAvailable(app)) return
+        if (!onDeviceAvailable()) return
         val r = runCatching { SpeechRecognizer.createOnDeviceSpeechRecognizer(app) }.getOrNull() ?: return
         runCatching { r.triggerModelDownload(intent()) }
-        main.postDelayed({ r.destroy(); detectMode() }, 2_000)
+        main.postDelayed({ r.destroy(); detect() }, 2_000)
     }
+
+    // ---- listening -----------------------------------------------------------------------------------
 
     override fun start(allowNetwork: Boolean, listener: SpeechInput.Listener) {
         stop()
-        if (_mode.value == RecognitionMode.SYSTEM_DIALOG) { startDialog(allowNetwork, listener); return }
-        val s = ++session
-        val onDevice = _mode.value == RecognitionMode.ON_DEVICE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-        if (!onDevice && !allowNetwork) {
-            main.post { if (s == session) listener.onError(RecognitionErrorKind.UNAVAILABLE) }
+        startWith(allowNetwork, listener)
+    }
+
+    private fun startWith(allowNetwork: Boolean, listener: SpeechInput.Listener) {
+        val backend = current
+        if (backend == null) {
+            main.post { listener.onError(RecognitionErrorKind.UNAVAILABLE) }
             return
         }
+        if (backend.mode != RecognitionMode.ON_DEVICE && !allowNetwork) {
+            main.post { listener.onError(RecognitionErrorKind.UNAVAILABLE) }
+            return
+        }
+        if (backend == RecognizerBackend.Dialog) { startDialog(listener); return }
+
+        val s = ++session
         val r = runCatching {
-            if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(app) else SpeechRecognizer.createSpeechRecognizer(app)
+            when (backend) {
+                is RecognizerBackend.Component ->
+                    SpeechRecognizer.createSpeechRecognizer(app, ComponentName(backend.packageName, backend.className))
+                RecognizerBackend.OnDevice ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) SpeechRecognizer.createOnDeviceSpeechRecognizer(app) else null
+                else -> SpeechRecognizer.createSpeechRecognizer(app)
+            }
         }.getOrNull()
         if (r == null) {
-            main.post { if (s == session) listener.onError(RecognitionErrorKind.UNAVAILABLE) }
+            demote("CREATE_FAILED_${backend.label}")
+            startWith(allowNetwork, listener)
             return
         }
         recognizer = r
@@ -151,8 +174,14 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
 
             override fun onError(error: Int) {
                 if (s != session) return
-                lastError(errorName(error))
                 finishSession()
+                if (error in RecognizerChoice.BACKEND_FAILURE_CODES && candidates.size > 1) {
+                    // This recogniser cannot serve hi-IN (or did not bind): try the next one in the same tap.
+                    demote("${errorName(error)} (${backend.label})")
+                    main.post { startWith(allowNetwork, listener) }
+                    return
+                }
+                lastError("${errorName(error)} (${backend.label})")
                 listener.onError(RecognitionErrors.kind(error))
             }
 
@@ -173,6 +202,7 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
         val dog = Runnable {
             if (s == session) {
                 stop()
+                lastError("TIMEOUT (${backend.label})")
                 listener.onError(RecognitionErrorKind.NO_SPEECH)
             }
         }
@@ -180,18 +210,9 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
         main.postDelayed(dog, TIMEOUT_MS)
         runCatching { r.startListening(intent()) }.onFailure {
             stop()
-            main.post { listener.onError(RecognitionErrorKind.UNAVAILABLE) }
+            demote("START_FAILED_${backend.label}")
+            main.post { startWith(allowNetwork, listener) }
         }
-    }
-
-    /** Ends the session without destroying synchronously inside the recogniser's own callback. */
-    private fun finishSession() {
-        session++
-        watchdog?.let(main::removeCallbacks)
-        watchdog = null
-        val r = recognizer
-        recognizer = null
-        if (r != null) main.post { r.destroy() }
     }
 
     // ---- fallback: system voice dialog (RecognizerIntent.ACTION_RECOGNIZE_SPEECH) -------------------
@@ -201,12 +222,13 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, LANGUAGE)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, LANGUAGE)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
     }
 
-    private fun startDialog(allowNetwork: Boolean, listener: SpeechInput.Listener) {
+    private fun startDialog(listener: SpeechInput.Listener) {
         val launch = dialogLauncher
-        if (!allowNetwork || launch == null) {
+        if (launch == null) {
+            lastError("DIALOG_NO_SCREEN")
             main.post { listener.onError(RecognitionErrorKind.UNAVAILABLE) }
             return
         }
@@ -214,7 +236,7 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
         val s = ++dialogSession
         runCatching { launch(dialogIntent()) }.onFailure {
             if (s == dialogSession) dialogListener = null
-            lastError("DIALOG_LAUNCH_FAILED")
+            demote("DIALOG_LAUNCH_FAILED")
             main.post { listener.onError(RecognitionErrorKind.UNAVAILABLE) }
         }
     }
@@ -227,9 +249,19 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
         val conf = data?.getFloatArrayExtra(RecognizerIntent.EXTRA_CONFIDENCE_SCORES)?.toList()
         when {
             resultCode == android.app.Activity.RESULT_OK && texts.isNotEmpty() -> listener.onResults(texts, conf)
-            resultCode == android.app.Activity.RESULT_OK -> { lastError("ERROR_NO_MATCH"); listener.onError(RecognitionErrorKind.NO_MATCH) }
+            resultCode == android.app.Activity.RESULT_OK -> { lastError("ERROR_NO_MATCH (DIALOG)"); listener.onError(RecognitionErrorKind.NO_MATCH) }
             else -> { lastError(dialogErrorName(resultCode)); listener.onError(RecognitionErrorKind.NO_SPEECH) }
         }
+    }
+
+    /** Ends the session without destroying synchronously inside the recogniser's own callback. */
+    private fun finishSession() {
+        session++
+        watchdog?.let(main::removeCallbacks)
+        watchdog = null
+        val r = recognizer
+        recognizer = null
+        if (r != null) main.post { r.destroy() }
     }
 
     override fun stop() {
@@ -246,7 +278,7 @@ class AndroidSpeechInput(context: Context) : SpeechInput {
     override fun release() = stop()
 
     companion object {
-        /** SpeechRecognizer.ERROR_* constant name for the staff diagnostics line. */
+        /** SpeechRecognizer.ERROR_* constant name for the staff voice check line. */
         fun errorName(code: Int): String = when (code) {
             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "ERROR_NETWORK_TIMEOUT"
             SpeechRecognizer.ERROR_NETWORK -> "ERROR_NETWORK"

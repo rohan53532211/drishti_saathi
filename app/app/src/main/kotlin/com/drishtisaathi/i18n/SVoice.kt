@@ -59,10 +59,13 @@ object SVoice {
         "The phone's voice-typing window opens for each answer (it may work online). Nothing is recorded or saved by this app.",
         "हर जवाब के लिए फ़ोन की वॉइस-टाइपिंग विंडो खुलेगी (यह ऑनलाइन काम कर सकती है)। यह ऐप कुछ भी रिकॉर्ड या सेव नहीं करता।",
     )
-    /** Staff mode only. %1 yes/no, %2 recogniser package, %3 voice-dialog package, %4 mode, %5 last error. */
+    /**
+     * Staff mode only. %1 default available yes/no, %2 default service package, %3 recogniser in use,
+     * %4 all RecognitionService components, %5 voice-dialog package, %6 mode, %7 last error.
+     */
     val diagnosticsLine = tx(
-        "Staff voice check: recognition available %1${'$'}s · recogniser %2${'$'}s · voice dialog %3${'$'}s · mode %4${'$'}s · last error %5${'$'}s",
-        "स्टाफ़ जाँच: आवाज़ पहचान उपलब्ध %1${'$'}s · पहचान सेवा %2${'$'}s · वॉइस विंडो %3${'$'}s · मोड %4${'$'}s · आख़िरी गड़बड़ी %5${'$'}s",
+        "Staff voice check: default available %1${'$'}s · default service %2${'$'}s · using %3${'$'}s · services [%4${'$'}s] · voice dialog %5${'$'}s · mode %6${'$'}s · last error %7${'$'}s",
+        "स्टाफ़ जाँच: डिफ़ॉल्ट उपलब्ध %1${'$'}s · डिफ़ॉल्ट सेवा %2${'$'}s · इस्तेमाल %3${'$'}s · सेवाएँ [%4${'$'}s] · वॉइस विंडो %5${'$'}s · मोड %6${'$'}s · आख़िरी गड़बड़ी %7${'$'}s",
     )
     val onlineConsentTitle = tx("Allow online voice recognition?", "ऑनलाइन आवाज़ पहचान की अनुमति दें?")
     /** Shown before voice input is turned on when on-device recognition cannot be confirmed. */

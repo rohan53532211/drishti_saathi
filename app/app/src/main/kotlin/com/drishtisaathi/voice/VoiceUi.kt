@@ -153,6 +153,8 @@ fun VoicePanel(voice: VoiceController, lang: Lang, modifier: Modifier = Modifier
                     SVoice.diagnosticsLine.format(
                         if (diag?.recognitionAvailable == true) "yes" else "no",
                         diag?.recognizerPackage ?: "-",
+                        diag?.backend ?: "-",
+                        diag?.services?.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "-",
                         diag?.dialogPackage ?: "-",
                         mode.name,
                         diag?.lastError ?: "-",
