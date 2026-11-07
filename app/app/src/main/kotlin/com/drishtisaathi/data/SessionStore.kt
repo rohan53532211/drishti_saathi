@@ -50,6 +50,8 @@ data class SessionEntity(
 data class Measurements(
     val face: com.drishtisaathi.engine.MeasuredFace? = null,
     val tests: com.drishtisaathi.engine.VisionTests? = null,
+    /** Staff demo mode: invented sample customer, labelled DEMO on every screen and PDF. */
+    val demo: Boolean = false,
 )
 
 @Dao

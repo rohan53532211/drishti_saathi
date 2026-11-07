@@ -71,6 +71,8 @@ data class UiState(
     /** M3 on-screen tests; empty = skipped or not done. */
     val tests: VisionTests = VisionTests(),
     val testsDone: Boolean = false,
+    /** Staff demo mode: sample customer, labelled DEMO everywhere. */
+    val demo: Boolean = false,
 ) {
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
     val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
@@ -128,6 +130,26 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     fun giveConsent() {
         calibration.clearCustomer()
         _state.update { UiState(lang = it.lang, staffMode = it.staffMode, consentAt = System.currentTimeMillis()) }
+    }
+
+    // ---- demo mode ---------------------------------------------------------------------------
+
+    /** Loads a sample customer (answers, camera, screen tests already filled in) for demos and recordings. */
+    fun loadDemo(c: com.drishtisaathi.demo.DemoCustomer) {
+        calibration.clearCustomer()
+        _state.update {
+            UiState(
+                lang = it.lang, staffMode = it.staffMode,
+                answers = c.answers,
+                answered = Questions.visible(c.answers).map { q -> q.id }.toSet(),
+                face = c.face,
+                captureStatus = c.face?.let { FaceCapture.Status.OK },
+                tests = c.tests ?: VisionTests(),
+                testsDone = c.tests != null,
+                consentAt = System.currentTimeMillis(),
+                demo = true,
+            )
+        }
     }
 
     // ---- camera capture + screen tests -------------------------------------------------------
@@ -219,7 +241,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 finalAdd = s.verification.finalAdd.ifBlank { null },
                 pdMeterMm = s.verification.pdMeterMm,
                 verifiedAt = s.verification.verifiedAt,
-                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone })),
+                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo)),
             )
             if (current == null) {
                 val id = dao.insert(entity)
@@ -289,6 +311,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 captureStatus = null,
                 tests = m.tests ?: VisionTests(),
                 testsDone = m.tests != null,
+                demo = m.demo,
                 verification = Verification(
                     e.finalTrialRight.orEmpty(), e.finalTrialLeft.orEmpty(), e.finalAdd.orEmpty(), e.pdMeterMm, e.verifiedAt,
                 ),
@@ -307,7 +330,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         runCatching {
             withContext(Dispatchers.IO) {
                 val blocks = if (customer) PdfContent.customerCopy(st, rules) else PdfContent.shopCopy(st, rules, choiceContext, st.lang)
-                val name = PdfExporter.prefix(st.sessionId) + (if (customer) "customer_hi" else "shop_${st.lang.name.lowercase()}") + ".pdf"
+                val name = PdfExporter.prefix(st.sessionId) + (if (st.demo) "DEMO_" else "") + (if (customer) "customer_hi" else "shop_${st.lang.name.lowercase()}") + ".pdf"
                 PdfExporter.write(app, blocks, File(PdfExporter.dir(app), name))
             }
         }.onSuccess(onReady).onFailure { onError() }

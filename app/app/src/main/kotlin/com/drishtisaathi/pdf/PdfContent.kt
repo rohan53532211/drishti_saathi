@@ -39,7 +39,8 @@ object PdfContent {
         val r = state.result ?: return emptyList()
         val a = r.assessment
         val out = mutableListOf<Block>()
-        out += Block.Title("${S.appName[l]} · ${S.shopSummary[l]}")
+        out += Block.Title("${if (state.demo) "DEMO · " else ""}${S.appName[l]} · ${S.shopSummary[l]}")
+        if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${state.sessionId?.let { S.sessionNo.format(it.toInt())[l] + " · " } ?: ""}${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
         out += Block.Rule
@@ -103,6 +104,7 @@ object PdfContent {
 
         out += Block.Rule
         out += Block.Para(S.disclaimerBoth, bold = true)
+        if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         return out
     }
 
@@ -115,7 +117,8 @@ object PdfContent {
         val r = state.result ?: return emptyList()
         val a = r.assessment
         val out = mutableListOf<Block>()
-        out += Block.Title("${S.appName[l]} · ${S.customerCopy[l]}")
+        out += Block.Title("${if (state.demo) "DEMO · " else ""}${S.appName[l]} · ${S.customerCopy[l]}")
+        if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
         out += Block.Para(S.customerIntro[l])
@@ -148,6 +151,7 @@ object PdfContent {
         out += Block.Rule
         out += Block.Para(S.privacyNote[l], tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
+        if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         return out
     }
 }

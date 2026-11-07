@@ -4,7 +4,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import com.drishtisaathi.demo.DemoCustomer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,4 +55,43 @@ fun CaptureOutcomeScreen(
             BigButton(SFlow.continueNext[l], onContinue, container = Teal)
         }
     }
+}
+
+/** Staff demo mode: pick a sample customer; the flow then runs with their pre-filled data. */
+@Composable
+fun DemoScreen(lang: Lang, onLang: (Lang) -> Unit, customers: List<DemoCustomer>, onPick: (DemoCustomer) -> Unit, onBack: () -> Unit) {
+    val l = lang
+    AppScaffold(l, onLang, title = SFlow.demoMode[l], onBack = onBack) { pad ->
+        Column(
+            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(SFlow.demoIntro[l], style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+            customers.forEach { c ->
+                Card(Modifier.fillMaxWidth().clickable { onPick(c) }) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("DEMO", color = UrgentRed, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                        Text(c.title[l], style = MaterialTheme.typography.titleMedium)
+                        Text(c.summary[l], style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Shown over every screen while a demo session is open, so recordings can never pass as real customers. */
+@Composable
+fun DemoBadge(lang: Lang, modifier: Modifier = Modifier) {
+    Text(
+        SFlow.demoBadge[lang],
+        color = Color.White,
+        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.labelLarge,
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(top = 4.dp)
+            .background(UrgentRed, RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+    )
 }

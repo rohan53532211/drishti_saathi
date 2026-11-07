@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.drishtisaathi.data.SessionEntity
 import com.drishtisaathi.engine.ReferralLevel
@@ -64,7 +65,13 @@ fun HistoryScreen(
                     Card(Modifier.fillMaxWidth().clickable { onOpen(s.id) }) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text(S.sessionNo.format(s.id.toInt())[l], style = MaterialTheme.typography.titleMedium)
+                                val demo = remember(s.id, s.measurementsJson) {
+                                    runCatching { com.drishtisaathi.data.SessionCodec.measurements(s).demo }.getOrDefault(false)
+                                }
+                                Text(
+                                    (if (demo) "DEMO · " else "") + S.sessionNo.format(s.id.toInt())[l],
+                                    style = MaterialTheme.typography.titleMedium, color = if (demo) UrgentRed else Color.Unspecified,
+                                )
                                 Text(fmt.format(Date(s.createdAt)), style = MaterialTheme.typography.bodyMedium)
                                 Text(S.referralLevel(level)[l], style = MaterialTheme.typography.bodySmall, color = color)
                                 if (s.verifiedAt != null) Text("✓ " + S.verified[l], style = MaterialTheme.typography.bodySmall, color = OkGreen)

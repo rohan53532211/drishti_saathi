@@ -60,4 +60,31 @@ object SFlow {
     val cameraCheck = tx("Camera check (distance, PD, angles)", "कैमरा जाँच (दूरी, PD, कोण)")
     val screenCalibration = tx("Screen size check with a bank card", "बैंक कार्ड से स्क्रीन साइज़ जाँच")
     val screenCalibrated = tx("Screen size checked", "स्क्रीन साइज़ जाँचा गया")
+
+    // ---- demo mode (staff) ----
+    val demoMode = tx("Demo mode: sample customers", "डेमो मोड: नमूना ग्राहक")
+    val demoIntro = tx(
+        "Sample customers with filled-in answers, camera measurements and screen-check results, for demonstrations and recordings. They are not real people. Every screen and PDF is marked DEMO.",
+        "नमूना ग्राहक, जिनके जवाब, कैमरा माप और स्क्रीन जाँच के नतीजे पहले से भरे हैं, डेमो और रिकॉर्डिंग के लिए। ये असली लोग नहीं हैं। हर स्क्रीन और PDF पर DEMO लिखा रहता है।",
+    )
+    val demoBadge = tx("DEMO · sample customer", "DEMO · नमूना ग्राहक")
+    val demoPdfLine = tx(
+        "DEMO: sample customer for demonstration only. Not a real person; not for use in the shop.",
+        "DEMO: केवल डेमो के लिए नमूना ग्राहक। असली व्यक्ति नहीं; दुकान में इस्तेमाल के लिए नहीं।",
+    )
+    val demo1Title = tx("Student, 21: distance blur, long screen use", "छात्र, 21: दूर का धुंधला, स्क्रीन ज़्यादा")
+    val demo1Summary = tx(
+        "First glasses. Far-point test shows short sight in both eyes. Face measured with the bank card.",
+        "पहला चश्मा। दूर-बिंदु जाँच में दोनों आँखों में निकट-दृष्टि। चेहरे का माप बैंक कार्ड के साथ।",
+    )
+    val demo2Title = tx("Shopkeeper, 48: reading difficulty", "दुकानदार, 48: पढ़ने में दिक्कत")
+    val demo2Summary = tx(
+        "Near blur only, reads daily. Reading add from the near-point test. Face measured without the card.",
+        "सिर्फ़ पास का धुंधला, रोज़ पढ़ते हैं। पढ़ने का ऐड पास-बिंदु जाँच से। चेहरे का माप कार्ड के बिना।",
+    )
+    val demo3Title = tx("Driver, 56: sudden flashes and floaters", "ड्राइवर, 56: अचानक चमक और तैरते धब्बे")
+    val demo3Summary = tx(
+        "Warning sign in the interview: urgent eye-doctor referral, no screen checks.",
+        "इंटरव्यू में चेतावनी का लक्षण: तुरंत आँखों के डॉक्टर के पास भेजें, स्क्रीन जाँच नहीं।",
+    )
 }

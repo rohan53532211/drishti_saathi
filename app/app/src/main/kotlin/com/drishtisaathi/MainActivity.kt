@@ -46,6 +46,9 @@ import com.drishtisaathi.ui.OldNumbersScreen
 import com.drishtisaathi.ui.ReferralScreen
 import com.drishtisaathi.ui.ResultScreen
 import com.drishtisaathi.ui.StepFrame
+import com.drishtisaathi.ui.DemoScreen
+import com.drishtisaathi.ui.DemoBadge
+import com.drishtisaathi.demo.DemoCustomers
 import com.drishtisaathi.vision.CameraVisionTestFlow
 import com.drishtisaathi.voice.rememberVoiceController
 
@@ -75,6 +78,7 @@ private object Routes {
     // Staff tools
     const val CAMERA_DEBUG = "cameraDebug"
     const val SCREEN_CAL = "screenCalibration"
+    const val DEMO = "demo"
 
     fun tryOn(frameId: String?) = "tryOn" + (frameId?.let { "?frame=$it" } ?: "")
 }
@@ -101,6 +105,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         nav.navigate(target) { popUpTo(Routes.CONFIRM) }
     }
 
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     NavHost(nav, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
             HomeScreen(
@@ -111,6 +116,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     val l = state.lang
                     BigButton(SFlow.cameraCheck[l], { nav.navigate(Routes.CAMERA_DEBUG) })
                     BigButton(SFlow.screenCalibration[l], { nav.navigate(Routes.SCREEN_CAL) })
+                    BigButton(SFlow.demoMode[l], { nav.navigate(Routes.DEMO) })
                 },
             )
         }
@@ -155,6 +161,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onEdit = { id -> vm.editQuestion(id); nav.navigate(Routes.INTERVIEW) },
                 onStaffMeasurements = vm::setStaffMeasurements,
                 onSeeResults = {
+                    // Demo customers already carry camera and screen-test results.
+                    if (state.demo) { computeAndShow(); return@ConfirmScreen }
                     // Red flags from the interview: no camera, no screen tests, straight to the referral.
                     if (vm.interviewNeedsUrgentReferral()) {
                         vm.skipCapture(); vm.skipVisionTests(); computeAndShow()
@@ -286,6 +294,13 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 CameraDebugScreen(l, vm.rules.camera, vm.calibration, onSkip = { nav.popBackStack() }, modifier = Modifier.fillMaxSize())
             }
         }
+        composable(Routes.DEMO) {
+            DemoScreen(
+                state.lang, vm::setLang, DemoCustomers.all,
+                onPick = { c -> vm.loadDemo(c); nav.navigate(Routes.CONFIRM) { popUpTo(Routes.HOME) } },
+                onBack = { nav.popBackStack() },
+            )
+        }
         composable(Routes.SCREEN_CAL) {
             val l = state.lang
             val context = LocalContext.current
@@ -300,5 +315,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 )
             }
         }
+    }
+    if (state.demo) DemoBadge(state.lang, Modifier.align(androidx.compose.ui.Alignment.TopCenter))
     }
 }
