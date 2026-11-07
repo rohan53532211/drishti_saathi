@@ -66,8 +66,8 @@ object S {
         "कोई नाम या फ़ोटो सेव नहीं होती। सिर्फ़ जवाब और माप इसी फ़ोन में रहते हैं।",
     )
     val phase1Note = t(
-        "Camera and on-screen eye tests come in the next version. Today: interview and old glasses numbers.",
-        "कैमरा और स्क्रीन पर आँखों के टेस्ट अगले संस्करण में आएँगे। अभी: इंटरव्यू और पुराने चश्मे के नंबर।",
+        "Interview, face measurement with the camera, and screen eye checks. Every step can be skipped.",
+        "इंटरव्यू, कैमरे से चेहरे का माप और स्क्रीन पर आँखों की जाँच। हर चरण छोड़ा जा सकता है।",
     )
 
     // ---- Consent (addition 1) -----------------------------------------------------------------
