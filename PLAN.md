@@ -57,9 +57,74 @@ Distance-locked tests, fusion, Bayesian band, 30-frame catalogue, try-on.
 
 **Addition 8: Live try-on.** Frame PNG overlay on the live front camera, posed with the Face Landmarker facial transformation matrix so it follows head turns (yaw/pitch/roll) and scales with distance. 2D overlay with perspective transform; no 3D avatar.
 
-## Parallel build status (2026-11-07)
-All tracks merged into `main`: A engine, B camera/calibration, C screen tests, D voice, E try-on. Integration done:
-consent → interview → confirm → forehead card (optional) → face capture → screen tests → fusion → referral/result →
-try-on → comparison → PDFs. 387 unit tests pass; debug APK ~54 MB. Not yet run on a phone.
-Open: on-device checks (camera debug screen, distance vs tape, card calibration, Hindi TTS/ASR offline, letter size,
-try-on yaw direction), simulation thresholds into rules.json, Hindi proofread, Room encryption, APK size (drop armeabi-v7a?).
+## Status (7 Nov 2026, end of day)
+
+**Built and on `main`:** Phase 1 plus all of Phase 2/3, built in parallel tracks and merged:
+- A engine: VisionMath, DistanceEstimator, BayesianBand, FarPointProtocol, FaceGeometry/aggregator, PlausibilityGate.
+- B camera: CameraX + MediaPipe Face Landmarker, quality gates with spoken retries, bank-card calibration (screen drag + OpenCV forehead card), camera debug screen.
+- C screen tests: far point (blue/white, self- and staff-held), clock dial, near-point push-up, tumbling-E acuity, Amsler grid.
+- D voice: TTS hi-IN, speech recognition with lexicon parser and spoken read-back, buttons always available.
+- E try-on: 30 frame cut-outs, live overlay posed by the transformation matrix.
+
+Full flow wired: consent → interview → confirm → forehead card (optional) → face capture → capture outcome/retry → screen tests → fusion → referral/result → try-on → comparison → PDFs. Interview red flags skip camera and tests. Staff tools on the home screen: camera check, screen calibration, demo mode.
+
+**Numbers:** 442 unit tests pass (engine + app). Debug APK ~54 MB. Database v3 (adds `measurementsJson`).
+
+**Verified on a phone:** nothing yet beyond TTS. User is testing on a Samsung Galaxy S23 FE; voice recognition did not work there (fix built, not yet installed: no adb connection).
+
+## Decisions made on 7 Nov
+
+**Simulation-tuned rules (`rules_update.md`, from `tools/far_point_simulation.py`), all applied:**
+1. Customer cannot reach blur within 0.60 m → staff hold the phone and move it away (Luo method); blur taps count up to 2.0 m.
+2. Beyond 0.60 m, distance comes from the card-calibrated PD (f·PD/interpupillary px), not the iris.
+3. Blue vs white SE differ by more than 0.50 D → retake once, then LOW confidence.
+4. Two repeats of one colour differ by more than 0.50 D → third reading, median.
+5. Bayesian band sigma 0.80 D (real studies); India prior 30+: 0.277 / 0.229 / 0.494; myopia magnitude exponential, mean 1.5 D (assumption, replace with pilot data); `priorWeight` 0.5 kept.
+6. PD without card: "about X mm (±3 mm)"; with card or staff ruler: ±1 mm. No "fits" claims from uncalibrated measurements.
+7. Every reading add says "confirm with a ready-reader at the counter".
+
+**User decisions after the agent's report:**
+- Band width 1.5 D (`bayes.bandWidthD`), sigma 0.8 and the 0.60 show cut-off kept. Typical bands now P 0.60–0.70, shown at MEDIUM. (At 1 D no band ever reached 0.60.)
+- One reach setting: `farPoint.selfHeldReachM` = 0.60 m (`optics.armsLengthM` removed).
+- Never "fits" for a population-average face either: "Frame N mm; average face about M mm (not measured), try it on".
+- Staff PD-ruler entry counts as calibrated (±1 mm).
+- Staff-held white readings count up to `staffHeldMaxM` (2.0 m), so the blue/white check works there.
+
+**Earlier the same day:**
+- F11–F30 live in `assets/frames/more_frames.json` (sizes estimated from photo proportions); engine ranks all 30.
+- F01–F10 names, shape, rim and colours corrected to match their photos (sizes, prices, weights unchanged).
+- Bridge fit (addition 5): 30 % of the fit score when the nose bridge was measured.
+- Face shape (addition 6): style suggestion only, staff section.
+- Staff ruler entry beats the camera for PD; camera beats population average.
+
+**Demo mode (for the 9 Nov mid-sprint recording):** staff tools → three sample customers (21 y myope with screen use, card-calibrated; 48 y reading need, no card; 56 y flashes → urgent). Pre-filled answers, camera and test results. DEMO badge on every screen, DEMO in history, DEMO title and line on both PDFs, `DEMO_` in file names.
+
+**Voice on Samsung:**
+- Manifest `<queries>` for RecognitionService and RECOGNIZE_SPEECH.
+- Recogniser order: Google component (`com.google.android.tts`, then `com.google.android.googlequicksearchbox`) → default → Android 13+ on-device → system voice dialog → buttons.
+- Recognisers that fail to bind or don't support Hindi are skipped within the same tap.
+- hi-IN with `EXTRA_PREFER_OFFLINE` false; online consent before use.
+- Staff voice check line lists all services, the recogniser in use, mode and last error.
+
+## Open items
+1. Install the latest APK on the S23 FE (adb not connected) and confirm voice works; read the staff voice check line.
+2. Run the phone checklist:
+   - camera check: fps, landmark alignment, distance vs tape at 300/400/600 mm, one eye covered
+   - card calibration (screen and forehead) and letter size with a ruler
+   - far point incl. staff-held mode, retake and third reading
+   - try-on yaw direction
+   - PDFs
+   - demo mode
+3. Tune on-device guesses in `rules.json` from real readings: sharpness/brightness gates, face-shape thresholds, bridge landmarks, landmark pose ratios.
+4. Under-30 Bayesian prior row is a draft; myopia magnitude prior is an assumption: replace with pilot data.
+5. Hindi proofread by a native speaker (all S*, SFlow, SVision, SVoice, SCamera, STryOn strings and the voice lexicon).
+6. Room encryption for stored sessions.
+7. APK size (~54 MB, mostly OpenCV + MediaPipe): consider dropping armeabi-v7a (~15 MB).
+8. Frame images (Kaggle Glasses dataset) have an unknown licence: demo use only.
+9. Every clinical number in `rules.json` still needs optometrist review before field use.
+
+## Next steps
+1. Phone: install via adb, voice check, then the checklist above; feed measured values back into `rules.json`.
+2. 9 Nov: record the mid-sprint update with demo mode (try-on uses the live camera).
+3. Fix whatever the phone test finds; re-tune thresholds; native-speaker Hindi pass.
+4. Then: Room encryption, APK size, pilot data for the priors.
