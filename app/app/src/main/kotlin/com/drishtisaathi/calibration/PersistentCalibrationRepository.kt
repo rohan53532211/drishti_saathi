@@ -50,8 +50,8 @@ class PersistentCalibrationRepository(private val store: KeyValueStore) : Calibr
         _c.value = new
     }
 
-    /** Forget this customer's values (iris size, camera scale); keep the phone's screen scale. */
-    fun clearCustomer() = update { it.copy(irisDiameterMm = null, cameraMmPerPx = null) }
+    /** Forget this customer's values (iris size, camera scale, card PD); keep the phone's screen scale. */
+    fun clearCustomer() = update { it.copy(irisDiameterMm = null, cameraMmPerPx = null, pdMm = null) }
 
     /** Forget the screen scale too (e.g. a different phone's settings were restored). */
     fun clearAll() = update { Calibration() }

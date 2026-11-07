@@ -17,6 +17,11 @@ data class Calibration(
     val irisDiameterMm: Double? = null,
     /** Camera mm-per-pixel at the face plane from the forehead card photo. */
     val cameraMmPerPx: Double? = null,
+    /**
+     * This customer's PD from a card-calibrated face capture (scale from the card or the personal iris), mm; null =
+     * none. Used for distances beyond farPoint.irisDistanceMaxM (rules_update.md rule 2: d = f·PD/interpupillary px).
+     */
+    val pdMm: Double? = null,
 )
 
 interface CalibrationRepository {

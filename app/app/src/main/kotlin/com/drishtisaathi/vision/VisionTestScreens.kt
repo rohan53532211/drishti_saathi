@@ -1,5 +1,6 @@
 package com.drishtisaathi.vision
 
+import com.drishtisaathi.engine.vision.FarPointProtocol
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -150,7 +151,7 @@ private fun TestLayout(
 @Composable
 fun FarPointTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, onSkip: () -> Unit, onComplete: (FarPointProcedure) -> Unit) {
     val cfg = env.cfg
-    var proc by remember { mutableStateOf(FarPointProcedure(cfg.repeats)) }
+    var proc by remember { mutableStateOf(FarPointProcedure.start(env.rules)) }
     LaunchedEffect(reading) { proc = proc.onReading(reading, cfg) }
     val status = DistanceGate.check(reading, null, null)
     val white = proc.colour == FarColour.WHITE
@@ -158,9 +159,23 @@ fun FarPointTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, on
     val rnd = remember { Random(System.nanoTime()) }
     val dirs = remember(proc.colour, proc.repeatIndex) { List(cfg.farPointLetterCount) { EDirection.random(rnd) } }
 
+    val step = when {
+        proc.staffHeld -> if (proc.seenClose) SVision.farStaffMoveAway else SVision.farStaffBringClose
+        else -> if (proc.seenClose) SVision.farMoveAway else SVision.farBringClose
+    }
+    // rules_update.md rules 3 and 4: say why an extra reading is asked for, before the phone is brought close again
+    val notice = when {
+        proc.seenClose -> null
+        proc.why == FarPointProtocol.Why.THIRD_READING -> SVision.farThirdReading
+        proc.why == FarPointProtocol.Why.RETAKE && proc.repeatIndex == 0 && !white -> SVision.farRetake
+        else -> null
+    }
+    val instruction = notice?.let { Txt(it.en + " " + step.en, it.hi + " " + step.hi) } ?: step
+
     TestLayout(
-        env, SVision.farTitle, eye, if (proc.seenClose) SVision.farMoveAway else SVision.farBringClose, reading, status,
-        proc.repeatIndex, cfg.repeats, onSkip, background = bg, subtitle = if (white) SVision.farWhite else SVision.farBlue,
+        env, SVision.farTitle, eye, instruction, reading, status,
+        proc.repeatIndex, maxOf(cfg.repeats, proc.repeatIndex + 1), onSkip, background = bg,
+        subtitle = if (white) SVision.farWhite else SVision.farBlue,
         target = {
             Canvas(Modifier.fillMaxSize()) {
                 val d = reading?.distanceMm ?: return@Canvas
@@ -176,8 +191,14 @@ fun FarPointTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, on
         controls = {
             BigButton(SVision.farBlurred[env.lang], enabled = status == DistanceStatus.OK && proc.canMarkBlur(reading, cfg), selected = true,
                 onClick = { val n = proc.markBlur(reading!!, cfg); if (n.isDone) onComplete(n) else proc = n })
-            BigButton(SVision.farStillClear[env.lang], enabled = status == DistanceStatus.OK && proc.canMarkNoBlur(reading, cfg),
-                onClick = { val n = proc.markNoBlur(reading!!, cfg); if (n.isDone) onComplete(n) else proc = n })
+            // rule 1: still clear at selfHeldReachM → staff hold the phone; "still clear" only counts beyond staffHeldMaxM
+            if (!proc.staffHeld) {
+                BigButton(SVision.farCannotReach[env.lang], enabled = status == DistanceStatus.OK && proc.canOfferStaffHeld(reading),
+                    onClick = { proc = proc.startStaffHeld() })
+            } else {
+                BigButton(SVision.farStillClear[env.lang], enabled = status == DistanceStatus.OK && proc.canMarkNoBlur(reading, cfg),
+                    onClick = { val n = proc.markNoBlur(reading!!, cfg); if (n.isDone) onComplete(n) else proc = n })
+            }
         },
     )
 }

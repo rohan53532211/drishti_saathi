@@ -66,7 +66,33 @@ object SVision {
     val farBringClose = tx("Bring the phone close to your eye, about a hand's width.", "फ़ोन को आँख के पास लाइए, लगभग एक हथेली की दूरी पर।")
     val farMoveAway = tx("Now move the phone slowly away. Tap when the letters just start to blur.", "अब फ़ोन धीरे-धीरे दूर ले जाइए। अक्षर धुंधले होने लगें तो बटन दबाइए।")
     val farBlurred = tx("Letters look blurred now", "अब अक्षर धुंधले हैं")
-    val farStillClear = tx("Still clear at full arm's length", "हाथ पूरा फैलाने पर भी साफ़ हैं")
+    val farStillClear = tx("Still clear at 2 metres", "2 मीटर पर भी साफ़ हैं")
+    // rules_update.md rule 1: staff-held far point (Luo method) when the blur point is beyond the customer's reach
+    val farCannotReach = tx("Still clear at arm's length: staff will hold the phone", "हाथ की दूरी पर भी साफ़ हैं: स्टाफ़ फ़ोन पकड़ेंगे")
+    val farStaffHeld = tx(
+        "Staff: hold the phone and slowly move it away from the customer",
+        "स्टाफ़: फ़ोन पकड़िए और धीरे-धीरे ग्राहक से दूर ले जाइए",
+    )
+    val farStaffBringClose = tx(
+        "Staff: hold the phone close to the customer's eye, about a hand's width. The customer keeps looking at the letters.",
+        "स्टाफ़: फ़ोन को ग्राहक की आँख के पास, लगभग एक हथेली की दूरी पर रखिए। ग्राहक अक्षरों को देखते रहें।",
+    )
+    val farStaffMoveAway = tx(
+        "Staff: hold the phone and slowly move it away from the customer. Customer: say when the letters just start to blur.",
+        "स्टाफ़: फ़ोन पकड़िए और धीरे-धीरे ग्राहक से दूर ले जाइए। ग्राहक: अक्षर धुंधले होने लगें तो बताइए।",
+    )
+    // rules 3 and 4
+    val farThirdReading = tx(
+        "The two tries were far apart. One more try, please.",
+        "दोनों बार के नतीजे काफ़ी अलग थे। कृपया एक बार और कीजिए।",
+    )
+    val farRetake = tx(
+        "Blue and white did not agree. Let us do the far point test once more, blue then white.",
+        "नीले और सफ़ेद के नतीजे नहीं मिले। दूर-बिंदु जाँच एक बार फिर कीजिए, पहले नीला फिर सफ़ेद।",
+    )
+    val sumFarStaffHeld = tx("Staff-held far point", "स्टाफ़ ने फ़ोन पकड़कर दूर-बिंदु मापा")
+    val sumFarThird = tx("A third reading was taken (repeats disagreed); median used.", "तीसरी बार मापा गया (दोहराव मेल नहीं खाए); बीच का मान लिया गया।")
+    val sumFarRetaken = tx("Blue and white disagreed, so the test was retaken once.", "नीला और सफ़ेद नहीं मिले, इसलिए जाँच एक बार दोबारा की गई।")
 
     // ---- 3. Clock dial ----
     val dialTitle = tx("Clock dial test", "घड़ी-डायल जाँच")

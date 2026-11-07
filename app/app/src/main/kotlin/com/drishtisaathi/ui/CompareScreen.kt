@@ -55,7 +55,9 @@ fun CompareScreen(state: UiState, engine: DrishtiEngine, rules: RulesConfig, onL
                 )
             }
             Section(S.rowSize[l]) { TextPair(a.frame.sizeMark, b.frame.sizeMark) }
-            Section(S.rowWidth.format(assessment.faceWidthMm.value)[l]) {
+            // rules_update.md rule 6: no "your face" claim when the camera measurement is not card-calibrated
+            val widthRow = if (assessment.fitMeasurementsUncalibrated) S.rowWidthUncal else S.rowWidth
+            Section(widthRow.format(assessment.faceWidthMm.value)[l]) {
                 // closer to the ideal width is better
                 TextPair(
                     widthText(a), widthText(b),

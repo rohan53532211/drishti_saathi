@@ -20,6 +20,12 @@ import kotlinx.coroutines.launch
 internal fun interface FrameDistanceEstimator {
     /** @param irisDiameterMm this customer's calibrated iris size, or null for the population prior. */
     fun estimate(frame: FaceFrame, irisDiameterMm: Double?): FrameDistance?
+
+    /**
+     * @param cardPdMm this customer's card-calibrated PD, used beyond the iris range (rules_update.md rule 2);
+     * estimators that cannot use it ignore it.
+     */
+    fun estimate(frame: FaceFrame, irisDiameterMm: Double?, cardPdMm: Double?): FrameDistance? = estimate(frame, irisDiameterMm)
 }
 
 internal data class FrameDistance(val distanceMm: Double, val confidence: Confidence)
@@ -108,7 +114,7 @@ class CameraDistanceProvider internal constructor(
     }
 
     internal fun onFrame(frame: FaceFrame?, nowMs: Long = System.currentTimeMillis()) {
-        val est = frame?.let { estimator.estimate(it, calibration.calibration.value.irisDiameterMm) }
+        val est = frame?.let { calibration.calibration.value.let { c -> estimator.estimate(it, c.irisDiameterMm, c.pdMm) } }
         if (est == null) {
             val last = _readings.value ?: return
             if (last.faceVisible) _readings.value = last.copy(faceVisible = false, timestampMs = nowMs)

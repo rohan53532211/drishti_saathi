@@ -152,28 +152,92 @@ class FarPointTest {
     }
 
     @Test fun `procedure needs a close start before a blur tap, blue twice then white twice`() {
-        var p = FarPointProcedure(2)
+        var p = FarPointProcedure.start(rules)
         assertEquals(FarColour.BLUE, p.colour)
         assertFalse(p.canMarkBlur(r(400.0), cfg))
         p = p.onReading(r(140.0), cfg)
         assertTrue(p.seenClose)
         assertFalse(p.canMarkBlur(r(90.0), cfg)) // closer than farPointMinMm
-        assertFalse(p.canMarkNoBlur(r(400.0), cfg)) // not far enough for "still clear"
+        assertFalse(p.canMarkNoBlur(r(700.0), cfg)) // self-held: "still clear" never counts (rule 1)
         assertFalse(p.canMarkBlur(r(400.0, face = false), cfg))
         p = p.markBlur(r(400.0, Confidence.MEDIUM), cfg)
         assertFalse(p.seenClose)
         assertEquals(1, p.repeatIndex)
         p = p.onReading(r(120.0), cfg).markBlur(r(410.0), cfg)
         assertEquals(FarColour.WHITE, p.colour)
-        p = p.onReading(r(120.0), cfg).markNoBlur(r(600.0), cfg)
         p = p.onReading(r(120.0), cfg).markBlur(r(550.0), cfg)
+        p = p.onReading(r(120.0), cfg).markBlur(r(540.0), cfg)
         assertTrue(p.isDone)
         assertEquals(listOf(400.0, 410.0), p.blueMm)
-        assertEquals(listOf(null, 550.0), p.whiteMm)
+        assertEquals(listOf(550.0, 540.0), p.whiteMm)
         assertEquals(Confidence.MEDIUM, p.worstConfidence)
-        // white not usable (one repeat unblurred) → blue alone, spread 0.06 D → HIGH, capped by the MEDIUM reading
+        // consistent blue/white → HIGH, capped by the MEDIUM distance reading
         assertEquals(Confidence.MEDIUM, p.result(TestEye.RIGHT, rules, capByDistance = true)!!.confidence)
         assertEquals(Confidence.HIGH, p.result(TestEye.RIGHT, rules, capByDistance = false)!!.confidence)
+        assertEquals(FarPointAnalysis.analyse(TestEye.RIGHT, p.blueMm, p.whiteMm, rules), p.result(TestEye.RIGHT, rules, false))
+    }
+
+    @Test fun `rule 1 - still clear at 60 cm offers staff-held mode, blur valid up to 2 m, no blur only beyond`() {
+        var p = FarPointProcedure.start(rules).onReading(r(120.0), cfg)
+        assertFalse(p.canOfferStaffHeld(r(550.0)))
+        assertTrue(p.canOfferStaffHeld(r(rules.farPoint.selfHeldReachM * 1000.0)))
+        p = p.startStaffHeld()
+        assertTrue(p.staffHeld)
+        assertFalse(p.seenClose) // staff start close again
+        assertFalse(p.canOfferStaffHeld(r(700.0)))
+        p = p.onReading(r(120.0), cfg)
+        assertTrue(p.canMarkBlur(r(1500.0), cfg))
+        assertTrue(p.canMarkBlur(r(2000.0), cfg))
+        assertFalse(p.canMarkBlur(r(2100.0), cfg))
+        assertFalse(p.canMarkNoBlur(r(1900.0), cfg))
+        assertTrue(p.canMarkNoBlur(r(2000.0), cfg))
+        p = p.markBlur(r(1500.0), cfg)
+        p = p.onReading(r(120.0), cfg).markBlur(r(1400.0), cfg)
+        assertTrue(p.staffHeld) // stays for this eye
+        p = p.onReading(r(120.0), cfg).markNoBlur(r(2100.0), cfg)
+        p = p.onReading(r(120.0), cfg).markNoBlur(r(2200.0), cfg)
+        assertTrue(p.isDone)
+        val res = p.result(TestEye.LEFT, rules, capByDistance = false)!!
+        assertTrue(res.staffHeld)
+        assertFalse(res.noMyopiaAtArmsLength) // blue blurred within 2 m
+        // blue at 1.5 / 1.4 m: −1/d + LCA, median → about −0.03 D, a valid measurement past the old 0.7 m limit
+        assertEquals(-1.0 / 1.45 + rules.optics.lcaBlueOffsetD, res.seBlueD!!, 0.01)
+        assertEquals(listOf(null, null), res.whiteMm)
+    }
+
+    @Test fun `rule 4 - repeats more than 0_5 D apart trigger a third reading and the median`() {
+        var p = FarPointProcedure.start(rules)
+        p = p.onReading(r(120.0), cfg).markBlur(r(400.0), cfg) // −1.83 D after LCA
+        p = p.onReading(r(120.0), cfg).markBlur(r(600.0), cfg) // −1.00 D: 0.83 D apart
+        assertEquals(FarColour.BLUE, p.colour)
+        assertEquals(com.drishtisaathi.engine.vision.FarPointProtocol.Why.THIRD_READING, p.why)
+        assertEquals(2, p.repeatIndex)
+        p = p.onReading(r(120.0), cfg).markBlur(r(420.0), cfg)
+        assertEquals(FarColour.WHITE, p.colour)
+        p = p.onReading(r(120.0), cfg).markBlur(r(560.0), cfg)
+        p = p.onReading(r(120.0), cfg).markBlur(r(560.0), cfg)
+        val res = p.result(TestEye.RIGHT, rules, capByDistance = false)!!
+        assertTrue(res.thirdReading)
+        assertEquals(-1000.0 / 420.0 + rules.optics.lcaBlueOffsetD, res.seBlueD!!, 1e-9) // median of the three
+    }
+
+    @Test fun `rule 3 - blue and white disagreeing retakes once, then LOW`() {
+        fun round(p0: FarPointProcedure): FarPointProcedure {
+            var p = p0
+            listOf(400.0, 400.0, 300.0, 300.0).forEach { p = p.onReading(r(120.0), cfg).markBlur(r(it), cfg) }
+            return p
+        }
+        var p = round(FarPointProcedure.start(rules))
+        assertFalse(p.isDone)
+        assertEquals(FarColour.BLUE, p.colour)
+        assertEquals(com.drishtisaathi.engine.vision.FarPointProtocol.Why.RETAKE, p.why)
+        assertTrue(p.blueMm.isEmpty())
+        p = round(p)
+        assertTrue(p.isDone)
+        val res = p.result(TestEye.RIGHT, rules, capByDistance = false)!!
+        assertEquals(1, res.retakes)
+        assertEquals(false, res.consistent)
+        assertEquals(Confidence.LOW, res.confidence)
     }
 }
 

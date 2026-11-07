@@ -43,6 +43,9 @@ object VisionSummary {
                 else -> fill(SVision.sumFar, mmList(fp.blueMm), mmList(fp.whiteMm), fmtD(fp.seD!!), S.confidence(fp.confidence))
             }
             if (fp?.consistent == false) lines += SVision.sumColoursDisagree
+            if (fp?.staffHeld == true) lines += SVision.sumFarStaffHeld
+            if (fp?.thirdReading == true) lines += SVision.sumFarThird
+            if ((fp?.retakes ?: 0) > 0) lines += SVision.sumFarRetaken
             val cd = s.clockDial[eye]
             lines += when {
                 cd == null -> labelled(SVision.dialTitle, missing(VisionStep.ClockDial(eye), s))

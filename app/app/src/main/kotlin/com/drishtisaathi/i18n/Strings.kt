@@ -195,6 +195,19 @@ object S {
     )
     val noStartingLens = t("No starting band yet: start the hand test from plano.", "अभी कोई शुरुआती रेंज नहीं: हाथ वाला टेस्ट प्लेनो से शुरू करें।")
     val readingAdd = t("Reading add (estimated)", "पढ़ने का ऐड (अनुमानित)")
+    /** rules_update.md rule 7 (readingAdd.verifyWithReadyReader). */
+    val confirmReadyReader = t("Confirm with a ready-reader at the counter", "काउंटर पर रेडी-रीडर चश्मे से पक्का करें")
+    val customerReadyReader = t(
+        "Before your reading lenses are made, the shop will check them with ready-made reading glasses at the counter.",
+        "पढ़ने के लेंस बनाने से पहले दुकान काउंटर पर रेडीमेड पढ़ने वाले चश्मे से जाँच करेगी।",
+    )
+    /** rules_update.md rule 5 (bayes.minBandProbabilityToShow). */
+    val bandUncertain = t(
+        "Band too uncertain to show: start with the trial lens and refine with the hand test",
+        "रेंज बहुत अनिश्चित है, इसलिए नहीं दिखाई: ट्रायल लेंस से शुरू करें और हाथ वाले टेस्ट से तय करें",
+    )
+    /** rules_update.md rule 6: PD with its uncertainty (pdMeasurement.sdNoCardMm / sdCardMm). */
+    val pdAbout = t("about %d mm (±%d mm)", "लगभग %d mm (±%d mm)")
     val lensPackage = t("Lens package", "लेंस पैकेज")
     val lensType = t("Lens type", "लेंस का प्रकार")
     val material = t("Material", "मटेरियल")
@@ -410,6 +423,14 @@ object S {
             "पहला चश्मा: बताएँ कि आदत पड़ने में 1–2 हफ़्ते लगते हैं (प्रोग्रेसिव में ज़्यादा)",
         ),
         Note.FACE_WIDTH_ASSUMED to t("Face width not measured: average used for frame fit", "चेहरे की चौड़ाई नहीं मापी: फ़्रेम फ़िट के लिए औसत लिया गया"),
+        Note.BAND_UNCERTAIN_REFINE_BY_HAND to t(
+            "Estimated band too uncertain to show: start from the trial lens and refine by hand",
+            "अनुमानित रेंज बहुत अनिश्चित है: ट्रायल लेंस से शुरू करके हाथ से तय करें",
+        ),
+        Note.MEASUREMENTS_NOT_CARD_CALIBRATED to t(
+            "PD and face width are camera estimates without the card (PD ±3 mm): check frame fit by trying on, measure PD with a ruler",
+            "PD और चेहरे की चौड़ाई कार्ड के बिना कैमरे के अनुमान हैं (PD ±3 mm): फ़्रेम पहनकर देखें, PD रूलर से मापें",
+        ),
     )
 
     // ---- Addition 3: comparison ---------------------------------------------------------------
@@ -420,6 +441,7 @@ object S {
     val rowLabel = t("Match", "मेल")
     val rowSize = t("Size (lens-bridge-temple)", "साइज़ (लेंस-ब्रिज-डंडी)")
     val rowWidth = t("Frame width (your face: %.0f mm)", "फ़्रेम की चौड़ाई (आपका चेहरा: %.0f mm)")
+    val rowWidthUncal = t("Frame width (face about %.0f mm, without the card)", "फ़्रेम की चौड़ाई (चेहरा लगभग %.0f mm, कार्ड के बिना)")
     val rowShape = t("Shape · rim · material", "आकार · रिम · मटेरियल")
     val rowThickness = t("Lens thickness in %s", "%s में लेंस की मोटाई")
     val rowPrice = t("Price", "कीमत")
@@ -461,12 +483,26 @@ object S {
     )
 
     /** Raw templates; [com.drishtisaathi.ui.Fmt.reason] fills in the numbers. */
-    fun reasonTemplate(code: ReasonCode, isEdge: Boolean, assumed: Boolean = false): Txt = when {
+    fun reasonTemplate(code: ReasonCode, isEdge: Boolean, assumed: Boolean = false, uncalibrated: Boolean = false): Txt = when {
         assumed && code == ReasonCode.FITS_FACE -> R_FITS_AVG
         assumed && code == ReasonCode.NARROW_FOR_FACE -> R_NARROW_AVG
         assumed && code == ReasonCode.WIDE_FOR_FACE -> R_WIDE_AVG
+        // rules_update.md rule 6 (pdMeasurement.frameFitClaimsRequireCard): camera measurement without the card →
+        // neutral sizes only, no fit claim
+        uncalibrated && code in FACE_FIT_CODES -> R_SIZE_UNCAL
+        uncalibrated && code in BRIDGE_CODES -> R_BRIDGE_UNCAL
         else -> reasonTemplateMeasured(code, isEdge)
     }
+    private val FACE_FIT_CODES = setOf(ReasonCode.FITS_FACE, ReasonCode.NARROW_FOR_FACE, ReasonCode.WIDE_FOR_FACE)
+    private val BRIDGE_CODES = setOf(ReasonCode.BRIDGE_FITS, ReasonCode.BRIDGE_MISMATCH)
+    private val R_SIZE_UNCAL = t(
+        "Frame %.0f mm; face about %.0f mm (camera estimate without the card: try the frame on)",
+        "फ़्रेम %.0f mm; चेहरा लगभग %.0f mm (कार्ड के बिना कैमरे का अनुमान: फ़्रेम पहनकर देखें)",
+    )
+    private val R_BRIDGE_UNCAL = t(
+        "Bridge %.0f mm; nose about %.0f mm (camera estimate without the card: try the frame on)",
+        "ब्रिज %.0f mm; नाक लगभग %.0f mm (कार्ड के बिना कैमरे का अनुमान: फ़्रेम पहनकर देखें)",
+    )
     /** Fit against the population average because face width / PD were not measured. */
     private val R_FITS_AVG = t("Fits average face width (not measured; frame %.0f mm, average %.0f mm)", "औसत चेहरे की चौड़ाई पर ठीक (मापा नहीं गया; फ़्रेम %.0f mm, औसत %.0f mm)")
     private val R_NARROW_AVG = t("Narrow for an average face (not measured; frame %.0f mm, average %.0f mm)", "औसत चेहरे के लिए छोटा (मापा नहीं गया; फ़्रेम %.0f mm, औसत %.0f mm)")

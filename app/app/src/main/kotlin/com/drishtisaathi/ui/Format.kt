@@ -1,6 +1,8 @@
 package com.drishtisaathi.ui
 
+import com.drishtisaathi.engine.Assessment
 import com.drishtisaathi.engine.Estimate
+import com.drishtisaathi.engine.EyeAdvice
 import com.drishtisaathi.engine.FrameReason
 import com.drishtisaathi.engine.ReasonCode
 import com.drishtisaathi.engine.PowerBand
@@ -24,9 +26,21 @@ object Fmt {
 
     fun mm(v: Double): String = String.format(Locale.US, "%.1f mm", v)
 
+    /**
+     * PD with its measurement uncertainty (rules_update.md rule 6): "about 63 mm (±3 mm)" without the card,
+     * "(±1 mm)" with it; the plain value when the engine gave no uncertainty (population average).
+     */
+    fun pd(a: Assessment, l: Lang): String {
+        val sd = a.pdUncertaintyMm ?: return mm(a.pdMm.value)
+        return S.pdAbout.format(Math.round(a.pdMm.value).toInt(), Math.round(sd).toInt().coerceAtLeast(1))[l]
+    }
+
+    /** The estimated band, or the "too uncertain to show" line (rules_update.md rule 5). */
+    fun bandOrUncertain(e: EyeAdvice, l: Lang): String = if (e.bandUncertain) S.bandUncertain[l] else band(e.band.value, l)
+
     /** One bullet, e.g. "Thin lens: edge about 4.2 mm in 1.60". */
     fun reason(r: FrameReason, l: Lang): String {
-        val tpl = S.reasonTemplate(r.code, r.isEdge, r.assumed)
+        val tpl = S.reasonTemplate(r.code, r.isEdge, r.assumed, r.uncalibrated)
         return when (r.code) {
             ReasonCode.FITS_FACE, ReasonCode.NARROW_FOR_FACE, ReasonCode.WIDE_FOR_FACE -> tpl.format(r.a ?: 0.0, r.b ?: 0.0)
             ReasonCode.THIN_LENS, ReasonCode.THICK_LENS -> tpl.format(r.a ?: 0.0, S.materialShort(r.materialId ?: ""))

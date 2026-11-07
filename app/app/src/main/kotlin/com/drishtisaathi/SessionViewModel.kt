@@ -145,6 +145,9 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     fun setCapture(frames: List<FaceFrame>): FaceCapture.Status {
         val out = faceCapture.analyse(frames, calibration.calibration.value.irisDiameterMm)
         _state.update { it.copy(face = out.face, captureStatus = out.status, result = null) }
+        // rules_update.md rule 2: keep a card-calibrated PD for camera distances beyond the iris range
+        val cardPd = out.face?.takeIf { it.cardCalibrated }?.pdMm?.value
+        calibration.update { it.copy(pdMm = cardPd) }
         return out.status
     }
 

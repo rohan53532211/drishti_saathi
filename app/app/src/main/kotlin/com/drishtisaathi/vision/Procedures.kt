@@ -2,7 +2,9 @@ package com.drishtisaathi.vision
 
 import com.drishtisaathi.engine.Confidence
 import com.drishtisaathi.engine.RulesConfig
+import com.drishtisaathi.engine.config.FarPointConfig
 import com.drishtisaathi.engine.config.VisionTestConfig
+import com.drishtisaathi.engine.vision.FarPointProtocol
 
 /*
  * Immutable step-by-step state of each test, driven by the composables (answer → new state). No Android here, so
@@ -17,24 +19,39 @@ private fun DistanceReading?.usable(): DistanceReading? = this?.takeIf { it.face
 enum class FarColour { BLUE, WHITE }
 
 /**
- * Far point: for each colour (blue first, then white) [repeats] times: bring the phone close (≤ farPointStartMaxMm),
- * move it away, tap when the letters just blur (distance recorded) or "still clear" at ≥ noBlurMinDistanceMm (null).
+ * Far point, driven by the engine's [FarPointProtocol] (rules_update.md rules 1, 3 and 4): for each colour (blue first,
+ * then white) [VisionTestConfig.repeats] times: bring the phone close (≤ farPointStartMaxMm), move it away, tap when the
+ * letters just blur. The protocol adds a third reading when two repeats of a colour disagree by more than 0.50 D, and
+ * retakes the whole far point once when blue and white disagree by more than 0.50 D.
+ *
+ * Self-held: if the letters are still clear at farPoint.selfHeldReachM (0.60 m) the customer cannot reach the blur
+ * point; the screen offers the staff-held mode (Luo method: staff hold the phone and slowly move it away). Then blur
+ * taps count up to farPoint.staffHeldMaxM (2.0 m) and "still clear" (null) only beyond it. The mode stays on for the
+ * rest of this eye's far point.
  */
 data class FarPointProcedure(
-    val repeats: Int,
-    val blueMm: List<Double?> = emptyList(),
-    val whiteMm: List<Double?> = emptyList(),
+    val protocol: FarPointProtocol,
+    val farPoint: FarPointConfig,
+    val state: FarPointProtocol.State = FarPointProtocol.State(),
     val seenClose: Boolean = false,
+    val staffHeld: Boolean = false,
     val worstConfidence: Confidence? = null,
 ) {
-    val colour: FarColour? get() = when {
-        blueMm.size < repeats -> FarColour.BLUE
-        whiteMm.size < repeats -> FarColour.WHITE
-        else -> null
+    private val step: FarPointProtocol.Step get() = protocol.next(state)
+
+    val colour: FarColour? get() = (step as? FarPointProtocol.Step.Measure)?.let {
+        if (it.colour == FarPointProtocol.Colour.BLUE) FarColour.BLUE else FarColour.WHITE
     }
+    /** Why the current reading is asked for (third reading or retake → the screen says so). */
+    val why: FarPointProtocol.Why? get() = (step as? FarPointProtocol.Step.Measure)?.why
     val isDone: Boolean get() = colour == null
-    /** 0-based repeat number within the current colour. */
-    val repeatIndex: Int get() = if (colour == FarColour.BLUE) blueMm.size else whiteMm.size
+    /** 0-based reading number within the current colour. */
+    val repeatIndex: Int get() = (step as? FarPointProtocol.Step.Measure)?.repeatIndex ?: 0
+    val blueMm: List<Double?> get() = state.blue.map { it.distanceMm }
+    val whiteMm: List<Double?> get() = state.white.map { it.distanceMm }
+
+    private val selfReachMm get() = farPoint.selfHeldReachM * 1000.0
+    private val staffMaxMm get() = farPoint.staffHeldMaxM * 1000.0
 
     fun onReading(r: DistanceReading?, cfg: VisionTestConfig): FarPointProcedure {
         val u = r.usable() ?: return this
@@ -43,12 +60,23 @@ data class FarPointProcedure(
 
     fun canMarkBlur(r: DistanceReading?, cfg: VisionTestConfig): Boolean {
         val u = r.usable() ?: return false
-        return !isDone && seenClose && u.distanceMm >= cfg.farPointMinMm
+        if (isDone || !seenClose || u.distanceMm < cfg.farPointMinMm) return false
+        return !staffHeld || u.distanceMm <= staffMaxMm
     }
 
+    /** Self-held and still clear at arm's reach (0.60 m): offer the staff-held mode. */
+    fun canOfferStaffHeld(r: DistanceReading?): Boolean {
+        val u = r.usable() ?: return false
+        return !isDone && !staffHeld && seenClose && u.distanceMm >= selfReachMm
+    }
+
+    /** Staff take the phone: start close again, then move it slowly away from the customer. */
+    fun startStaffHeld(): FarPointProcedure = copy(staffHeld = true, seenClose = false)
+
+    /** "Still clear" counts only in the staff-held mode, beyond staffHeldMaxM (2.0 m). */
     fun canMarkNoBlur(r: DistanceReading?, cfg: VisionTestConfig): Boolean {
         val u = r.usable() ?: return false
-        return !isDone && seenClose && u.distanceMm >= cfg.noBlurMinDistanceMm
+        return !isDone && staffHeld && seenClose && u.distanceMm >= staffMaxMm
     }
 
     fun markBlur(r: DistanceReading, cfg: VisionTestConfig): FarPointProcedure {
@@ -59,14 +87,16 @@ data class FarPointProcedure(
         check(canMarkNoBlur(r, cfg)); return record(null, r.confidence)
     }
 
-    private fun record(mm: Double?, c: Confidence): FarPointProcedure {
-        val w = worst(worstConfidence, c)
-        return if (colour == FarColour.BLUE) copy(blueMm = blueMm + mm, seenClose = false, worstConfidence = w)
-        else copy(whiteMm = whiteMm + mm, seenClose = false, worstConfidence = w)
-    }
+    private fun record(mm: Double?, c: Confidence): FarPointProcedure =
+        copy(state = protocol.record(state, FarPointProtocol.Reading(mm, staffHeld)), seenClose = false,
+            worstConfidence = worst(worstConfidence, c))
 
     fun result(eye: TestEye, rules: RulesConfig, capByDistance: Boolean): FarPointEyeResult? =
-        FarPointAnalysis.analyse(eye, blueMm, whiteMm, rules, if (capByDistance) worstConfidence else null)
+        FarPointAnalysis.fromState(eye, state, rules, if (capByDistance) worstConfidence else null)
+
+    companion object {
+        fun start(rules: RulesConfig) = FarPointProcedure(FarPointProtocol(rules), rules.farPoint)
+    }
 }
 
 /**

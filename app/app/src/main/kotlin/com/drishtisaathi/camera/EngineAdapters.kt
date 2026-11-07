@@ -28,5 +28,9 @@ object EngineBridge {
 internal class EngineDistanceEstimator(rules: RulesConfig) : FrameDistanceEstimator {
     private val engine = DistanceEstimator(rules)
     override fun estimate(frame: FaceFrame, irisDiameterMm: Double?): FrameDistance? =
-        engine.estimate(frame, irisDiameterMm)?.let { FrameDistance(it.distanceMm, it.confidence) }
+        estimate(frame, irisDiameterMm, null)
+
+    /** Beyond farPoint.irisDistanceMaxM the card PD gives the distance; without it the iris is kept at LOW. */
+    override fun estimate(frame: FaceFrame, irisDiameterMm: Double?, cardPdMm: Double?): FrameDistance? =
+        engine.estimate(frame, irisDiameterMm, cardPdMm)?.let { FrameDistance(it.distanceMm, it.confidence) }
 }

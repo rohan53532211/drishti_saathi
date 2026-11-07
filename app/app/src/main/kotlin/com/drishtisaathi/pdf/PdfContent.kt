@@ -60,9 +60,11 @@ object PdfContent {
             adv.eyes.forEach { e ->
                 val eye = if (e.eye == Eye.RIGHT) "R" else "L"
                 out += Block.Para("$eye  ${Fmt.trialLens(e.startingTrialLens.value)}", bold = true, tone = Tone.ACCENT)
-                out += Block.Bullet("${S.estimatedBand[l]}: ${Fmt.band(e.band.value, l)} ${Fmt.meta(e.band, l)}")
+                out += if (e.bandUncertain) Block.Bullet(S.bandUncertain[l], Tone.ROUTINE)
+                else Block.Bullet("${S.estimatedBand[l]}: ${Fmt.band(e.band.value, l)} ${Fmt.meta(e.band, l)}")
             }
             adv.add?.let { out += Block.Para("${S.readingAdd[l]}: ${Fmt.band(it.value, l)} ${Fmt.meta(it, l)}") }
+            if (adv.confirmAddWithReadyReader) out += Block.Bullet(S.confirmReadyReader[l], Tone.ACCENT)
             if (adv.eyes.isNotEmpty()) out += Block.Para(S.startingLensHint[l], tone = Tone.MUTED)
 
             out += Block.Heading(S.lensPackage[l])
@@ -84,7 +86,7 @@ object PdfContent {
             a.notes.forEach { out += Block.Bullet(S.note(it, rules.oldNumbers.freshMaxYears)[l]) }
         }
         out += Block.Heading(S.staffOnly[l])
-        out += Block.Bullet("${S.pd[l]}: ${Fmt.mm(a.pdMm.value)} ${Fmt.meta(a.pdMm, l)}")
+        out += Block.Bullet("${S.pd[l]}: ${Fmt.pd(a, l)} ${Fmt.meta(a.pdMm, l)}")
         out += Block.Bullet("${S.faceWidth[l]}: ${Fmt.mm(a.faceWidthMm.value)} ${Fmt.meta(a.faceWidthMm, l)}")
 
         out += Block.Heading(S.profile[l])
@@ -132,6 +134,8 @@ object PdfContent {
             out += Block.Bullet("${S.lensType[l]}: ${S.lensType(adv.lensType.value)[l]}")
             out += Block.Bullet("${S.material[l]}: ${S.material(adv.materialId.value)[l]}")
             adv.coatings.forEach { out += Block.Bullet(S.coating(it)[l]) }
+            // rule 7: reading lenses are confirmed with a ready-reader at the counter (no power numbers here)
+            if (adv.confirmAddWithReadyReader) out += Block.Para(S.customerReadyReader[l])
             if (r.frames.isNotEmpty()) {
                 out += Block.Heading(S.suggestedFrames[l])
                 r.frames.take(3).forEachIndexed { i, rf ->

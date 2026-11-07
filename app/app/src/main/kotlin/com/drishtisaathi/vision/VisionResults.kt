@@ -6,6 +6,7 @@ import com.drishtisaathi.engine.MeasuredEye
 import com.drishtisaathi.engine.RulesConfig
 import com.drishtisaathi.engine.VisionTests
 import com.drishtisaathi.engine.config.VisionTestConfig
+import com.drishtisaathi.engine.vision.FarPointProtocol
 import com.drishtisaathi.engine.vision.VisionMath
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -25,18 +26,24 @@ private fun Confidence.capBy(cap: Confidence?): Confidence = if (cap == null) th
 
 data class FarPointEyeResult(
     val eye: TestEye,
-    /** Recorded far-point distances per repeat; null = still clear at arm's length. */
+    /** Recorded far-point distances per reading; null = still clear up to the mode's limit. */
     val blueMm: List<Double?>,
     val whiteMm: List<Double?>,
-    /** Median SE of the blue repeats (after the LCA offset) and of the white repeats, when measured. */
+    /** Median SE of the blue readings (after the LCA offset) and of the white readings, when measured. */
     val seBlueD: Double?,
     val seWhiteD: Double?,
-    /** Best SE for VisionTests (null when no myopia was found within arm's length). */
+    /** Best SE for VisionTests (null when no myopia was found within reach). */
     val seD: Double?,
     val confidence: Confidence,
     val noMyopiaAtArmsLength: Boolean,
     /** Two-colour self-check: true/false, or null when white could not be used (beyond 0.8 m or skipped). */
     val consistent: Boolean?,
+    /** Staff held the phone (Luo method) for at least one reading. */
+    val staffHeld: Boolean = false,
+    /** Rule 3: the far point was retaken because blue and white disagreed. */
+    val retakes: Int = 0,
+    /** Rule 4: a third reading was taken because two repeats of one colour disagreed. */
+    val thirdReading: Boolean = false,
 ) {
     /** White-light far point implied by the SE (where the fogged clock dial is referenced), mm. */
     val farPointMm: Double? get() = seD?.takeIf { it < -0.01 }?.let { 1000.0 / -it }
@@ -44,13 +51,14 @@ data class FarPointEyeResult(
 
 object FarPointAnalysis {
     /**
-     * Repeats → SE per eye, via VisionMath:
-     * - a repeat with no blur within arm's length (null, or ≥ optics.armsLengthM) is censored at arm's length;
-     * - all blue repeats unblurred → noMyopiaAtArmsLength (seD = null, never invented); white blurring then = LOW;
-     * - blue SE = median of per-repeat −1/d + LCA, confidence from the spread (combineRepeats);
-     * - white used only if every white repeat is within optics.whiteFarPointMaxM; then the two-colour check:
+     * Readings → SE per eye, by the engine's [FarPointProtocol.evaluate] (one source of the far-point rules):
+     * - a reading with no blur (null, or self-held at/beyond optics.armsLengthM) is censored at its mode's limit;
+     * - all blue readings unblurred → noMyopiaAtArmsLength (seD = null, never invented); white blurring then = LOW;
+     * - blue SE = median of per-reading −1/d + LCA, confidence from the spread (three readings: MEDIUM if two agree);
+     * - white used only if every white reading is within optics.whiteFarPointMaxM; then the two-colour check:
      *   agree → SE = mean of blue and white, confidence = the lower of the two; disagree → blue SE, LOW;
      * - finally capped at [distanceCap] (the worst distance-reading confidence at the taps), if given.
+     * These lists are self-held readings; use [fromState] for a procedure that may have been staff-held.
      */
     fun analyse(
         eye: TestEye,
@@ -58,32 +66,19 @@ object FarPointAnalysis {
         whiteMm: List<Double?>,
         rules: RulesConfig,
         distanceCap: Confidence? = null,
-    ): FarPointEyeResult? {
-        if (blueMm.isEmpty()) return null
-        val vm = VisionMath(rules)
-        val armsMm = rules.optics.armsLengthM * 1000.0
-        val b = blueMm.map { it?.takeIf { d -> d < armsMm } }
-        val w = whiteMm.map { it?.takeIf { d -> d < armsMm } }
+    ): FarPointEyeResult? = fromState(
+        eye,
+        FarPointProtocol.State(blueMm.map { FarPointProtocol.Reading(it) }, whiteMm.map { FarPointProtocol.Reading(it) }),
+        rules, distanceCap,
+    )
 
-        if (b.all { it == null }) {
-            val whiteBlurred = w.any { it != null }
-            val conf = (if (whiteBlurred) Confidence.LOW else Confidence.HIGH).capBy(distanceCap)
-            return FarPointEyeResult(eye, blueMm, whiteMm, null, null, null, conf, noMyopiaAtArmsLength = true,
-                consistent = if (w.isEmpty()) null else !whiteBlurred)
-        }
-        val blue = vm.combineRepeats(b.map { vm.seFromBlueFarPoint((it ?: armsMm) / 1000.0) })
-        val whiteAllUsable = w.isNotEmpty() && w.all { vm.whiteUsable(it?.div(1000.0)) }
-        val white = if (whiteAllUsable) vm.combineRepeats(w.map { vm.seFromWhiteFarPoint(it!! / 1000.0) }) else null
-
-        val (se, conf, consistent) = if (white == null) {
-            Triple(blue.value, blue.confidence, null)
-        } else if (vm.blueWhiteConsistent(blue.value, white.value)) {
-            Triple((blue.value + white.value) / 2.0, blue.confidence.min(white.confidence), true)
-        } else {
-            Triple(blue.value, Confidence.LOW, false)
-        }
-        return FarPointEyeResult(eye, blueMm, whiteMm, blue.value, white?.value, se, conf.capBy(distanceCap),
-            noMyopiaAtArmsLength = false, consistent = consistent)
+    fun fromState(eye: TestEye, s: FarPointProtocol.State, rules: RulesConfig, distanceCap: Confidence? = null): FarPointEyeResult? {
+        val o = FarPointProtocol(rules).evaluate(s.blue, s.white, s.retakes) ?: return null
+        return FarPointEyeResult(
+            eye, s.blue.map { it.distanceMm }, s.white.map { it.distanceMm }, o.seBlueD, o.seWhiteD, o.seD,
+            o.confidence.capBy(distanceCap), o.noMyopiaWithinReach, o.consistent,
+            staffHeld = o.staffHeld, retakes = o.retakes, thirdReading = o.thirdReadingBlue || o.thirdReadingWhite,
+        )
     }
 
     /** Where to hold the fogged clock dial: far point + offset, or the no-far-point distance; never beyond the latter. */

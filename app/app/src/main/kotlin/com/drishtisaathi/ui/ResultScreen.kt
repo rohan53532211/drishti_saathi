@@ -85,7 +85,8 @@ fun ResultScreen(
                         adv.eyes.forEach { e ->
                             val eye = if (e.eye == Eye.RIGHT) "R" else "L"
                             Text("$eye  ${Fmt.trialLens(e.startingTrialLens.value)}", style = MaterialTheme.typography.titleLarge, color = Teal)
-                            Text("${S.estimatedBand[l]}: ${Fmt.band(e.band.value, l)} ${Fmt.meta(e.band, l)}",
+                            if (e.bandUncertain) Text(S.bandUncertain[l], style = MaterialTheme.typography.bodyMedium)
+                            else Text("${S.estimatedBand[l]}: ${Fmt.band(e.band.value, l)} ${Fmt.meta(e.band, l)}",
                                 style = MaterialTheme.typography.bodyMedium)
                         }
                         Text(S.startingLensHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
@@ -94,6 +95,9 @@ fun ResultScreen(
                         HorizontalDivider()
                         Text("${S.readingAdd[l]}: ${Fmt.band(add.value, l)}", style = MaterialTheme.typography.titleMedium)
                         Text(Fmt.meta(add, l), style = MaterialTheme.typography.bodySmall)
+                        if (adv.confirmAddWithReadyReader) {
+                            Text("• " + S.confirmReadyReader[l], style = MaterialTheme.typography.titleMedium, color = Teal)
+                        }
                     }
                 }
 
@@ -144,7 +148,7 @@ fun ResultScreen(
                 }
             }
             SectionCard(S.staffOnly[l]) {
-                Labeled(S.pd[l], Fmt.mm(a.pdMm.value), Fmt.meta(a.pdMm, l))
+                Labeled(S.pd[l], Fmt.pd(a, l), Fmt.meta(a.pdMm, l))
                 Labeled(S.faceWidth[l], Fmt.mm(a.faceWidthMm.value), Fmt.meta(a.faceWidthMm, l))
                 state.face?.let { f ->
                     f.bridgeWidthMm?.let { Labeled(SFlow.bridgeWidth[l], Fmt.mm(it.value), Fmt.meta(it, l)) }
