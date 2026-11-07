@@ -81,7 +81,7 @@ data class DistanceConfig(
 @Serializable
 data class BayesConfig(
     @SerialName("_comment") val comment: String? = null,
-    /** false → measured eyes get the old fixed band (optics.measuredBandHalfWidthD around the rounded SE). */
+    /** false → measured eyes get the old fixed band (bandWidthD around the rounded SE). */
     val enabled: Boolean,
     /** SE grid (dioptres). */
     val gridMinD: Double,

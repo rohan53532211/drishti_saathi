@@ -484,9 +484,8 @@ object S {
 
     /** Raw templates; [com.drishtisaathi.ui.Fmt.reason] fills in the numbers. */
     fun reasonTemplate(code: ReasonCode, isEdge: Boolean, assumed: Boolean = false, uncalibrated: Boolean = false): Txt = when {
-        assumed && code == ReasonCode.FITS_FACE -> R_FITS_AVG
-        assumed && code == ReasonCode.NARROW_FOR_FACE -> R_NARROW_AVG
-        assumed && code == ReasonCode.WIDE_FOR_FACE -> R_WIDE_AVG
+        // Face width / PD are population averages: sizes only, never a fit claim.
+        assumed && code in FACE_FIT_CODES -> R_SIZE_AVG
         // rules_update.md rule 6 (pdMeasurement.frameFitClaimsRequireCard): camera measurement without the card →
         // neutral sizes only, no fit claim
         uncalibrated && code in FACE_FIT_CODES -> R_SIZE_UNCAL
@@ -504,9 +503,10 @@ object S {
         "ब्रिज %.0f mm; नाक लगभग %.0f mm (कार्ड के बिना कैमरे का अनुमान: फ़्रेम पहनकर देखें)",
     )
     /** Fit against the population average because face width / PD were not measured. */
-    private val R_FITS_AVG = t("Fits average face width (not measured; frame %.0f mm, average %.0f mm)", "औसत चेहरे की चौड़ाई पर ठीक (मापा नहीं गया; फ़्रेम %.0f mm, औसत %.0f mm)")
-    private val R_NARROW_AVG = t("Narrow for an average face (not measured; frame %.0f mm, average %.0f mm)", "औसत चेहरे के लिए छोटा (मापा नहीं गया; फ़्रेम %.0f mm, औसत %.0f mm)")
-    private val R_WIDE_AVG = t("Wide for an average face (not measured; frame %.0f mm, average %.0f mm)", "औसत चेहरे के लिए चौड़ा (मापा नहीं गया; फ़्रेम %.0f mm, औसत %.0f mm)")
+    private val R_SIZE_AVG = t(
+        "Frame %.0f mm; average face about %.0f mm (not measured), try it on",
+        "फ़्रेम %.0f mm; औसत चेहरा लगभग %.0f mm (मापा नहीं गया), पहनकर देखें",
+    )
 
     private fun reasonTemplateMeasured(code: ReasonCode, isEdge: Boolean): Txt = when (code) {
         ReasonCode.THIN_LENS -> if (isEdge) R_THIN_EDGE else R_THIN_CENTRE

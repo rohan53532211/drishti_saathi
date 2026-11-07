@@ -5,7 +5,10 @@ import kotlin.math.roundToLong
 import kotlin.math.tan
 
 /** M3 formulas. All constants come from [OpticsConfig] (rules.json). Distances in metres unless named _mm. */
-class Optics(private val c: OpticsConfig) {
+class Optics(private val c: OpticsConfig, private val selfHeldReachM: Double) {
+
+    /** Self-held reach is farPoint.selfHeldReachM (one setting for "no blur within reach" and the staff-held offer). */
+    constructor(rules: RulesConfig) : this(rules.optics, rules.farPoint.selfHeldReachM)
 
     /** Height of a letter subtending [OpticsConfig.letterArcmin] at distance d: h = 2·d·tan(arcmin/2). */
     fun letterHeightMm(distanceMm: Double): Double {
@@ -32,7 +35,7 @@ class Optics(private val c: OpticsConfig) {
      * Pass null for a distance where no blur was found within arm's length.
      */
     fun farPoint(dBlueM: Double?, dWhiteM: Double?): FarPointResult {
-        if (dBlueM == null || dBlueM >= c.armsLengthM) {
+        if (dBlueM == null || dBlueM >= selfHeldReachM) {
             return FarPointResult(0.0, null, 0.0, null, reliable = true, noMyopiaAtArmsLength = true)
         }
         require(dBlueM > 0) { "far point distance must be positive" }

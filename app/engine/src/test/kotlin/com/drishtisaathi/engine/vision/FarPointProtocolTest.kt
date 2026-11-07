@@ -128,9 +128,17 @@ class FarPointProtocolTest {
     }
 
     @Test fun `white beyond 0_8 m skips the check and the retake`() {
-        val o = done(State().add(600.0, 600.0, 900.0, 900.0))
+        val o = done(State().add(500.0, 500.0, 900.0, 900.0))
         assertNull(o.consistent)
         assertEquals(0, o.retakes)
+    }
+
+    @Test fun `staff-held white readings count up to 2 m so the blue-white check works`() {
+        // blue 1.0 m → −1.0 + 0.67 = −0.33; white 1.5 m → −0.67; diff 0.34 ≤ 0.50
+        val o = done(State().add(1000.0, 1000.0, 1500.0, 1500.0, staff = true))
+        assertNotNull(o.seWhiteD)
+        assertEquals(true, o.consistent)
+        assertEquals(-1.0 / 1.5, o.seWhiteD!!, 1e-9)
     }
 
     // ---- staff-held (rule 1) --------------------------------------------------------------------------

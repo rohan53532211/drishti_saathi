@@ -42,10 +42,20 @@ class RulesUpdateAppTest {
         scaleSource = src,
     )
 
-    private fun state(a: InterviewAnswers, tests: VisionTests = VisionTests(), face: MeasuredFace? = null) = UiState(
+    /** Same catalogue and priors, stricter show threshold: makes a typical band "uncertain" for the rule 5 test. */
+    private val strictEngine = com.drishtisaathi.engine.DrishtiEngine(
+        rules.copy(bayes = rules.bayes.copy(minBandProbabilityToShow = 0.70, bandProbabilityHigh = 0.80)),
+        com.drishtisaathi.engine.AnthroPriors.parse(asset("anthro_priors.json")),
+        com.drishtisaathi.engine.FrameCatalog.parse(asset("frames.json")),
+    )
+
+    private fun state(
+        a: InterviewAnswers, tests: VisionTests = VisionTests(), face: MeasuredFace? = null,
+        eng: com.drishtisaathi.engine.DrishtiEngine = engine,
+    ) = UiState(
         answers = a,
         answered = Questions.visible(a).map { it.id }.toSet(),
-        result = engine.evaluate(a, tests = tests, face = face),
+        result = eng.evaluate(a, tests = tests, face = face),
         sessionId = 3,
         createdAt = 0,
     )
@@ -120,14 +130,41 @@ class RulesUpdateAppTest {
 
     @Test fun `rule 5 - band below the show threshold is not printed as an estimated band`() {
         val m = MeasuredEye(seD = -3.0, confidence = Confidence.HIGH)
-        val s = state(adult, tests = VisionTests(right = m, left = m))
+        val s = state(adult, tests = VisionTests(right = m, left = m), eng = strictEngine)
         val eyes = s.result!!.assessment.advice!!.eyes
         assertTrue(eyes.all { it.bandUncertain })
         val shop = text(PdfContent.shopCopy(s, rules, ctx, Lang.EN))
         assertTrue(shop.contains(S.bandUncertain.en))
         assertFalse(shop.contains(S.estimatedBand.en + ":"))
-        assertTrue(shop.contains("−2.75 DS")) // the starting trial lens is still given (band midpoint)
+        // the starting trial lens (band midpoint) is still given
+        assertTrue(shop.contains(Fmt.trialLens(eyes.first().startingTrialLens.value)))
         eyes.forEach { assertEquals(S.bandUncertain.en, Fmt.bandOrUncertain(it, Lang.EN)) }
+    }
+
+    @Test fun `population-average face never gets a fits claim`() {
+        // No camera, no staff entry: face width and PD are population averages.
+        val s = state(adult.copy(knownRx = com.drishtisaathi.engine.KnownRx(com.drishtisaathi.engine.EyeRx(-2.0), com.drishtisaathi.engine.EyeRx(-2.0)), glassesAgeYears = 1))
+        val frames = s.result!!.frames
+        assertTrue(frames.isNotEmpty())
+        for (l in Lang.entries) frames.forEach { rf ->
+            val fit = rf.reasons.first { it.code.name.endsWith("FACE") }
+            assertTrue(fit.assumed)
+            val line = Fmt.reason(fit, l)
+            assertFalse(line, line.contains("fit", ignoreCase = true))
+            assertFalse(line, line.contains("ठीक"))
+        }
+        assertTrue(Fmt.reason(frames.first().reasons.first { it.code.name.endsWith("FACE") }, Lang.EN).contains("average face about"))
+    }
+
+    @Test fun `rule 5 - with the shipped 1_5 D band a typical band is shown`() {
+        val m = MeasuredEye(seD = -3.0, confidence = Confidence.HIGH)
+        val s = state(adult, tests = VisionTests(right = m, left = m))
+        val eyes = s.result!!.assessment.advice!!.eyes
+        assertTrue(eyes.none { it.bandUncertain })
+        eyes.forEach { assertEquals(1.5, it.band.value.highD - it.band.value.lowD, 1e-9) }
+        val shop = text(PdfContent.shopCopy(s, rules, ctx, Lang.EN))
+        assertTrue(shop.contains(S.estimatedBand.en))
+        assertFalse(shop.contains(S.bandUncertain.en))
     }
 
     // ---- rule 2 ---------------------------------------------------------------------------------

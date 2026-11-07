@@ -52,7 +52,7 @@ data class FarPointEyeResult(
 object FarPointAnalysis {
     /**
      * Readings → SE per eye, by the engine's [FarPointProtocol.evaluate] (one source of the far-point rules):
-     * - a reading with no blur (null, or self-held at/beyond optics.armsLengthM) is censored at its mode's limit;
+     * - a reading with no blur (null, or self-held at/beyond farPoint.selfHeldReachM) is censored at its mode's limit;
      * - all blue readings unblurred → noMyopiaAtArmsLength (seD = null, never invented); white blurring then = LOW;
      * - blue SE = median of per-reading −1/d + LCA, confidence from the spread (three readings: MEDIUM if two agree);
      * - white used only if every white reading is within optics.whiteFarPointMaxM; then the two-colour check:

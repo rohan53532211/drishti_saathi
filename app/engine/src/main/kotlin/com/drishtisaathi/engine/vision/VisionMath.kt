@@ -15,11 +15,11 @@ import kotlin.math.sqrt
  * The named public API for the M3 vision-test formulas. Built on [Optics] (constants from rules.json `optics`)
  * plus the add fusion of innovation 5 (rules.json `bayes.addFusion`). Distances in metres unless named _mm.
  */
-class VisionMath(private val c: OpticsConfig, private val fusion: AddFusionConfig) {
+class VisionMath(private val c: OpticsConfig, private val fusion: AddFusionConfig, selfHeldReachM: Double) {
 
-    constructor(rules: RulesConfig) : this(rules.optics, rules.bayes.addFusion)
+    constructor(rules: RulesConfig) : this(rules.optics, rules.bayes.addFusion, rules.farPoint.selfHeldReachM)
 
-    val optics = Optics(c)
+    val optics = Optics(c, selfHeldReachM)
 
     // ---- optotype size --------------------------------------------------------------------------
 

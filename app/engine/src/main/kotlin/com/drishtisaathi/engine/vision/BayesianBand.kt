@@ -34,9 +34,9 @@ import kotlin.math.sqrt
  * ≥ minBandProbabilityToShow → MEDIUM, else LOW with [Result.shown] = false (not shown as an estimated band).
  * Note: with σ = 0.80 D a 1 D band can hold at most P(|z| < 0.625) ≈ 0.47 under a flat prior.
  */
-class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig) {
+class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig, private val selfHeldReachM: Double) {
 
-    constructor(rules: RulesConfig) : this(rules.bayes, rules.optics)
+    constructor(rules: RulesConfig) : this(rules.bayes, rules.optics, rules.farPoint.selfHeldReachM)
 
     val grid: DoubleArray = run {
         val n = ((c.gridMaxD - c.gridMinD) / c.gridStepD).roundToInt()
@@ -121,7 +121,7 @@ class BayesianBand(private val c: BayesConfig, private val optics: OpticsConfig)
      * No blur found up to [armsLengthM] (pass farPoint.staffHeldMaxM after a staff-held test): censored likelihood
      * SE > −1/L, softened by σ.
      */
-    fun fromNoBlurAtArmsLength(age: Int?, sigmaD: Double = c.likelihoodSigmaD, armsLengthM: Double = optics.armsLengthM): Result {
+    fun fromNoBlurAtArmsLength(age: Int?, sigmaD: Double = c.likelihoodSigmaD, armsLengthM: Double = selfHeldReachM): Result {
         require(sigmaD > 0 && armsLengthM > 0)
         val limit = -1.0 / armsLengthM
         val like = DoubleArray(grid.size) { i -> normalCdf((grid[i] - limit) / sigmaD) }

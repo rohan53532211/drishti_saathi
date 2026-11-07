@@ -135,7 +135,7 @@ data class Assessment(
 /** M4 fusion and recommendation rules. Every threshold and table comes from [RulesConfig]. */
 class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
 
-    private val optics = Optics(rules.optics)
+    private val optics = Optics(rules)
     private val priors = priors
     private val gate = PlausibilityGate(priors, rules.plausibility)
     private val bayes = BayesianBand(rules)
@@ -262,7 +262,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         if (usableMeasure != null && (usableMeasure.confidence != Confidence.LOW || old == null)) {
             if (rules.bayes.enabled) return bayesianEyeAdvice(eye, usableMeasure, a.age, notes)
             val se = optics.roundToStep(usableMeasure.seD!!)
-            val hw = rules.optics.measuredBandHalfWidthD
+            val hw = rules.bayes.bandWidthD / 2
             val c = usableMeasure.confidence
             return EyeAdvice(
                 eye,

@@ -106,17 +106,17 @@ class RulesEngineTest {
         val m = MeasuredEye(seD = -1.4, confidence = Confidence.HIGH)
         val r = engine.assess(base().copy(distanceBlur = true), tests = VisionTests(right = m, left = m))
         val eye = r.advice!!.eyes.first()
-        // Bayesian band (innovation 10) with the real-study sigma 0.80 D (rules_update.md rule 5): the age-35 India
-        // prior (about half the population near 0 D, prior weight 0.5) pulls the measured −1.4 D towards emmetropia,
-        // so the most probable 1 D band is −1.50…−0.50 with a starting lens of −1.00. Its probability (~0.45) is below
-        // bayes.minBandProbabilityToShow 0.60: the band is flagged uncertain (LOW), the starting lens is still given.
-        assertEquals(-1.5, eye.band.value.lowD, 1e-9)
-        assertEquals(-0.5, eye.band.value.highD, 1e-9)
-        assertEquals(1.0, eye.band.value.highD - eye.band.value.lowD, 1e-9)
+        // Bayesian band with sigma 0.80 D and a 1.5 D band (bayes.bandWidthD, user decision after rules_update.md):
+        // the age-35 India prior pulls the measured −1.4 D a little towards emmetropia, so the most probable band is
+        // −1.75…−0.25 with a starting lens of −1.00. Its probability (~0.64) clears bayes.minBandProbabilityToShow
+        // 0.60, so the band is shown; below bandProbabilityHigh 0.70 it is MEDIUM.
+        assertEquals(-1.75, eye.band.value.lowD, 1e-9)
+        assertEquals(-0.25, eye.band.value.highD, 1e-9)
+        assertEquals(1.5, eye.band.value.highD - eye.band.value.lowD, 1e-9)
         assertEquals(-1.0, eye.startingTrialLens.value.sph, 1e-9)
-        assertTrue(eye.bandProbability!! in 0.40..0.50)
-        assertTrue(eye.bandUncertain)
-        assertEquals(Confidence.LOW, eye.band.confidence)
+        assertTrue(eye.bandProbability!! in 0.60..0.70)
+        assertFalse(eye.bandUncertain)
+        assertEquals(Confidence.MEDIUM, eye.band.confidence)
         assertEquals(Source.MEASURED, eye.band.source)
         assertEquals(LensType.SINGLE_VISION, r.advice!!.lensType.value)
     }

@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OpticsTest {
-    private val optics = Optics(TestAssets.rules.optics)
+    private val optics = Optics(TestAssets.rules)
 
     // ---- letter size -------------------------------------------------------------------------
 
@@ -29,10 +29,10 @@ class OpticsTest {
     }
 
     @Test fun `blue and white disagree by more than 0_50 D - unreliable`() {
-        // d_b = 0.60 → −1.667 + 0.67 = −0.997; d_w = 0.50 → −2.00; diff ≈ 1.0 D
-        val r = optics.farPoint(dBlueM = 0.60, dWhiteM = 0.50)
+        // d_b = 0.55 → −1.818 + 0.67 = −1.148; d_w = 0.50 → −2.00; diff ≈ 0.85 D (reach is 0.60 m)
+        val r = optics.farPoint(dBlueM = 0.55, dWhiteM = 0.50)
         assertFalse(r.reliable)
-        assertEquals(1.003, r.disagreementD!!, 0.001)
+        assertEquals(0.852, r.disagreementD!!, 0.001)
     }
 
     @Test fun `exactly 0_50 D disagreement is still reliable`() {
@@ -43,14 +43,17 @@ class OpticsTest {
     }
 
     @Test fun `white beyond 0_8 m is ignored - blue only`() {
-        val r = optics.farPoint(dBlueM = 0.60, dWhiteM = 0.85)
+        val r = optics.farPoint(dBlueM = 0.55, dWhiteM = 0.85)
         assertNull(r.seWhiteD)
-        assertEquals(-1.0 / 0.60 + 0.67, r.seD, 1e-9)
+        assertEquals(-1.0 / 0.55 + 0.67, r.seD, 1e-9)
     }
 
     @Test fun `no blur at arms length - no significant myopia`() {
         assertTrue(optics.farPoint(dBlueM = null, dWhiteM = null).noMyopiaAtArmsLength)
         assertTrue(optics.farPoint(dBlueM = 0.75, dWhiteM = null).noMyopiaAtArmsLength)
+        // One reach setting: farPoint.selfHeldReachM (0.60 m)
+        assertTrue(optics.farPoint(dBlueM = 0.60, dWhiteM = null).noMyopiaAtArmsLength)
+        assertFalse(optics.farPoint(dBlueM = 0.59, dWhiteM = null).noMyopiaAtArmsLength)
     }
 
     // ---- near point / add ------------------------------------------------------------------

@@ -68,7 +68,6 @@ data class OpticsConfig(
     val lcaBlueOffsetD: Double,
     val farPointAgreementMaxD: Double,
     val whiteFarPointMaxM: Double,
-    val armsLengthM: Double,
     val workingDistanceDefaultM: Double,
     val workingDistanceFineWorkM: Double,
     val hofstetterMinIntercept: Double,
@@ -78,7 +77,6 @@ data class OpticsConfig(
     val addMaxD: Double,
     val repeatSpreadHighMaxD: Double,
     val repeatSpreadMediumMaxD: Double,
-    val measuredBandHalfWidthD: Double,
 )
 
 @Serializable

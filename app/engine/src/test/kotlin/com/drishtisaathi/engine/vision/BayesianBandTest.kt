@@ -45,9 +45,10 @@ class BayesianBandTest {
 
     // ---- measured SE -------------------------------------------------------------------------------
 
-    @Test fun `band is 1 D wide, holds the measurement, probability matches the posterior`() {
+    @Test fun `band width comes from rules json, holds the measurement, probability matches the posterior`() {
         val r = bayes.fromMeasurement(-3.0, 45)
-        assertEquals(1.0, r.band.highD - r.band.lowD, 1e-9)
+        assertEquals(1.5, rules.bayes.bandWidthD, 1e-9)
+        assertEquals(rules.bayes.bandWidthD, r.band.highD - r.band.lowD, 1e-9)
         assertTrue(-3.0 in r.band.lowD..r.band.highD)
         assertEquals(1.0, r.posterior.sum(), 1e-9)
         val step = rules.bayes.gridStepD
@@ -70,17 +71,19 @@ class BayesianBandTest {
         assertTrue(r.posteriorMeanD > -2.0 && r.posteriorMeanD < 0.0)
     }
 
-    @Test fun `rule 5 - with sigma 0_8 a 1 D band stays below 0_60 and is not shown`() {
-        // The table reported to the lead: typical measurements at ages 35 and 55.
+    @Test fun `rule 5 - sigma 0_8 with a 1_5 D band clears 0_60 and is shown`() {
+        // Typical measurements at ages 35 and 55 (user decision: widen the band, keep sigma 0.8 and the 0.60 cut-off).
         for (age in listOf(35, 55)) for (se in listOf(-1.4, -3.0, -5.0)) {
             val r = bayes.fromMeasurement(se, age)
-            assertTrue("P=${r.probability} for $se at $age", r.probability in 0.40..0.55)
-            assertFalse(r.shown)
-            assertEquals(Confidence.LOW, r.confidence)
+            assertTrue("P=${r.probability} for $se at $age", r.probability in 0.60..0.70)
+            assertTrue(r.shown)
+            assertEquals(Confidence.MEDIUM, r.confidence)
         }
-        // A 1 D band cannot reach 0.60 with σ 0.8 even under a flat prior (max ≈ 0.47).
-        val flat = BayesianBand(rules.bayes.copy(priorWeight = 0.0), rules.optics)
-        assertTrue(flat.fromMeasurement(-3.0, 45).probability < 0.48)
+        // Why the band was widened: a 1 D band cannot reach 0.60 with σ 0.8 even under a flat prior (max ≈ 0.47).
+        val oneD = BayesianBand(rules.bayes.copy(priorWeight = 0.0, bandWidthD = 1.0), rules.optics, rules.farPoint.selfHeldReachM)
+        val p = oneD.fromMeasurement(-3.0, 45)
+        assertTrue(p.probability < 0.48)
+        assertFalse(p.shown)
     }
 
     @Test fun `a tighter measurement clears the show threshold`() {
@@ -91,14 +94,14 @@ class BayesianBandTest {
     }
 
     @Test fun `flat prior centres the band on the measurement`() {
-        val flat = BayesianBand(rules.bayes.copy(priorWeight = 0.0), rules.optics)
+        val flat = BayesianBand(rules.bayes.copy(priorWeight = 0.0), rules.optics, rules.farPoint.selfHeldReachM)
         val r = flat.fromMeasurement(-2.0, 45)
-        assertEquals(PowerBand(-2.5, -1.5), r.band)
+        assertEquals(PowerBand(-2.75, -1.25), r.band)
         assertEquals(-2.0, r.mapD, 1e-9)
     }
 
     @Test fun `confidence thresholds come from rules json`() {
-        val lax = BayesianBand(rules.bayes.copy(bandProbabilityHigh = 0.45, minBandProbabilityToShow = 0.40), rules.optics)
+        val lax = BayesianBand(rules.bayes.copy(bandProbabilityHigh = 0.45, minBandProbabilityToShow = 0.40), rules.optics, rules.farPoint.selfHeldReachM)
         val r = lax.fromMeasurement(-3.0, 45)
         assertEquals(Confidence.HIGH, r.confidence)
         assertTrue(r.shown)
@@ -114,7 +117,7 @@ class BayesianBandTest {
 
     @Test fun `no blur within arms length - myopia beyond the limit becomes unlikely`() {
         val r = bayes.fromNoBlurAtArmsLength(45)
-        val limit = -1.0 / rules.optics.armsLengthM
+        val limit = -1.0 / rules.farPoint.selfHeldReachM
         assertTrue(mass(r.posterior) { it < limit - 1.0 } < 0.01)
         assertTrue(r.band.highD >= 0.0)
         assertTrue(r.mapD >= -0.5)
@@ -148,8 +151,10 @@ class BayesianBandTest {
     }
 
     @Test fun `uncertain band keeps the starting trial lens, flags the band and tells staff to refine by hand`() {
+        // With the shipped 1.5 D band typical bands clear 0.60; a stricter cut-off makes this one uncertain.
+        val strict = rules.copy(bayes = rules.bayes.copy(minBandProbabilityToShow = 0.70, bandProbabilityHigh = 0.80))
         val m = MeasuredEye(seD = -3.0, confidence = Confidence.HIGH)
-        val r = engine.assess(adult, tests = VisionTests(right = m))
+        val r = RulesEngine(strict, TestAssets.anthro).assess(adult, tests = VisionTests(right = m))
         val eye = r.advice!!.eyes.single()
         assertTrue(eye.bandUncertain)
         assertEquals(Confidence.LOW, eye.band.confidence)
@@ -166,7 +171,8 @@ class BayesianBandTest {
         val off = RulesConfig.parse(TestAssets.text("rules.json").replace(Regex("\"enabled\": true(,\\s*\"gridMinD\")"), "\"enabled\": false$1"))
         val m = MeasuredEye(seD = -1.4, confidence = Confidence.HIGH)
         val eye = RulesEngine(off, TestAssets.anthro).assess(adult, tests = VisionTests(right = m)).advice!!.eyes.single()
-        assertEquals(PowerBand(-2.0, -1.0), eye.band.value)
+        // Fixed band of bayes.bandWidthD (1.5 D) around the rounded SE (−1.50)
+        assertEquals(PowerBand(-2.25, -0.75), eye.band.value)
         assertEquals(-1.5, eye.startingTrialLens.value.sph, 1e-9)
         assertNull(eye.bandProbability)
     }

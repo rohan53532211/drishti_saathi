@@ -115,9 +115,9 @@ class FarPointTest {
     }
 
     @Test fun `white beyond 0_8 m or unblurred skips the self-check`() {
-        val res = FarPointAnalysis.analyse(TestEye.RIGHT, listOf(600.0, 600.0), listOf(null, null), rules)!!
+        val res = FarPointAnalysis.analyse(TestEye.RIGHT, listOf(550.0, 550.0), listOf(null, null), rules)!!
         assertNull(res.consistent)
-        assertEquals(-1.0 / 0.6 + 0.67, res.seD!!, 1e-9)
+        assertEquals(-1.0 / 0.55 + 0.67, res.seD!!, 1e-9)
         assertNull(res.seWhiteD)
     }
 
@@ -134,7 +134,8 @@ class FarPointTest {
     @Test fun `one repeat clear at arm's length is censored at arm's length and lowers confidence`() {
         val res = FarPointAnalysis.analyse(TestEye.RIGHT, listOf(400.0, null), emptyList(), rules)!!
         assertFalse(res.noMyopiaAtArmsLength)
-        assertEquals(((-1.0 / 0.7 + 0.67) + (-1.83)) / 2, res.seD!!, 1e-9)
+        // censored at the single reach setting farPoint.selfHeldReachM (0.60 m)
+        assertEquals(((-1.0 / 0.6 + 0.67) + (-1.83)) / 2, res.seD!!, 1e-9)
         assertEquals(Confidence.LOW, res.confidence)
     }
 

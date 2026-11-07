@@ -21,7 +21,7 @@ import kotlin.math.abs
  *   farPoint.consistencyAction = RETAKE_ONCE_THEN_LOW_CONFIDENCE, both colours are retaken once; still disagreeing →
  *   blue SE at LOW confidence.
  *
- * A reading of null means "still clear" up to the limit of its mode: optics.armsLengthM when self-held,
+ * A reading of null means "still clear" up to the limit of its mode: farPoint.selfHeldReachM when self-held,
  * farPoint.staffHeldMaxM when staff-held; it is censored at that limit. A self-held tap at or beyond arm's length
  * also counts as "still clear". White is used only when every white reading blurred within optics.whiteFarPointMaxM.
  */
@@ -34,7 +34,7 @@ class FarPointProtocol(
 
     init { require(repeats >= 1) }
 
-    private val o = Optics(optics)
+    private val o = Optics(optics, fp.selfHeldReachM)
 
     enum class Colour { BLUE, WHITE }
 
@@ -110,7 +110,7 @@ class FarPointProtocol(
 
     // ---- evaluation ---------------------------------------------------------------------------------
 
-    private fun limitMm(r: Reading): Double = (if (r.staffHeld) fp.staffHeldMaxM else optics.armsLengthM) * 1000.0
+    private fun limitMm(r: Reading): Double = (if (r.staffHeld) fp.staffHeldMaxM else fp.selfHeldReachM) * 1000.0
 
     /** Blur distance, or null when still clear (including a self-held tap at or beyond arm's length). */
     private fun blurMm(r: Reading): Double? = r.distanceMm?.takeIf { it < limitMm(r) }
@@ -118,7 +118,10 @@ class FarPointProtocol(
     private fun seBlue(r: Reading): Double = -1000.0 / (blurMm(r) ?: limitMm(r)) + optics.lcaBlueOffsetD
 
     private fun whiteUsable(readings: List<Reading>): Boolean =
-        readings.isNotEmpty() && readings.all { r -> blurMm(r)?.let { it <= optics.whiteFarPointMaxM * 1000.0 } == true }
+        readings.isNotEmpty() && readings.all { r -> blurMm(r)?.let { it <= whiteMaxMm(r) } == true }
+
+    /** White limit: optics.whiteFarPointMaxM when self-held; staff-held readings count up to farPoint.staffHeldMaxM. */
+    private fun whiteMaxMm(r: Reading): Double = (if (r.staffHeld) fp.staffHeldMaxM else optics.whiteFarPointMaxM) * 1000.0
 
     private fun seWhite(r: Reading): Double = -1000.0 / blurMm(r)!!
 

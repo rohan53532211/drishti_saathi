@@ -7,7 +7,6 @@
     "lcaBlueOffsetD": 0.67,
     "farPointAgreementMaxD": 0.50,
     "whiteFarPointMaxM": 0.80,
-    "armsLengthM": 0.70,
     "workingDistanceDefaultM": 0.40,
     "workingDistanceFineWorkM": 0.33,
     "hofstetterMinIntercept": 15.0,
@@ -16,8 +15,7 @@
     "addMinD": 0.75,
     "addMaxD": 3.00,
     "repeatSpreadHighMaxD": 0.25,
-    "repeatSpreadMediumMaxD": 0.50,
-    "measuredBandHalfWidthD": 0.50
+    "repeatSpreadMediumMaxD": 0.50
   },
 
   "ages": {
@@ -147,7 +145,7 @@
     "gridMinD": -12.0,
     "gridMaxD": 8.0,
     "gridStepD": 0.25,
-    "bandWidthD": 1.0,
+    "bandWidthD": 1.5,
     "likelihoodSigmaD": 0.80,
     "priorWeight": 0.5,
     "myopiaMaxD": -0.5,
