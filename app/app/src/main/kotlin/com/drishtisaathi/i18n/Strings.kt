@@ -206,6 +206,8 @@ object S {
         "Band too uncertain to show: start with the trial lens and refine with the hand test",
         "रेंज बहुत अनिश्चित है, इसलिए नहीं दिखाई: ट्रायल लेंस से शुरू करें और हाथ वाले टेस्ट से तय करें",
     )
+    /** Learning loop: the far-point estimate was corrected with this phone model's fit (rules.json deviceCorrection). */
+    val correctedWithRecords = t("corrected with %d shop records", "%d दुकान रिकॉर्ड से सुधारा गया")
     /** rules_update.md rule 6: PD with its uncertainty (pdMeasurement.sdNoCardMm / sdCardMm). */
     val pdAbout = t("about %d mm (±%d mm)", "लगभग %d mm (±%d mm)")
     val lensPackage = t("Lens package", "लेंस पैकेज")

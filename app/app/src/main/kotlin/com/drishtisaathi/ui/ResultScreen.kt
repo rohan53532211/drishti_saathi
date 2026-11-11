@@ -88,6 +88,10 @@ fun ResultScreen(
                             if (e.bandUncertain) Text(S.bandUncertain[l], style = MaterialTheme.typography.bodyMedium)
                             else Text("${S.estimatedBand[l]}: ${Fmt.band(e.band.value, l)} ${Fmt.meta(e.band, l)}",
                                 style = MaterialTheme.typography.bodyMedium)
+                            e.correctedWithShopRecords?.let {
+                                Text(S.correctedWithRecords.format(it)[l], style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary)
+                            }
                         }
                         Text(S.startingLensHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }

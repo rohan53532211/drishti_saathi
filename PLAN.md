@@ -53,7 +53,7 @@ TTS/ASR with read-back; CameraX + Face Landmarker; card calibration; PD + face w
 ## Phase 3: Nov 10–12 (from the brief)
 Distance-locked tests, fusion, Bayesian band, 30-frame catalogue, try-on.
 
-**Addition 7: Temple length (experimental).** Optional ~45° side capture; estimate ear-to-frame-front distance → snap to 135 / 140 / 145 mm. Labelled **Experimental** everywhere it appears; never used to drop a frame, only as a staff hint.
+**Addition 7: Temple length (experimental).** Optional ~45° side capture; estimate ear-to-frame-front distance → snap to 135 / 140 / 145 mm. Labelled **Experimental** everywhere it appears; never used to drop a frame, only as a staff hint. **Status: not implemented** (no side capture or temple estimate in the code yet; frames keep their catalogue temple length).
 
 **Addition 8: Live try-on.** Frame PNG overlay on the live front camera, posed with the Face Landmarker facial transformation matrix so it follows head turns (yaw/pitch/roll) and scales with distance. 2D overlay with perspective transform; no 3D avatar.
 
@@ -106,6 +106,17 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 - hi-IN with `EXTRA_PREFER_OFFLINE` false; online consent before use.
 - Staff voice check line lists all services, the recogniser in use, mode and last error.
 
+**Per-device correction (learning loop, added 11 Nov):**
+- Each verified session gives up to two pairs: the raw far-point SE the phone measured and the SE (sph + cyl/2) of the final trial lens the staff typed in (e.g. `-1.75 / -0.50 x 180`; unreadable entries are skipped).
+- Once 5 or more verified sessions exist for this phone model (`Build.MANUFACTURER Build.MODEL`), the app fits final = intercept + slope × measured by least squares and applies it to new far-point estimates before the Bayesian band. Staff see "corrected with N shop records" under the band, on screen and in the shop PDF. The customer copy is unchanged.
+- Guards in `rules.json` `deviceCorrection`:
+  - pairs more than 3 D apart are treated as entry errors and left out
+  - when measured values spread less than 0.5 D, only an offset is fitted
+  - the slope is clamped to 0.7–1.3
+  - the change to one estimate is capped at ±1 D
+- Old-glasses numbers and demo customers are never corrected. Demo sessions never count towards the fit.
+- The fit always uses the raw measured SE, so it cannot feed on itself. It is refitted at app start, after a verification is saved and after a session is deleted, and stored in Room table `device_corrections` (database v4).
+
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:
@@ -122,6 +133,8 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 7. APK size (~54 MB, mostly OpenCV + MediaPipe): consider dropping armeabi-v7a (~15 MB).
 8. Frame images (Kaggle Glasses dataset) have an unknown licence: demo use only.
 9. Every clinical number in `rules.json` still needs optometrist review before field use.
+10. Addition 7 (temple length from a ~45° side capture) is not implemented.
+11. `deviceCorrection` thresholds (5 sessions, 0.5 D spread, slope 0.7–1.3, 3 D entry-error cut-off, ±1 D cap) are starting values: review with pilot data. The Room DAO and migration are checked against the exported schema in unit tests, not on a device.
 
 ## Next steps
 1. Phone: install via adb, voice check, then the checklist above; feed measured values back into `rules.json`.

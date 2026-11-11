@@ -10,11 +10,15 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.Upsert
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.SessionResult
 import com.drishtisaathi.engine.StaffMeasurements
+import com.drishtisaathi.engine.vision.DeviceFit
+import com.drishtisaathi.engine.vision.PairedEye
+import com.drishtisaathi.engine.vision.TrialLensText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 
@@ -54,8 +58,40 @@ data class Measurements(
     val demo: Boolean = false,
 )
 
+/**
+ * Learning loop: this phone model's fitted correction (final trial lens SE = intercept + slope × measured SE), refitted
+ * from verified sessions. Numbers only. One row per phone model; removed again when fewer than the minimum remain.
+ */
+@Entity(tableName = "device_corrections")
+data class DeviceCorrectionEntity(
+    @PrimaryKey val phoneModel: String,
+    val intercept: Double,
+    val slope: Double,
+    val sessions: Int,
+    val eyes: Int,
+    val residualSdD: Double,
+    val maxCorrectionD: Double,
+    val fittedAt: Long,
+) {
+    fun toFit() = DeviceFit(intercept, slope, sessions, eyes, residualSdD, maxCorrectionD)
+
+    companion object {
+        fun from(phoneModel: String, f: DeviceFit, at: Long) =
+            DeviceCorrectionEntity(phoneModel, f.intercept, f.slope, f.sessions, f.eyes, f.residualSdD, f.maxCorrectionD, at)
+    }
+}
+
+@Dao
+interface DeviceCorrectionDao {
+    @Query("SELECT * FROM device_corrections WHERE phoneModel = :model") suspend fun get(model: String): DeviceCorrectionEntity?
+    @Upsert suspend fun upsert(e: DeviceCorrectionEntity)
+    @Query("DELETE FROM device_corrections WHERE phoneModel = :model") suspend fun delete(model: String)
+}
+
 @Dao
 interface SessionDao {
+    @Query("SELECT * FROM sessions WHERE phoneModel = :model AND verifiedAt IS NOT NULL")
+    suspend fun verifiedFor(model: String): List<SessionEntity>
     @Insert suspend fun insert(s: SessionEntity): Long
     @Update suspend fun update(s: SessionEntity)
     @Query("SELECT * FROM sessions WHERE id = :id") suspend fun get(id: Long): SessionEntity?
@@ -63,9 +99,10 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :id") suspend fun delete(id: Long)
 }
 
-@Database(entities = [SessionEntity::class], version = 3, exportSchema = true)
+@Database(entities = [SessionEntity::class, DeviceCorrectionEntity::class], version = 4, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun sessions(): SessionDao
+    abstract fun deviceCorrections(): DeviceCorrectionDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -82,9 +119,17 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE sessions ADD COLUMN measurementsJson TEXT")
             }
         }
+        /** v4 adds device_corrections (learning-loop fit per phone model). SQL matches schemas/.../4.json. */
+        const val CREATE_DEVICE_CORRECTIONS =
+            "CREATE TABLE IF NOT EXISTS `device_corrections` (`phoneModel` TEXT NOT NULL, `intercept` REAL NOT NULL, " +
+                "`slope` REAL NOT NULL, `sessions` INTEGER NOT NULL, `eyes` INTEGER NOT NULL, `residualSdD` REAL NOT NULL, " +
+                "`maxCorrectionD` REAL NOT NULL, `fittedAt` INTEGER NOT NULL, PRIMARY KEY(`phoneModel`))"
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) = db.execSQL(CREATE_DEVICE_CORRECTIONS)
+        }
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "drishti.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build().also { instance = it }
         }
     }
@@ -104,4 +149,29 @@ object SessionCodec {
     fun measurements(e: SessionEntity): Measurements =
         e.measurementsJson?.let { json.decodeFromString(Measurements.serializer(), it) } ?: Measurements()
     fun encode(m: Measurements) = json.encodeToString(Measurements.serializer(), m)
+}
+
+
+/** Learning loop: paired eyes (raw measured far-point SE vs final trial lens SE) from stored sessions. */
+object PairedRecords {
+    /**
+     * Uses verified, non-demo sessions with screen-test results. Per eye: a measured SE (not "no myopia at arm's
+     * length") and a readable final trial lens. Rows from other phone models must already be filtered out.
+     */
+    fun from(rows: List<SessionEntity>): List<PairedEye> = rows.flatMap { e ->
+        if (e.verifiedAt == null) return@flatMap emptyList()
+        val m = runCatching { SessionCodec.measurements(e) }.getOrNull() ?: return@flatMap emptyList()
+        if (m.demo) return@flatMap emptyList()
+        val tests = m.tests ?: return@flatMap emptyList()
+        listOfNotNull(
+            pair(e.id, tests.right, e.finalTrialRight),
+            pair(e.id, tests.left, e.finalTrialLeft),
+        )
+    }
+
+    private fun pair(id: Long, eye: com.drishtisaathi.engine.MeasuredEye?, finalText: String?): PairedEye? {
+        val measured = eye?.takeIf { !it.noMyopiaAtArmsLength }?.seD ?: return null
+        val final = TrialLensText.sphericalEquivalent(finalText) ?: return null
+        return PairedEye(id, measured, final)
+    }
 }

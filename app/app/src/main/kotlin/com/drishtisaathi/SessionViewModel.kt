@@ -16,6 +16,10 @@ import com.drishtisaathi.engine.face.FaceCapture
 import com.drishtisaathi.engine.face.FaceFrame
 import com.drishtisaathi.data.SessionCodec
 import com.drishtisaathi.data.SessionEntity
+import com.drishtisaathi.data.DeviceCorrectionEntity
+import com.drishtisaathi.data.PairedRecords
+import com.drishtisaathi.engine.vision.DeviceCorrection
+import com.drishtisaathi.engine.vision.DeviceFit
 import com.drishtisaathi.engine.DrishtiEngine
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.KnownRx
@@ -102,8 +106,37 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         ChoiceContext(rules.frameScoring.budgetMaxPriceInrLow, rules.frameScoring.budgetMaxPriceInrMid)
     }
 
-    private val dao = AppDatabase.get(app).sessions()
+    private val db = AppDatabase.get(app)
+    private val dao = db.sessions()
     val sessions: Flow<List<SessionEntity>> = dao.observeAll()
+
+    // ---- learning loop: per-phone-model correction ------------------------------------------
+
+    /** Same string stored with every session. */
+    private val phoneModel = "${Build.MANUFACTURER} ${Build.MODEL}"
+    private val _deviceFit = MutableStateFlow<DeviceFit?>(null)
+    /** This phone model's fit from verified shop records; null until minVerifiedSessions exist. */
+    val deviceFit: StateFlow<DeviceFit?> = _deviceFit.asStateFlow()
+    private var refitJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            _deviceFit.value = db.deviceCorrections().get(phoneModel)?.toFit() // stored fit, available at once
+            refitDeviceCorrection()                                              // then refresh with current rules
+        }
+    }
+
+    /** Refits from all verified sessions of this phone model and stores the fit (or removes it below the minimum). */
+    private fun refitDeviceCorrection() {
+        val previous = refitJob
+        refitJob = viewModelScope.launch {
+            previous?.join()
+            val fit = DeviceCorrection.fit(PairedRecords.from(dao.verifiedFor(phoneModel)), rules.deviceCorrection)
+            if (fit == null) db.deviceCorrections().delete(phoneModel)
+            else db.deviceCorrections().upsert(DeviceCorrectionEntity.from(phoneModel, fit, System.currentTimeMillis()))
+            _deviceFit.value = fit
+        }
+    }
 
     /** The pending save; delete waits for it so a fast "Delete" never leaves a row behind. */
     private var saveJob: Job? = null
@@ -219,7 +252,8 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** Runs the engine and saves the session (updates the same row if answers were edited after results). */
     fun computeResult(): SessionResult {
         val s = _state.value
-        val result = engine.evaluate(s.answers, s.staff, s.tests, s.face)
+        // Demo customers are never corrected, so recordings stay the same on every phone.
+        val result = engine.evaluate(s.answers, s.staff, s.tests, s.face, correction = if (s.demo) null else _deviceFit.value)
         val createdAt = s.createdAt ?: System.currentTimeMillis()
         _state.update { it.copy(result = result, createdAt = createdAt) }
         val previous = saveJob
@@ -230,7 +264,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 id = current ?: 0,
                 createdAt = createdAt,
                 lang = s.lang.name,
-                phoneModel = "${Build.MANUFACTURER} ${Build.MODEL}",
+                phoneModel = phoneModel,
                 answersJson = SessionCodec.encode(s.answers),
                 staffJson = SessionCodec.encode(s.staff),
                 resultJson = SessionCodec.encode(result),
@@ -267,6 +301,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                     verifiedAt = stamped.verifiedAt,
                 ))
             }
+            refitDeviceCorrection()
         }
     }
 
@@ -284,6 +319,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun removeSession(id: Long) {
         dao.delete(id)
         withContext(Dispatchers.IO) { PdfExporter.deleteFor(getApplication(), id) }
+        refitDeviceCorrection()
     }
 
     fun deleteSession(id: Long) = viewModelScope.launch {

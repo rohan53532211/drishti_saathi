@@ -364,5 +364,15 @@
 
   "readingAdd": {
     "verifyWithReadyReader": true
+  },
+  "deviceCorrection": {
+    "_comment": "Learning loop: per phone model, fit final trial lens SE = intercept + slope x raw measured far-point SE from verified sessions (demo sessions excluded) and apply it to new far-point estimates. Starting values, not tuned: review with pilot data.",
+    "enabled": true,
+    "minVerifiedSessions": 5,
+    "minMeasuredSpreadD": 0.5,
+    "slopeMin": 0.7,
+    "slopeMax": 1.3,
+    "excludePairAbsDiffOverD": 3.0,
+    "maxCorrectionD": 1.0
   }
 }

@@ -35,6 +35,8 @@ data class RulesConfig(
     val farPoint: com.drishtisaathi.engine.config.FarPointConfig = com.drishtisaathi.engine.config.FarPointConfig(),
     val pdMeasurement: com.drishtisaathi.engine.config.PdMeasurementConfig = com.drishtisaathi.engine.config.PdMeasurementConfig(),
     val readingAdd: com.drishtisaathi.engine.config.ReadingAddConfig = com.drishtisaathi.engine.config.ReadingAddConfig(),
+    // ---- Learning loop: per-phone-model correction from verified shop records ----
+    val deviceCorrection: com.drishtisaathi.engine.config.DeviceCorrectionConfig = com.drishtisaathi.engine.config.DeviceCorrectionConfig(),
 ) {
     fun material(id: String): MaterialSpec =
         materials.firstOrNull { it.id == id } ?: error("Material '$id' is not defined in rules.json")

@@ -1,6 +1,7 @@
 package com.drishtisaathi.engine
 
 import com.drishtisaathi.engine.vision.BayesianBand
+import com.drishtisaathi.engine.vision.DeviceFit
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
@@ -62,6 +63,11 @@ data class EyeAdvice(
      * band (the starting trial lens is still given; staff refine it with the hand test). Band confidence is LOW.
      */
     val bandUncertain: Boolean = false,
+    /**
+     * Learning loop: the measured far-point SE was corrected with this phone model's fit from this many verified shop
+     * sessions ("corrected with N shop records"). Null when no correction was applied.
+     */
+    val correctedWithShopRecords: Int? = null,
 )
 
 @Serializable
@@ -145,12 +151,15 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         staff: StaffMeasurements = StaffMeasurements(),
         tests: VisionTests = VisionTests(),
         face: MeasuredFace? = null,
+        /** This phone model's fit from verified shop records; ignored when deviceCorrection.enabled is false. */
+        correction: DeviceFit? = null,
     ): Assessment {
         val notes = linkedSetOf<Note>()
         val referral = referral(answers, tests)
         val (pd, faceWidth) = anatomy(staff, face, notes)
 
-        val advice = if (referral.adviceWithheld) null else lensAdvice(answers, tests, notes)
+        val fit = correction?.takeIf { rules.deviceCorrection.enabled }
+        val advice = if (referral.adviceWithheld) null else lensAdvice(answers, tests, notes, fit)
         val pm = rules.pdMeasurement
         val pdSd = when (pd.source) {
             Source.STAFF_ENTRY -> pm.sdCardMm
@@ -225,10 +234,10 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
 
     // ---- Lens advice -------------------------------------------------------------------------
 
-    private fun lensAdvice(a: InterviewAnswers, t: VisionTests, notes: MutableSet<Note>): LensAdvice {
+    private fun lensAdvice(a: InterviewAnswers, t: VisionTests, notes: MutableSet<Note>, fit: DeviceFit?): LensAdvice {
         val eyes = listOfNotNull(
-            eyeAdvice(Eye.RIGHT, t.right, a.knownRx?.right, a, notes),
-            eyeAdvice(Eye.LEFT, t.left, a.knownRx?.left, a, notes),
+            eyeAdvice(Eye.RIGHT, t.right, a.knownRx?.right, a, notes, fit),
+            eyeAdvice(Eye.LEFT, t.left, a.knownRx?.left, a, notes, fit),
         )
         val measured = listOfNotNull(t.right, t.left)
         if (measured.any { it.astigmatismFlag }) notes += Note.CHECK_CYLINDER
@@ -257,18 +266,24 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         }
     }
 
-    private fun eyeAdvice(eye: Eye, m: MeasuredEye?, old: EyeRx?, a: InterviewAnswers, notes: MutableSet<Note>): EyeAdvice? {
+    private fun eyeAdvice(
+        eye: Eye, m: MeasuredEye?, old: EyeRx?, a: InterviewAnswers, notes: MutableSet<Note>, fit: DeviceFit?,
+    ): EyeAdvice? {
         val usableMeasure = m?.takeIf { it.seD != null && !it.noMyopiaAtArmsLength }
         if (usableMeasure != null && (usableMeasure.confidence != Confidence.LOW || old == null)) {
-            if (rules.bayes.enabled) return bayesianEyeAdvice(eye, usableMeasure, a.age, notes)
-            val se = optics.roundToStep(usableMeasure.seD!!)
+            // Learning loop: correct the raw far-point SE with this phone model's fit before any band is formed.
+            val corrected = if (fit != null) usableMeasure.copy(seD = fit.apply(usableMeasure.seD!!)) else usableMeasure
+            val records = fit?.sessions
+            if (rules.bayes.enabled) return bayesianEyeAdvice(eye, corrected, a.age, notes).copy(correctedWithShopRecords = records)
+            val se = optics.roundToStep(corrected.seD!!)
             val hw = rules.bayes.bandWidthD / 2
-            val c = usableMeasure.confidence
+            val c = corrected.confidence
             return EyeAdvice(
                 eye,
                 Estimate(PowerBand(se - hw, se + hw), c, Source.MEASURED),
                 Estimate(TrialLens(se), c, Source.MEASURED),
                 thicknessPowerD = se,
+                correctedWithShopRecords = records,
             )
         }
         if (old == null) return null

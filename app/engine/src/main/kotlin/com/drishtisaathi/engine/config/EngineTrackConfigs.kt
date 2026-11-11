@@ -399,3 +399,29 @@ data class ReadingAddConfig(
         operator fun invoke(): ReadingAddConfig = missingSection("readingAdd")
     }
 }
+
+/** Per-phone-model bias correction from verified shop records (see vision/DeviceCorrection.kt). */
+@Serializable
+data class DeviceCorrectionConfig(
+    @SerialName("_comment") val comment: String? = null,
+    val enabled: Boolean,
+    /** Verified sessions on this phone model needed before any correction is fitted or applied. */
+    val minVerifiedSessions: Int,
+    /** Below this SD of measured SE (D) only an offset is fitted (slope 1). */
+    val minMeasuredSpreadD: Double,
+    val slopeMin: Double,
+    val slopeMax: Double,
+    /** Pairs whose measured and final SE differ by more than this (D) are treated as entry errors. */
+    val excludePairAbsDiffOverD: Double,
+    /** Largest change the correction may make to one estimate (D). */
+    val maxCorrectionD: Double,
+) {
+    init {
+        require(minVerifiedSessions >= 2) { "deviceCorrection.minVerifiedSessions must be >= 2" }
+        require(slopeMin in 0.0..1.0 && slopeMax >= 1.0) { "deviceCorrection slope bounds must contain 1" }
+        require(minMeasuredSpreadD >= 0 && excludePairAbsDiffOverD > 0 && maxCorrectionD >= 0) { "deviceCorrection: bad bounds" }
+    }
+    companion object {
+        operator fun invoke(): DeviceCorrectionConfig = missingSection("deviceCorrection")
+    }
+}

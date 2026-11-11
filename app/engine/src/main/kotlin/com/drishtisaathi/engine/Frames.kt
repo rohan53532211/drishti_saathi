@@ -395,8 +395,10 @@ class DrishtiEngine(private val rules: RulesConfig, priors: AnthroPriors, privat
         staff: StaffMeasurements = StaffMeasurements(),
         tests: VisionTests = VisionTests(),
         face: MeasuredFace? = null,
+        /** This phone model's learning-loop fit (null: none yet, or a demo session). */
+        correction: com.drishtisaathi.engine.vision.DeviceFit? = null,
     ): SessionResult {
-        val a = rulesEngine.assess(answers, staff, tests, face)
+        val a = rulesEngine.assess(answers, staff, tests, face, correction)
         val advice = a.advice ?: return SessionResult(a, emptyList()) // referral only: no frames either
         val powers = advice.eyes.map { Estimate(it.thicknessPowerD, it.startingTrialLens.confidence, it.startingTrialLens.source) }
         val prefs = FramePrefs.from(answers, advice.lensType.value)

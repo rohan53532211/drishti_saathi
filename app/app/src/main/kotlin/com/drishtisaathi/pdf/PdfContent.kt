@@ -63,6 +63,7 @@ object PdfContent {
                 out += Block.Para("$eye  ${Fmt.trialLens(e.startingTrialLens.value)}", bold = true, tone = Tone.ACCENT)
                 out += if (e.bandUncertain) Block.Bullet(S.bandUncertain[l], Tone.ROUTINE)
                 else Block.Bullet("${S.estimatedBand[l]}: ${Fmt.band(e.band.value, l)} ${Fmt.meta(e.band, l)}")
+                e.correctedWithShopRecords?.let { out += Block.Bullet(S.correctedWithRecords.format(it)[l], Tone.MUTED) }
             }
             adv.add?.let { out += Block.Para("${S.readingAdd[l]}: ${Fmt.band(it.value, l)} ${Fmt.meta(it, l)}") }
             if (adv.confirmAddWithReadyReader) out += Block.Bullet(S.confirmReadyReader[l], Tone.ACCENT)
