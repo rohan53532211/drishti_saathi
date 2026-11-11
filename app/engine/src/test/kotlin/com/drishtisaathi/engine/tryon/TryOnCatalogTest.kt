@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Assume
 import org.junit.Test
 import java.io.DataInputStream
 import java.io.File
@@ -34,6 +35,12 @@ class TryOnCatalogTest {
     }
 
     @Test fun `every frame has a bundled try-on PNG whose size matches its overlay`() {
+        // The PNGs are not in git (Kaggle images, licence unknown; see README). Skip on a fresh clone,
+        // but once any is present, every frame must have a matching one.
+        Assume.assumeTrue(
+            "frame PNGs not present (generate with tools/frames_cutout.py)",
+            File(assets, "frames").listFiles { x -> x.extension == "png" }?.isNotEmpty() == true,
+        )
         all.frames.forEach { f ->
             val ov = f.overlay!!
             assertEquals(f.image, ov.png)

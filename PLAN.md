@@ -107,7 +107,7 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 - Staff voice check line lists all services, the recogniser in use, mode and last error.
 
 ## Open items
-1. Install the latest APK on the S23 FE (adb not connected) and confirm voice works; read the staff voice check line.
+1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:
    - camera check: fps, landmark alignment, distance vs tape at 300/400/600 mm, one eye covered
    - card calibration (screen and forehead) and letter size with a ruler
