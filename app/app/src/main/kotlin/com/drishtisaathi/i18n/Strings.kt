@@ -360,7 +360,7 @@ object S {
             "Sudden vision loss, painful red eye, halos with pain, or new double vision",
             "अचानक नज़र कम होना, आँख में दर्द-लाली, दर्द के साथ घेरे, या दो-दो दिखना",
         ),
-        ReferralReason.AMSLER_DISTORTION to t("Distortion or missing area on the grid test", "ग्रिड टेस्ट में टेढ़ी या गायब रेखाएँ"),
+        ReferralReason.AMSLER_DISTORTION to t("Straight lines look wavy or bent (distortion)", "सीधी लकीरें टेढ़ी या लहरदार दिखती हैं"),
         ReferralReason.DIABETES_OR_BP_WITH_BLUR to t("Sugar or BP with blurred vision", "शुगर या बीपी के साथ धुंधलापन"),
         ReferralReason.NEAR_ACUITY_BELOW_THRESHOLD to t("Near vision test below the safe limit", "पास की नज़र का टेस्ट सुरक्षित सीमा से कम"),
         ReferralReason.LOW_CONFIDENCE_REPEATED to t("Test results were unreliable twice", "टेस्ट के नतीजे दो बार भरोसेमंद नहीं रहे"),

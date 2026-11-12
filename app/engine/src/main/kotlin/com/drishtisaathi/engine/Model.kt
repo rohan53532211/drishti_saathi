@@ -130,6 +130,9 @@ data class QuickEye(
     val cylD: Double? = null,
     /** Two-line blur test: approximate axis, 180 or 90. */
     val cylAxisDeg: Int? = null,
+    /** The power shown to people as a range, never one exact number: [seD] ± 0.25 D (less minus, more minus). */
+    val rangeFromD: Double? = null,
+    val rangeToD: Double? = null,
 )
 
 /**
@@ -148,6 +151,9 @@ data class QuickEstimate(
     val primary: Boolean = true,
     /** Under the add age: the near point expected for the age (Hofstetter mean), for the optometrist. */
     val expectedNearPointCm: Double? = null,
+    /** The reading add shown as a range: [addD] ± 0.25 D. */
+    val addFromD: Double? = null,
+    val addToD: Double? = null,
 ) {
     val eyes: List<Pair<Eye, QuickEye>> get() = listOfNotNull(right?.let { Eye.RIGHT to it }, left?.let { Eye.LEFT to it })
 }

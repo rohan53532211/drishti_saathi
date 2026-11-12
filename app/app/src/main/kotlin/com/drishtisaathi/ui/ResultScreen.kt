@@ -69,10 +69,23 @@ fun ResultScreen(
             // Order: functional vision profile, power and its source, referral, lens package, frames.
             // An urgent referral goes first.
             val urgent = a.referral.level == ReferralLevel.URGENT
+            // Urgent warning signs: ONE red card at the very top (message and reasons), never hidden or softened.
+            if (urgent) SectionCard(S.referral[l], container = UrgentBg) {
+                Text(SShop.urgentTop[l], style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = UrgentRed)
+                a.referral.reasons.forEach {
+                    Text("• " + S.referralReason(it, rules)[l], style = MaterialTheme.typography.bodyLarge, color = UrgentRed)
+                }
+            }
+            // Below it, the eye check, lens package and frames as for everyone else.
+            if (urgent) Text(SShop.afterDoctor[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            // The eye check runs for everyone: its ranges show even when lens advice is withheld.
+            val eyeLines = PowerPathText.quickLines(state)
+            if (eyeLines.isNotEmpty()) SectionCard(SShop.eyeCheckTitle[l]) {
+                eyeLines.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyLarge) }
+            }
             SectionCard(SAnamnesis.profileTitle[l]) {
                 PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
             }
-            if (urgent) ReferralBlock(a.referral, rules, l)
 
             val adv = a.advice
             if (adv == null) {
@@ -101,7 +114,6 @@ fun ResultScreen(
                         Text(S.startingLensHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }
                     PowerPathText.sourceLine(adv)?.let { Text(it[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
-                    PowerPathText.quickLines(state).forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyMedium) }
                     val compare = PowerPathText.compareLines(state, adv)
                     if (compare.isNotEmpty()) {
                         HorizontalDivider()
@@ -208,6 +220,7 @@ fun ResultScreen(
             extraActions()
             BigButton(SShop.finish[l], onDone, container = Teal)
             BigButton(S.deleteSession[l], { confirmDelete = true }, container = UrgentRed)
+            if (!urgent) Text(SShop.phoneCheckNote[l], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Disclaimer()
         }
     }

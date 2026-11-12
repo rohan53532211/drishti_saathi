@@ -106,6 +106,8 @@ data class UiState(
     val glassesOn: Boolean = false,
     /** Power path quick estimate (primary = power source; otherwise a comparison for staff). */
     val quick: QuickEstimate? = null,
+    /** Shop tools → Precision mode: the same reading test, the near check always runs. */
+    val precision: Boolean = false,
     /** Remote Optometrist Bridge: what was sent for this session and the reply; null = not sent. */
     val remote: RemoteReviewEntity? = null,
     val bridgeBusy: Boolean = false,
@@ -468,7 +470,10 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     /** What the customer eye check runs (power and two-line per eye, grid when needed, reading check). */
     fun eyeCheckPlan(): com.drishtisaathi.vision.EyeCheckPlan =
-        com.drishtisaathi.vision.EyeCheckPlan.from(_state.value.answers, quickPlan())
+        com.drishtisaathi.vision.EyeCheckPlan.from(_state.value.answers, full = _state.value.precision)
+
+    /** Precision mode (after consent): the same eye check, then the same results, saved as a session. */
+    fun startPrecision() = _state.update { it.copy(precision = true) }
 
     /** YES path: offer the optional quick check next to the known power. */
     fun offerCompare(): Boolean = quickEstimator.offerCompare(_state.value.answers)
@@ -481,8 +486,8 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     fun setQuick(q: QuickEstimate?) = _state.update { it.copy(quick = q, result = null) }
 
 
-    /** The quick estimate only counts while the power path still applies (an urgent flag clears it). */
-    private fun quickFor(s: UiState): QuickEstimate? = s.quick?.takeIf { !s.answers.urgentRedFlag && s.answers.powerKnown != null }
+    /** The eye check is compulsory: its result always counts (with a known power it is the staff comparison). */
+    private fun quickFor(s: UiState): QuickEstimate? = s.quick
 
     /** Back within the interview. Returns false when already at the first question. */
     fun previousQuestion(): Boolean {

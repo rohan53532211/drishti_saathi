@@ -17,12 +17,20 @@ import com.drishtisaathi.engine.anamnesis.QuickEstimator
 import com.drishtisaathi.interview.Questions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import com.drishtisaathi.i18n.Lang
+import com.drishtisaathi.i18n.SShop
+import com.drishtisaathi.UiState
+import com.drishtisaathi.pdf.Block
+import com.drishtisaathi.pdf.PdfContent
+import com.drishtisaathi.ui.PowerPathText
+import kotlin.random.Random
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** The guided customer eye check: which tests run, the one automatic repeat, and what reaches the engine. */
+/** The compulsory reading eye check: which tests run, letters and sentences, ranges, and what reaches the results. */
 class EyeCheckTest {
     private val a = "src/main/assets/"
     private val rules = RulesConfig.parse(File(a + "rules.json").readText())
@@ -33,48 +41,161 @@ class EyeCheckTest {
     }
     private fun answers(p: VisionProblem, age: Int) =
         Questions.setVisionProblem(InterviewAnswers(age = age), p).copy(powerKnown = PowerKnown.NOT_SURE)
-    private fun plan(a: InterviewAnswers) = EyeCheckPlan.from(a, est.plan(a))
-    private fun steps(p: VisionProblem, age: Int, primary: Boolean = true) =
-        eyeCheckSteps(plan(answers(p, age)), primary).map { it.toString() }
+    private fun plan(a: InterviewAnswers) = EyeCheckPlan.from(a)
+    private fun steps(p: VisionProblem, age: Int) = eyeCheckSteps(plan(answers(p, age))).map { it.toString() }
+    private val ctx = com.drishtisaathi.interview.ChoiceContext(1500, 4000)
+    private fun paras(b: List<Block>) = b.mapNotNull { (it as? Block.Para)?.text }
     private fun r(mm: Double) = DistanceReading(mm, Confidence.HIGH)
 
-    @Test fun `far - per eye power then two-line test, right eye first, no grid under 40`() {
-        assertEquals(
-            listOf("Power(eye=RIGHT)", "Lines(eye=RIGHT)", "Power(eye=LEFT)", "Lines(eye=LEFT)", "Done"),
-            steps(VisionProblem.DISTANCE, 30),
-        )
+    @Test fun `everyone does the far check both eyes, near for NEAR, BOTH or 38+`() {
+        assertEquals(listOf("Power(eye=RIGHT)", "Power(eye=LEFT)", "Done"), steps(VisionProblem.DISTANCE, 30))
+        assertEquals(listOf("Power(eye=RIGHT)", "Power(eye=LEFT)", "Near", "Done"), steps(VisionProblem.DISTANCE, 45))
+        assertEquals(listOf("Power(eye=RIGHT)", "Power(eye=LEFT)", "Near", "Done"), steps(VisionProblem.NEAR, 25))
+        assertEquals(listOf("Power(eye=RIGHT)", "Power(eye=LEFT)", "Near", "Done"), steps(VisionProblem.BOTH, 30))
+        // a known power changes nothing: the check is compulsory
+        assertEquals(steps(VisionProblem.DISTANCE, 30),
+            eyeCheckSteps(plan(answers(VisionProblem.DISTANCE, 30).copy(powerKnown = PowerKnown.YES))).map { it.toString() })
     }
 
-    @Test fun `40+ adds the grid per eye, both adds the reading check last`() {
-        assertEquals(
-            listOf("Power(eye=RIGHT)", "Lines(eye=RIGHT)", "Grid(eye=RIGHT)", "Power(eye=LEFT)", "Lines(eye=LEFT)", "Grid(eye=LEFT)", "Near", "Done"),
-            steps(VisionProblem.BOTH, 45),
-        )
-        assertEquals("Near", steps(VisionProblem.BOTH, 30).let { it[it.size - 2] })
+    @Test fun `far letters - a new random set of 5 Sloan letters every 3 cm`() {
+        val rnd = Random(1)
+        var set = LetterSet.start(rnd)
+        assertEquals(5, set.letters.length)
+        assertEquals(5, set.letters.toSet().size)
+        assertTrue(set.letters.all { it in SLOAN_LETTERS })
+        set = set.update(200.0, rnd)                          // first reading anchors, letters stay
+        val first = set.letters
+        assertEquals(first, set.update(229.0, rnd).letters)   // 2.9 cm: same letters
+        assertEquals(first, set.update(171.0, rnd).letters)
+        val moved = set.update(230.0, rnd)                    // 3 cm: new letters, new anchor
+        assertNotEquals(first, moved.letters)
+        assertEquals(230.0, moved.anchorMm!!, 0.0)
+        assertEquals(moved.letters, moved.update(255.0, rnd).letters)
+        assertNotEquals(moved.letters, moved.update(260.0, rnd).letters)
+        assertEquals(moved, moved.update(null, rnd))          // no reading: unchanged
     }
 
-    @Test fun `near only - reading check at any age, grid from 40`() {
-        assertEquals(listOf("Grid(eye=RIGHT)", "Grid(eye=LEFT)", "Near", "Done"), steps(VisionProblem.NEAR, 50))
-        assertEquals(listOf("Near", "Done"), steps(VisionProblem.NEAR, 30))
-        assertTrue(plan(answers(VisionProblem.NEAR, 30)).runsAnything)
+    @Test fun `near check - a new random sentence on every attempt, 30+ per language`() {
+        val s = ReadingSentences.parse(File(a + ReadingSentences.ASSET).readText())
+        assertTrue(s.en.size >= 30 && s.hi.size >= 30)
+        val rnd = Random(7)
+        var prev: String? = null
+        repeat(50) {
+            val next = s.pick(Lang.EN, rnd, prev)
+            assertNotEquals(prev, next)
+            assertTrue(next in s.en)
+            prev = next
+        }
+        assertTrue(s.pick(Lang.HI, rnd) in s.hi)
     }
 
-    @Test fun `grid only when lines look bent, 40+, or diabetes`() {
-        val young = answers(VisionProblem.DISTANCE, 30)
-        assertFalse(EyeCheckPlan.gridNeeded(young))
-        assertTrue(EyeCheckPlan.gridNeeded(young.copy(straightLinesBent = true)))
-        assertTrue(EyeCheckPlan.gridNeeded(young.copy(diabetesOrBp = true)))
-        assertTrue(EyeCheckPlan.gridNeeded(answers(VisionProblem.DISTANCE, 40)))
-        assertFalse(EyeCheckPlan.gridNeeded(young.copy(straightLinesBent = false, diabetesOrBp = false)))
-        assertEquals(listOf("Grid(eye=RIGHT)", "Grid(eye=LEFT)", "Done"),
-            eyeCheckSteps(plan(young.copy(diabetesOrBp = true)), primary = false, gridOnly = true).map { it.toString() })
+    @Test fun `power is shown as a range - 30 cm gives centre -3_25, range -3_00 to -3_50 D`() {
+        val r = PowerRange.far(300.0)                       // -3.33 -> nearest 0.25 = -3.25
+        assertEquals(-3.25, r.centreD, 1e-9); assertEquals(-3.00, r.fromD, 1e-9); assertEquals(-3.50, r.toD, 1e-9)
+        assertEquals(-3.50, PowerRange.far(290.0).centreD, 1e-9)   // -3.45 -> -3.50 (nearest, not always down)
+        val r40 = PowerRange.far(400.0)                     // exactly -2.50
+        assertEquals(-2.25, r40.fromD, 1e-9); assertEquals(-2.75, r40.toD, 1e-9)
+        val eye = PowerRange.farEye(300.0)
+        assertEquals(-3.25, eye.seD!!, 1e-9)                // the centre feeds lens and frame suggestions
+        assertEquals(30.0, eye.blurAtCm!!, 0.0)
+        val text = quickEyeText(eye).en
+        assertTrue(text, "between −3.00 and −3.50 D" in text)
+        val add = PowerRange.add(1.75)
+        assertEquals(1.50, add.fromD, 1e-9); assertEquals(2.00, add.toD, 1e-9)
+        assertTrue("+1.50 to +2.00" in nearResultText(40.0, 1.75, null, false).en)
     }
 
-    @Test fun `the comparison with a known power is the power check only`() {
-        assertEquals(listOf("Power(eye=RIGHT)", "Power(eye=LEFT)", "Done"), steps(VisionProblem.DISTANCE, 30, primary = false))
+    @Test fun `a red flag does not end the flow - the eye check runs and the referral shows with the ranges`() {
+        val red = answers(VisionProblem.DISTANCE, 30).copy(redFlagFlashes = true, powerKnown = null)
+        assertEquals(listOf("Power(eye=RIGHT)", "Power(eye=LEFT)", "Done"), eyeCheckSteps(plan(red)).map { it.toString() })
+        val q = eyeCheckResult(PowerRange.farEye(300.0), PowerRange.farEye(400.0), null, primary = true)
+        val result = engine.evaluate(red, quick = q)
+        assertEquals(ReferralLevel.URGENT, result.assessment.referral.level)
+        val state = UiState(answers = red, quick = q, result = result)
+        val lines = PowerPathText.quickLines(state).map { it.en }
+        assertTrue(lines.toString(), lines.any { "−3.00 and −3.50" in it } && lines.any { "−2.25 and −2.75" in it })
+        val texts = paras(PdfContent.shopCopy(state, rules, ctx, Lang.EN))
+        assertTrue(texts.indexOf(SShop.urgentTop.en) in 0..3)   // at the top
+        assertFalse(SShop.phoneCheckNote.en in texts)
+        assertTrue(SShop.urgentTop.hi in paras(PdfContent.customerCopy(state, rules)))
     }
 
-    @Test fun `a reading that looks invalid is repeated once and the median is used`() {
+    @Test fun `no red flag - the closing line recommends a complete eye check-up, on both PDFs`() {
+        val a0 = answers(VisionProblem.DISTANCE, 30).copy(redFlagFlashes = false, redFlagOther = false)
+        val q = eyeCheckResult(PowerRange.farEye(500.0), PowerRange.farEye(500.0), null, primary = true)
+        val state = UiState(answers = a0, quick = q, result = engine.evaluate(a0, quick = q))
+        assertTrue(SShop.phoneCheckNote.en in paras(PdfContent.shopCopy(state, rules, ctx, Lang.EN)))
+        assertTrue(SShop.phoneCheckNote.hi in paras(PdfContent.customerCopy(state, rules)))
+        assertFalse(SShop.urgentTop.en in paras(PdfContent.shopCopy(state, rules, ctx, Lang.EN)))
+    }
+
+    @Test fun `precision mode - the same reading test gives a full result with no answers`() {
+        val none = InterviewAnswers()
+        val p = EyeCheckPlan.from(none, full = true)
+        assertEquals(listOf("Power(eye=RIGHT)", "Power(eye=LEFT)", "Near", "Done"), eyeCheckSteps(p).map { it.toString() })
+        val near = NearCheck.analyse(300.0, none.age, -2.0, none, rules)
+        val q = eyeCheckResult(PowerRange.farEye(350.0), PowerRange.farEye(450.0), near, primary = true)
+        val result = engine.evaluate(none, quick = q)
+        assertEquals(Source.PHONE_ESTIMATE, result.assessment.advice!!.powerSource)
+        assertEquals(2, result.assessment.advice!!.eyes.size)
+        val state = UiState(answers = none, quick = q, result = result, precision = true)
+        assertEquals(3, PowerPathText.quickLines(state).size)   // R range, L range, near point
+        assertTrue(paras(PdfContent.shopCopy(state, rules, ctx, Lang.EN)).isNotEmpty())
+    }
+
+    @Test fun `far letters at 31 cm are at least minLetterPx tall and laid out in the panel`() {
+        val cfg = rules.farPoint
+        assertEquals(7.5, cfg.letterArcmin, 0.0)                // 20/30 by default, from rules.json
+        assertEquals(18.0, cfg.minLetterPx, 0.0)
+        val scale = ScreenScale(mmPerPx = 0.0635, fromCard = false)   // ~400 dpi phone
+        val panelW = 1000.0
+        val l = FarLetters.layout("CDHKN", 310.0, scale, cfg, panelW)
+        assertTrue(l.letterPx >= cfg.minLetterPx)
+        assertEquals("CDHKN", l.letters)
+        assertEquals(5, l.centresPx.size)
+        assertTrue(l.centresPx.all { it - l.letterPx / 2 >= 0 && it + l.letterPx / 2 <= panelW })
+        assertEquals(2 * l.letterPx, l.centresPx[1] - l.centresPx[0], 1e-9)    // spacing = 1 letter width
+        // distance-locked: 2·d·tan(3.75') at 60 cm, above the floor there
+        val far = FarLetters.layout("CDHKN", 600.0, scale, cfg, panelW)
+        assertEquals(2 * 600.0 * Math.tan(Math.toRadians(3.75 / 60.0)) / 0.0635, far.letterPx, 1e-6)
+        // no reading yet: still drawn at the default distance, never empty
+        val none = FarLetters.layout(LetterSet.start(Random(3)).letters, null, scale, cfg, panelW)
+        assertEquals(5, none.letters.length)
+        assertTrue(none.letterPx >= cfg.minLetterPx)
+    }
+
+    @Test fun `urgent path - the full interview, lens advice and frames, one red card`() {
+        val red = answers(VisionProblem.DISTANCE, 30).copy(redFlagFlashes = true)
+        val ids = com.drishtisaathi.interview.Questions.visible(red).map { it.id }
+        assertTrue(ids.toString(), "screenHours" in ids && "budget" in ids && "powerKnown" in ids)
+        val q = eyeCheckResult(PowerRange.farEye(300.0), PowerRange.farEye(400.0), null, primary = true)
+        val result = engine.evaluate(red, quick = q)
+        assertEquals(ReferralLevel.URGENT, result.assessment.referral.level)
+        assertTrue(result.assessment.advice != null)
+        assertTrue(result.frames.isNotEmpty())
+        val state = UiState(answers = red, quick = q, result = result)
+        val shop = PdfContent.shopCopy(state, rules, ctx, Lang.EN)
+        assertEquals(1, paras(shop).count { it == SShop.urgentTop.en })
+        assertTrue(SShop.afterDoctor.en in paras(shop))
+    }
+
+    @Test fun `skipped lifestyle questions say not answered instead of 0_0 h`() {
+        val st = UiState(answers = answers(VisionProblem.DISTANCE, 30))
+        val lines = PowerPathText.profileLines(st, rules).map { it.en }
+        assertTrue(lines.toString(), lines.take(3).all { it.endsWith("not answered") })
+        val answered = PowerPathText.profileLines(
+            UiState(answers = answers(VisionProblem.DISTANCE, 30).copy(screenHours = com.drishtisaathi.engine.ScreenHours.H4_PLUS)), rules,
+        ).map { it.en }
+        assertTrue(answered.toString(), answered[1].contains(" h a day"))
+    }
+
+    @Test fun `bent straight lines (no grid in the eye check) still refer`() {
+        val bent = answers(VisionProblem.DISTANCE, 30).copy(straightLinesBent = true)
+        assertTrue(ReferralReason.AMSLER_DISTORTION in engine.evaluate(bent).assessment.referral.reasons)
+    }
+
+    @Test fun `a reading that looks invalid is repeated once and the mean is used`() {
+        assertEquals(-2.75, PowerRange.farEyeMedian(400.0, 350.0).seD!!, 1e-9)   // 2.50 and 2.86 -> 2.67 -> centre -2.75
         val p = QuickFarProcedure().onReading(r(120.0), rules, nowMs = 1_000)
         assertTrue(p.looksInvalid(400.0, nowMs = 1_800))      // tapped too soon after being close
         assertFalse(p.looksInvalid(400.0, nowMs = 6_000))
@@ -89,42 +210,6 @@ class EyeCheckTest {
         // the repeat stayed sharp to arm's length: that wins
         val clear = QuickFarProcedure.median(first, p.stillClear(QuickTarget.WHITE), est, QuickTarget.WHITE)
         assertTrue(clear.noMyopiaAtReach)
-    }
-
-    @Test fun `two-line test - a 0_75 D difference flags astigmatism with cyl and axis`() {
-        // horizontal blurs at 40 cm (-2.50), vertical at 80 cm (-1.25): 1.25 cyl, horizontal first -> axis 180
-        val a = TwoLineAstig.analyse(400.0, 800.0)
-        assertTrue(a.flagged); assertEquals(1.25, a.cylD, 1e-9); assertEquals(180, a.axisDeg)
-        // vertical blurs first -> axis 90
-        assertEquals(90, TwoLineAstig.analyse(800.0, 400.0).axisDeg)
-        // exactly 0.75 D apart (50 cm vs 80 cm = 2.00 vs 1.25) flags; rounding to 0.25
-        assertTrue(TwoLineAstig.analyse(500.0, 800.0).flagged)
-        assertEquals(1.0, TwoLineAstig.analyse(480.0, 1000.0).cylD, 1e-9) // 2.08 - 1.00 = 1.08 -> 1.00
-        assertEquals(1.25, TwoLineAstig.analyse(450.0, 1000.0).cylD, 1e-9) // 1.22 -> 1.25
-        // still sharp at arm's length counts as 0 D
-        val sharp = TwoLineAstig.analyse(null, 500.0)
-        assertTrue(sharp.flagged); assertEquals(2.0, sharp.cylD, 1e-9); assertEquals(90, sharp.axisDeg)
-    }
-
-    @Test fun `two-line test - lines blurring together give no flag`() {
-        val r = TwoLineAstig.analyse(400.0, 450.0)  // 2.50 vs 2.22
-        assertFalse(r.flagged); assertNull(r.axisDeg)
-        assertFalse(TwoLineAstig.analyse(null, null).flagged)
-    }
-
-    @Test fun `two-line flag reaches the engine, the phone estimate stays the power source`() {
-        val lines = mapOf(TestEye.RIGHT to TwoLineAstig.analyse(400.0, 800.0), TestEye.LEFT to TwoLineAstig.analyse(440.0, 460.0))
-        val q = QuickEstimate(QuickEye(-2.5, 40.0, QuickTarget.WHITE), QuickEye(-2.25, 44.0, QuickTarget.WHITE), primary = true)
-        val t = eyeCheckTests(lines, emptyMap(), q.right, q.left)
-        assertTrue(t.right!!.astigmatismFlag)
-        assertEquals(180, t.right!!.astigmatismAxisDeg)
-        assertNull(t.left)
-        val withCyl = withCylinder(q.right, lines[TestEye.RIGHT])!!
-        assertEquals(-1.25, withCyl.cylD!!, 1e-9); assertEquals(180, withCyl.cylAxisDeg)
-        assertNull(withCylinder(q.left, lines[TestEye.LEFT])!!.cylD)
-        val result = engine.evaluate(answers(VisionProblem.DISTANCE, 30), tests = t, quick = q.copy(right = withCyl))
-        assertEquals(Source.PHONE_ESTIMATE, result.assessment.advice!!.powerSource)
-        assertTrue(ReferralReason.ASTIGMATISM_FLAG in result.assessment.referral.reasons)
     }
 
     @Test fun `reading check 38+ - add rounded to 0_25 and clamped to 0_75 to 3_00`() {
@@ -151,15 +236,6 @@ class EyeCheckTest {
         assertNull(normal.addD)
         assertFalse(normal.fartherThanExpected)
         assertFalse(NearCheck.analyse(500.0, null, null, a, rules).fartherThanExpected)
-    }
-
-    @Test fun `wavy grid lines mean an urgent referral`() {
-        val grid = mapOf(TestEye.LEFT to AmslerAnalysis.analyse(TestEye.LEFT, listOf(true), emptyList(), rules.visionTests.copy(repeats = 1))!!)
-        val t = eyeCheckTests(emptyMap(), grid, null, null)
-        assertTrue(t.amslerAbnormal)
-        val result = engine.evaluate(answers(VisionProblem.DISTANCE, 30), tests = t)
-        assertEquals(ReferralLevel.URGENT, result.assessment.referral.level)
-        assertTrue(ReferralReason.AMSLER_DISTORTION in result.assessment.referral.reasons)
     }
 
     @Test fun `instructions are spoken once, a repeat waits 8 seconds, a new one goes at once`() {

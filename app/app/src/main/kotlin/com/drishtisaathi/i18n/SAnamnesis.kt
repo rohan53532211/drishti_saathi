@@ -125,7 +125,7 @@ object SAnamnesis {
     val sourceKnown = tx("customer's known power", "ग्राहक का बताया नंबर")
     val sourcePhone = tx("phone estimate, approximate", "फ़ोन का अनुमान, लगभग")
     val compareHeading = tx("Phone quick check (staff only, for comparison)", "फ़ोन की झटपट जाँच (सिर्फ़ स्टाफ़, तुलना के लिए)")
-    val compareEye = tx("%s: phone about %s D, known %s D", "%s: फ़ोन लगभग %s D, बताया गया %s D")
+    val compareEye = tx("%s: phone between %s and %s D, known %s D", "%s: फ़ोन %s और %s D के बीच, बताया गया %s D")
     val compareEyeNoMyopia = tx("%s: phone found no myopia at arm's length, known %s D", "%s: फ़ोन को हाथ भर तक कमज़ोर दूर-नज़र नहीं मिली, बताया गया %s D")
     val quickHeading = tx("Phone quick estimate (approximate, confirm with trial lens)", "फ़ोन का झटपट अनुमान (लगभग, ट्रायल लेंस से पक्का करें)")
 

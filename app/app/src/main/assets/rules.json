@@ -350,7 +350,9 @@
     "irisDistanceMaxM": 0.60,
     "beyondIrisUse": "CARD_CALIBRATED_PD",
     "consistencyAction": "RETAKE_ONCE_THEN_LOW_CONFIDENCE",
-    "repeatSpreadAction": "THIRD_READING_MEDIAN"
+    "repeatSpreadAction": "THIRD_READING_MEDIAN",
+    "letterArcmin": 7.5,
+    "minLetterPx": 18
   },
 
 

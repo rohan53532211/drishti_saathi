@@ -1,6 +1,6 @@
 # Drishti Saathi
 
-**Drishti Saathi** is a phone-only helper for small optical shops in India. A voice-guided Hindi/English interview, a camera-measured eye check (power check with BLUR at the blur distance, a two-line blur test for astigmatism, a reading check, and the Amsler grid only when needed) and a face scan give the staff a starting trial lens, referral flags, a lens package and ranked frames with live try-on, in about 5 minutes on one phone. Results go into a shop PDF and a Hindi customer PDF, and, with consent, to a remote optometrist who can reply from a browser. No name or photo ever leaves the phone. It is a starting point for the shop's trial-lens test, not a replacement for it.
+**Drishti Saathi** is a phone-only helper for small optical shops in India. A voice-guided Hindi/English interview, a compulsory camera-measured reading eye check (random letters for far, a random sentence for near, the power shown as a ±0.25 D range) and a face scan give the staff a starting trial lens, referral flags, a lens package and ranked frames with live try-on, in about 5 minutes on one phone. Results go into a shop PDF and a Hindi customer PDF, and, with consent, to a remote optometrist who can reply from a browser. No name or photo ever leaves the phone. It is a starting point for the shop's trial-lens test, not a replacement for it.
 
 ### Download the APK
 
@@ -17,8 +17,8 @@ Get **DrishtiSaathi-v1.0.apk** from [Releases](https://github.com/rohan53532211/
 
 1. **Demo mode:** Home → **Shop tools** → **Demo mode: sample customers** → pick the Student, Shopkeeper or Driver. The full results open at once (every screen marked DEMO).
 2. **Real customer:** Home → **Start new customer** → consent → language → answer the questions by voice or tap.
-3. **Eye check:** glasses off, cover one eye, start close and move the phone away; tap **BLUR** (or say "dhundhla") when the letters, then the lines, stop being sharp. Near problems get the reading check; the grid shows only for bent lines, 40+ or diabetes.
-4. **Results:** power estimate with its source, approximate cylinder, reading add, referral flags, lens package, frames, try-on; share the shop and customer PDFs.
+3. **Eye check (everyone):** glasses off, cover one eye, start close and move the phone away; tap **Can't read clearly** (or say "dhundhla") when you can no longer read the letters. Then, for near problems or 38+, both eyes: hold far, move closer, tap when the sentence blurs.
+4. **Results:** power range per eye, reading add range (38+), referral at the top if urgent, lens package, frames, try-on; share the shop and customer PDFs.
 5. **Optometrist bridge:** start the backend (below), set its URL in **Shop tools → Optometrist bridge settings**, tap **Send to optometrist** on the results, open the same URL in a browser as the optometrist, reply, and watch the reply appear on the phone with its case number.
 
 ### Screenshots
@@ -104,16 +104,16 @@ Home has two big buttons, **Start new customer** and **Past sessions**, and a sm
 
 1. Consent, then the language (Hindi or English).
 2. Questions: the AI voice interview when the backend answers, otherwise the scripted questions. Red flags come right after the main problem; the power question ends this part. No question numbers. Texts, follow-up rules and voice keywords are in `app/app/src/main/assets/anamnesis_questions.json`; the backend reads its interview topics from the same file.
-3. Power: known → enter it (optional "Quick check to compare" when the glasses are over 2 years old or still blurry). Not sure / No → the eye check, at once.
-4. Eye check, right eye then left: power check (BLUR at the distance where letters stop being sharp, power = −1/d), two-line blur test (horizontal, then vertical lines; ≥ 0.75 D apart flags possible astigmatism with an approximate cylinder and axis 180 or 90), grid check only when straight lines look bent, age 40+ or diabetes (wavy lines → urgent referral). Then, for NEAR or BOTH, the reading check with both eyes: 38+ gives an approximate reading add (1/WD − A/2, +0.75…+3.00); under 38 no plus number, the near point is compared with the age-expected one. Each test has a header, Skip and a short result. The clock dial is only in Shop tools → Device checks.
+3. Power: known → enter it, then the eye check anyway (both are shown). Not sure / No → the eye check, at once. The eye check is compulsory for everyone, also after a red flag.
+4. Eye check, one test style only (reading). Far, right eye then left, other eye covered: 5 random Sloan letters (C D H K N O R S V Z), bold, spacing = 1 letter width, in their own grey panel (≥ 35% of the screen), distance-locked at 20/30 (`farPoint.letterArcmin` 7.5′, never under `farPoint.minLetterPx` 18 px), a new set every 3 cm; "Can't read clearly" freezes the distance d → power range centre −1/d rounded to the nearest 0.25 D, shown ± 0.25 D (30 cm → −3.00 to −3.50 D). Near, both eyes, for NEAR / BOTH or 38+: a new random sentence each attempt (`assets/reading_sentences.json`, chosen language) in small print; 38+ gives a reading add range (1/WD − A/2 ± 0.25 D); under 38 no plus number, the near point is compared with the age-expected one. The range centre feeds lens and frame suggestions. Each step has a header, Skip, a short result and Do it again. "Straight lines look bent" = yes refers (there is no grid in the eye check).
 5. Face measurement for frame fit (optional card on the forehead, can be skipped).
 6. The remaining lifestyle and frame questions (only unanswered ones).
 7. Results: vision profile, power and source, referral, lens package, frames, try-on and compare. Staff details are folded under **For the shop** (notes, measurements, transcript, verification, **Edit answers**).
 8. Send to optometrist, share PDFs, **Finish**.
 
-An urgent red flag (in the answers or the grid check) skips the rest and opens the referral.
+An urgent red flag no longer ends the flow early: the eye check, face scan and lifestyle questions still run; the results (and both PDFs) open with one red card "Please see an eye doctor today" and its reasons, then the eye check, lens package and frames marked "Suggestions for after your eye doctor visit". Skipped lifestyle questions show "not answered", not 0.0 h. Everyone else gets the closing line recommending a complete eye check-up with an optometrist.
 
-**Shop tools:** Phone setup (one time: bank-card screen size and a quick camera test; it opens by itself on first launch, "Skip for now" leaves a reminder on home), Demo mode, Optometrist bridge settings, Device checks (camera check, and precision mode with the full staff tests: blue/white far point, retakes, near point, letter chart with at most 12 answers, grid).
+**Shop tools:** Phone setup (one time: bank-card screen size and a quick camera test; it opens by itself on first launch, "Skip for now" leaves a reminder on home), Demo mode, Optometrist bridge settings, Device checks (camera check, and Precision mode: full eye test = the same reading test, far for both eyes and near, ending on the same results screen with PDFs, saved as a session).
 
 ## Demo mode
 

@@ -58,11 +58,26 @@ object PdfContent {
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${state.sessionId?.let { S.sessionNo.format(it.toInt())[l] + " · " } ?: ""}${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
+        val urgent = a.referral.level == ReferralLevel.URGENT
+        if (urgent) {
+            out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
+            reasonGroups(a.referral, rules, l, out)
+            out += Block.Para(com.drishtisaathi.i18n.SShop.afterDoctor[l], bold = true)
+        }
         out += Block.Rule
 
-        out += Block.Heading(S.referral[l])
-        out += Block.Para(S.referralLevel(a.referral.level)[l], bold = true, tone = referralTone(a.referral.level))
-        reasonGroups(a.referral, rules, l, out)
+        // The eye check (compulsory): the known power if any, the phone ranges, the near result.
+        val quick = PowerPathText.quickLines(state)
+        if (quick.isNotEmpty()) {
+            out += Block.Heading(com.drishtisaathi.i18n.SShop.eyeCheckTitle[l])
+            quick.forEach { out += Block.Bullet(it[l]) }
+        }
+
+        if (!urgent) {
+            out += Block.Heading(S.referral[l])
+            out += Block.Para(S.referralLevel(a.referral.level)[l], bold = true, tone = referralTone(a.referral.level))
+            reasonGroups(a.referral, rules, l, out)
+        }
         if (state.glassesOn) out += Block.Para(com.drishtisaathi.i18n.SFlow.glassesOnNote[l], bold = true, tone = Tone.ROUTINE)
 
         val adv = a.advice
@@ -85,11 +100,6 @@ object PdfContent {
             if (adv.confirmAddWithReadyReader) out += Block.Bullet(S.confirmReadyReader[l], Tone.ACCENT)
             if (adv.eyes.isNotEmpty()) out += Block.Para(S.startingLensHint[l], tone = Tone.MUTED)
             PowerPathText.sourceLine(adv)?.let { out += Block.Para(it[l], bold = true) }
-            val quick = PowerPathText.quickLines(state)
-            if (quick.isNotEmpty()) {
-                out += Block.Para(SAnamnesis.quickHeading[l], tone = Tone.MUTED)
-                quick.forEach { out += Block.Bullet(it[l]) }
-            }
             val compare = PowerPathText.compareLines(state, adv)
             if (compare.isNotEmpty()) {
                 out += Block.Para(SAnamnesis.compareHeading[l], bold = true, tone = Tone.ROUTINE)
@@ -147,6 +157,7 @@ object PdfContent {
         }
 
         out += Block.Rule
+        if (!urgent) out += Block.Para(com.drishtisaathi.i18n.SShop.phoneCheckNote[l], bold = true)
         out += Block.Para(S.disclaimerBoth, bold = true)
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         return out
@@ -165,16 +176,22 @@ object PdfContent {
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
+        val urgent = a.referral.level == ReferralLevel.URGENT
+        if (urgent) {
+            out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
+            reasonGroups(a.referral, rules, l, out)
+            out += Block.Para(com.drishtisaathi.i18n.SShop.afterDoctor[l], bold = true)
+        }
         out += Block.Para(S.customerIntro[l])
         out += Block.Rule
 
         val tone = referralTone(a.referral.level)
         when (a.referral.level) {
-            ReferralLevel.URGENT -> { out += Block.Heading(S.urgentTitle[l]); out += Block.Para(S.urgentBody[l], bold = true, tone = tone) }
+            ReferralLevel.URGENT -> Unit   // already at the top, once
             ReferralLevel.ROUTINE -> { out += Block.Heading(S.routineTitle[l]); out += Block.Para(S.routineBody[l], tone = tone) }
             ReferralLevel.NONE -> { out += Block.Heading(S.referral[l]); out += Block.Para(S.referralLevel(a.referral.level)[l], tone = tone) }
         }
-        reasonGroups(a.referral, rules, l, out)
+        if (!urgent) reasonGroups(a.referral, rules, l, out)
 
         a.advice?.let { adv ->
             out += Block.Heading(S.lensPackage[l])
@@ -193,6 +210,7 @@ object PdfContent {
             }
         }
         out += Block.Rule
+        if (!urgent) out += Block.Para(com.drishtisaathi.i18n.SShop.phoneCheckNote[l], bold = true)
         out += Block.Para(S.privacyNote[l], tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)

@@ -56,7 +56,6 @@ import com.drishtisaathi.ui.StepFrame
 import com.drishtisaathi.ui.DemoScreen
 import com.drishtisaathi.ui.DemoBadge
 import com.drishtisaathi.demo.DemoCustomers
-import com.drishtisaathi.vision.CameraVisionTestFlow
 import com.drishtisaathi.vision.CameraQuickEstimateFlow
 import com.drishtisaathi.ui.CompareOfferScreen
 import com.drishtisaathi.ui.BridgeConsentScreen
@@ -84,7 +83,6 @@ private object Routes {
     const val SHOP_TOOLS = "shopTools"
     const val PHONE_SETUP = "phoneSetup"
     const val DIAGNOSTICS = "diagnostics"
-    const val PRECISION = "precision"
     const val CAMERA_DEBUG = "cameraDebug"
     const val DEMO = "demo"
     // Customer flow: consent → language → questions (AI voice or scripted) → power / eye check → face → more
@@ -96,8 +94,8 @@ private object Routes {
     const val AI_INTERVIEW = "aiInterview"
     const val OLD_NUMBERS = "oldNumbers"
     const val COMPARE_OFFER = "compareOffer"
-    const val QUICK = "quick?primary={primary}&gridOnly={gridOnly}"
-    fun quick(primary: Boolean, gridOnly: Boolean = false) = "quick?primary=$primary&gridOnly=$gridOnly"
+    const val QUICK = "quick?primary={primary}"
+    fun quick(primary: Boolean) = "quick?primary=$primary"
     const val CARD = "card"
     const val CAPTURE = "capture"
     const val CAPTURE_OUTCOME = "captureOutcome"
@@ -149,11 +147,10 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
     }
 
-    /** Runs the engine with everything gathered so far; any referral is shown before the summary. */
+    /** Runs the engine with everything gathered so far and opens the results (a referral shows at the top there). */
     fun computeAndShow() {
-        val r = vm.computeResult()
-        val target = if (r.assessment.referral.level == ReferralLevel.NONE) Routes.RESULT else Routes.REFERRAL
-        nav.navigate(target) { popUpTo(Routes.HOME) }
+        vm.computeResult()
+        nav.navigate(Routes.RESULT) { popUpTo(Routes.HOME) }
     }
 
     /** Back to the edit-answers screen ("For the shop"). */
@@ -168,63 +165,50 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     /** Face measurement for frame fit (card on the forehead first, optional). */
     fun toFace() = nav.navigate(Routes.CARD) { popUpTo(Routes.LANGUAGE) }
 
-    /** After the power answer or the eye check: urgent → referral at once; else the face measurement. */
+    /**
+     * After the eye check: precision mode → the results; everyone else (urgent cases too) → the face measurement
+     * for frame fit and the remaining questions, then the results (an urgent warning at the top).
+     */
     fun afterEyeCheck() {
-        if (vm.needsUrgentReferral()) { vm.skipCapture(); computeAndShow() } else toFace()
+        if (vm.state.value.precision) { vm.skipCapture(); computeAndShow() } else toFace()
     }
 
     // ---- power path ----
     /** The power path was opened from the edit-answers screen: return there instead of going on. */
     var powerFromEdit by remember { mutableStateOf(false) }
-    /** The grid check already ran (or was offered) in this session's eye check. */
-    var gridAsked by remember { mutableStateOf(false) }
     fun finishPowerPath() {
-        when {
-            powerFromEdit -> { powerFromEdit = false; toEdit() }
-            // Grid needed (bent lines, 40+, diabetes) but no eye check with the grid ran: the grid check alone.
-            !gridAsked && vm.eyeCheckPlan().grid -> { gridAsked = true; nav.navigate(Routes.quick(primary = false, gridOnly = true)) }
-            else -> afterEyeCheck()
-        }
+        if (powerFromEdit) { powerFromEdit = false; toEdit() } else afterEyeCheck()
     }
     /**
-     * Runs the eye check, or stores the no-test outcome and goes on. As the power source ([primary]) it opens straight
-     * on the camera; [primary] false = the optional check to compare with a known power.
+     * The eye check is compulsory for everyone (also with a known power or a red flag). [primary] = it is the power
+     * source; false next to a known power (both are shown).
      */
     fun startQuick(primary: Boolean) {
-        val plan = vm.eyeCheckPlan()
-        if (!(if (primary) plan.runsAnything else plan.far)) {
-            vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
-            finishPowerPath()
-        } else {
-            vm.setGlassesOn(false)
-            if (primary) gridAsked = true
-            nav.navigate(Routes.quick(primary))
-        }
+        vm.setGlassesOn(false)
+        nav.navigate(Routes.quick(primary))
     }
     fun startPowerPath() {
-        if (!powerFromEdit) gridAsked = false
         vm.setQuick(null)
         vm.skipVisionTests()
         when (vm.state.value.answers.powerKnown) {
             PowerKnown.YES -> nav.navigate(Routes.OLD_NUMBERS)
-            PowerKnown.NOT_SURE, PowerKnown.NO -> startQuick(primary = true)
-            null -> finishPowerPath()
+            // NOT SURE / NO, or not asked (an urgent red flag ends the questions early): the eye check is the source.
+            else -> startQuick(primary = true)
         }
     }
 
-    /** CORE questions done: urgent → referral; else the power question's path (known power or eye check). */
-    fun afterCore() {
-        if (vm.state.value.answers.urgentRedFlag) {
-            vm.skipCapture(); vm.skipVisionTests(); vm.setQuick(null); computeAndShow()
-        } else startPowerPath()
-    }
+    /** CORE questions done: the power question's path and the eye check, also after a red flag (no early end). */
+    fun afterCore() = startPowerPath()
+
+    /** Precision mode: consent first, then the same eye check and the same results, saved as a session. */
+    var precisionRun by remember { mutableStateOf(false) }
 
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     NavHost(nav, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
             HomeScreen(
                 state, vm::setLang,
-                onStart = { vm.startNew(); nav.navigate(Routes.CONSENT) },
+                onStart = { precisionRun = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onHistory = { nav.navigate(Routes.HISTORY) },
                 onShopTools = { nav.navigate(Routes.SHOP_TOOLS) },
                 setupDone = setupDone,
@@ -257,28 +241,23 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             DiagnosticsScreen(
                 state.lang, vm::setLang,
                 onCamera = { nav.navigate(Routes.CAMERA_DEBUG) },
-                onPrecision = { nav.navigate(Routes.PRECISION) },
+                onPrecision = { precisionRun = true; vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onBack = { nav.popBackStack() },
             )
-        }
-        // Precision mode: the full staff protocol (blue/white far point, retakes, near point, letter chart, grid).
-        composable(Routes.PRECISION) {
-            val l = state.lang
-            StepFrame(l, vm::setLang, SShop.precisionMode[l], onBack = { nav.popBackStack() }) {
-                CameraVisionTestFlow(
-                    l, vm.rules, vm.calibration, age = null, occupation = null,
-                    onDone = { _, _ -> nav.popBackStack() },
-                    onCancel = { nav.popBackStack() },
-                    modifier = Modifier.fillMaxSize(),
-                    onInstruction = { voice.instructionSpeaker.speak(it, l) },
-                    allowDemoWithoutCamera = true,
-                )
-            }
         }
         composable(Routes.CONSENT) {
             ConsentScreen(
                 state.lang, vm::setLang,
-                onContinue = { vm.giveConsent(); nav.navigate(Routes.LANGUAGE) { popUpTo(Routes.HOME) } },
+                onContinue = {
+                    vm.giveConsent()
+                    if (precisionRun) {
+                        // Precision mode: the same reading test as the customer flow, then the same results.
+                        precisionRun = false
+                        vm.startPrecision()
+                        nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
+                        startQuick(primary = true)
+                    } else nav.navigate(Routes.LANGUAGE) { popUpTo(Routes.HOME) }
+                },
                 onCancel = { goHome() },
             )
         }
@@ -360,7 +339,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 // Power path YES: the entered numbers are the power source ("customer's known power").
                 onSave = { rx ->
                     vm.setKnownRx(rx)
-                    if (vm.offerCompare()) nav.navigate(Routes.COMPARE_OFFER) else finishPowerPath()
+                    startQuick(primary = false)
                 },
                 // "No numbers available": continue as NO, with the eye check.
                 onNone = { vm.setPowerKnown(PowerKnown.NO); startQuick(primary = true) },
@@ -378,36 +357,23 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         composable(
             Routes.QUICK,
-            arguments = listOf(
-                navArgument("primary") { type = NavType.BoolType; defaultValue = true },
-                navArgument("gridOnly") { type = NavType.BoolType; defaultValue = false },
-            ),
+            arguments = listOf(navArgument("primary") { type = NavType.BoolType; defaultValue = true }),
         ) { entry ->
             val l = state.lang
             val primary = entry.arguments?.getBoolean("primary") ?: true
-            val gridOnly = entry.arguments?.getBoolean("gridOnly") ?: false
             val plan = androidx.compose.runtime.remember { vm.eyeCheckPlan() }
             StepFrame(l, vm::setLang, SShop.eyeCheckTitle[l], onBack = { nav.popBackStack() }) {
                 CameraQuickEstimateFlow(
                     l, vm.rules, vm.calibration, plan, state.answers, primary,
-                    onDone = { q, tests ->
-                        when {
-                            gridOnly -> vm.setVisionTests(tests)
-                            // the line and grid checks of the customer's own eye check (not of the comparison)
-                            primary -> { vm.setQuick(q); vm.setVisionTests(tests) }
-                            else -> vm.setQuick(q)
-                        }
-                        finishPowerPath()
-                    },
-                    onSkip = {
-                        if (!gridOnly) vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
-                        finishPowerPath()
-                    },
-                    gridOnly = gridOnly,
+                    onDone = { q -> vm.setQuick(q); finishPowerPath() },
+                    onSkip = { vm.setQuick(null); finishPowerPath() },
                     modifier = Modifier.fillMaxSize(),
                     voice = voice,
                     onInstruction = { voice.instructionSpeaker.speak(it, l) },
-                    allowDemoWithoutCamera = state.demo,
+                    // Without camera permission: demo and precision mode use the distance slider (no dead end).
+                    allowDemoWithoutCamera = state.demo || state.precision,
+                    // Staff / device checks: the far letters' size line
+                    debug = state.precision || state.demo,
                 )
             }
         }

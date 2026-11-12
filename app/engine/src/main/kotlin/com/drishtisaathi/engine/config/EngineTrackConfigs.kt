@@ -340,6 +340,10 @@ data class FarPointConfig(
     val consistencyAction: ConsistencyAction,
     /** Two repeats of one colour differ by more than optics.repeatSpreadMediumMaxD. */
     val repeatSpreadAction: RepeatSpreadAction,
+    /** Far reading check: letter height in arcmin, distance-locked (7.5 = 20/30; 5 = 20/20). Tuned after the pilot. */
+    val letterArcmin: Double = 7.5,
+    /** Far reading check: letters are never drawn smaller than this (px), so they always stay visible. */
+    val minLetterPx: Double = 18.0,
 ) {
     enum class BeyondIris {
         /** d = f_px × PD_mm / interpupillary px with the card-calibrated PD; without one, iris at LOW confidence. */
@@ -364,6 +368,7 @@ data class FarPointConfig(
 
     init {
         require(selfHeldReachM > 0 && staffHeldMaxM > selfHeldReachM && irisDistanceMaxM > 0)
+        require(letterArcmin > 0 && minLetterPx > 0)
     }
 
     companion object {

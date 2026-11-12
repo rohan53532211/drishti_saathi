@@ -63,12 +63,12 @@ class QuestionFileTest {
         assertTrue("glassesAgeYears" in core(near.copy(wearsGlasses = true)))
     }
 
-    @Test fun `after an urgent red flag only the red-flag follow-ups are asked`() {
+    @Test fun `after an urgent red flag the follow-ups are added and nothing is skipped`() {
         val a = Questions.setVisionProblem(InterviewAnswers(age = 50), VisionProblem.BOTH).copy(redFlagFlashes = true)
-        assertEquals(listOf("age", "visionProblem", "redFlagFlashes", "redFlagOther", "redFlagOnset", "redFlagEye"), core(a))
-        assertEquals(emptyList<String>(), later(a))
-        val s = UiState(answers = a, answered = core(a).toSet())
-        assertTrue(s.allAnswered)
+        val calm = a.copy(redFlagFlashes = false)
+        assertEquals(listOf("age", "visionProblem", "redFlagFlashes", "redFlagOther", "redFlagOnset", "redFlagEye"), core(a).take(6))
+        assertEquals(core(calm), core(a) - setOf("redFlagOnset", "redFlagEye"))
+        assertEquals(later(calm), later(a))
     }
 
     @Test fun `answering moves to the next unanswered question of the stage`() {

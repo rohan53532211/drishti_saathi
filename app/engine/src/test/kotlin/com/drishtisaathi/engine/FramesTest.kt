@@ -78,10 +78,10 @@ class FramesTest {
 
     private val engine = DrishtiEngine(rules, TestAssets.anthro, catalog)
 
-    @Test fun `facade - urgent referral gives no frames`() {
+    @Test fun `facade - urgent referral still gives lens advice and frames`() {
         val res = engine.evaluate(InterviewAnswers(age = 50, redFlagFlashes = true))
-        assertNull(res.assessment.advice)
-        assertTrue(res.frames.isEmpty())
+        assertTrue(res.assessment.advice != null)
+        assertTrue(res.frames.isNotEmpty())
     }
 
     @Test fun `facade - high myope gets 1_60 and thickness on every frame`() {

@@ -10,10 +10,10 @@ object SShop {
     val phoneSetup = tx("Phone setup (one time)", "फ़ोन सेटअप (एक बार)")
     val phoneSetupDone = tx("Phone setup: done", "फ़ोन सेटअप: हो गया")
     val diagnostics = tx("Device checks", "जाँच टूल")
-    val precisionMode = tx("Precision mode: full eye tests (staff)", "प्रिसिज़न मोड: पूरी आँख जाँच (स्टाफ़)")
+    val precisionMode = tx("Precision mode: full eye test", "प्रिसिज़न मोड: पूरी आँख जाँच")
     val precisionNote = tx(
-        "Longer tests for staff: blue and white far point, retakes, the full protocol and the letter chart. Results are shown here only.",
-        "स्टाफ़ के लिए लंबी जाँच: नीला और सफ़ेद दूर-बिंदु, दोबारा जाँच, पूरा तरीका और अक्षर चार्ट। नतीजे सिर्फ़ यहीं दिखते हैं।",
+        "The same reading test as the customer eye check (far for each eye, then near), with the same results screen and PDFs, saved as a session.",
+        "ग्राहक जाँच जैसी ही पढ़ने की जाँच (हर आँख की दूर की, फिर पास की), वही नतीजे और PDF, सेशन के रूप में सेव।",
     )
 
     // ---- phone setup ----
@@ -74,7 +74,48 @@ object SShop {
     val nearNormal = tx("Near point %d cm: as expected for your age (about %d cm).", "पास का बिंदु %d cm: उम्र के हिसाब से ठीक (लगभग %d cm)।")
     val nearOnly = tx("Near point %d cm.", "पास का बिंदु %d cm।")
     val gridCheck = tx("Grid check", "जाली जाँच")
-    val readingCheck = tx("Reading check", "पढ़ने की जाँच")
+    val farCheck = tx("Far reading check", "दूर पढ़ने की जाँच")
+    val readingCheck = tx("Near reading check", "पास पढ़ने की जाँच")
+    val cantRead = tx("Can't read clearly", "साफ़ नहीं पढ़ पा रहे")
+    val farInstruction = tx(
+        "Start close. Move the phone slowly away. Tap 'Can't read clearly' when you can no longer read the letters.",
+        "पास से शुरू करें। फ़ोन धीरे-धीरे दूर ले जाएँ। जब अक्षर पढ़ न पाएँ, तो 'साफ़ नहीं पढ़ पा रहे' दबाएँ।",
+    )
+    val nearInstruction = tx(
+        "Both eyes open. Hold the phone far. Move it slowly closer. Tap 'Can't read clearly' when the words blur.",
+        "दोनों आँखें खुली रखें। फ़ोन दूर पकड़ें। धीरे-धीरे पास लाएँ। जब शब्द धुंधले हों, तो 'साफ़ नहीं पढ़ पा रहे' दबाएँ।",
+    )
+    val stillReadableReach = tx("Still readable at arm's length", "हाथ भर दूरी पर भी पढ़ पा रहे हैं")
+    val stillReadableClose = tx("Still readable up close", "पास में भी पढ़ पा रहे हैं")
+    val doAgain = tx("Do it again", "फिर से करें")
+    val farShort = tx(
+        "Glasses off, cover your %s eye.\nMove slowly away; tap when letters blur.",
+        "चश्मा उतारें, %s आँख ढकें।\nधीरे-धीरे दूर जाएँ; अक्षर धुंधले हों तो दबाएँ।",
+    )
+    val howTo = tx("How to", "कैसे करें")
+    val ok = tx("OK", "ठीक है")
+    val afterDoctor = tx(
+        "Suggestions for after your eye doctor visit. Do not delay the visit.",
+        "ये सुझाव आँखों के डॉक्टर को दिखाने के बाद के लिए हैं। डॉक्टर के पास जाने में देर न करें।",
+    )
+    val notAnswered = tx("not answered", "जवाब नहीं दिया")
+    val farRange = tx(
+        "Your approximate power: between %s and %s D (read up to %d cm; not a final glasses number, confirm with a trial lens)",
+        "आपका अनुमानित चश्मे का नंबर: %s और %s D के बीच (%d cm तक पढ़ा; पक्का नंबर नहीं, ट्रायल लेंस से पक्का करें)",
+    )
+    val nearAddRange = tx(
+        "Near point %d cm: reading add about %s to %s (approximate, confirm with a ready-reader)",
+        "पास का बिंदु %d cm: पढ़ने के लिए लगभग %s से %s (अनुमान, रेडी-रीडर से पक्का करें)",
+    )
+    val urgentTop = tx(
+        "Some of your answers can be signs of an eye problem that needs a doctor soon. Please see an eye doctor today.",
+        "आपके कुछ जवाब आँख की ऐसी समस्या के संकेत हो सकते हैं जिसमें जल्दी डॉक्टर की ज़रूरत होती है। कृपया आज ही आँखों के डॉक्टर को दिखाएँ।",
+    )
+    val phoneCheckNote = tx(
+        "This is a quick phone check, not a full eye examination. We recommend a complete eye check-up with an optometrist.",
+        "यह फ़ोन से की गई एक छोटी जाँच है, आँखों की पूरी जाँच नहीं। हम ऑप्टोमेट्रिस्ट से आँखों की पूरी जाँच कराने की सलाह देते हैं।",
+    )
+    val knownPowerLine = tx("Known power (from the customer)", "पहले से पता नंबर (ग्राहक से)")
     /** "Right eye: Power check" */
     val header = tx("%s: %s", "%s: %s")
     val glassesOffCover = tx(

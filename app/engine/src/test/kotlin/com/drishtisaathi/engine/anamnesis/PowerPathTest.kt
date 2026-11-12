@@ -155,12 +155,12 @@ class PowerPathEngineTest {
         assertTrue(Note.HAND_TEST_NEEDED in res.notes)
     }
 
-    @Test fun `red flag stops everything - urgent referral, no advice`() {
+    @Test fun `red flag - urgent referral, the phone estimate and suggestions still given`() {
         val a = myope.copy(redFlagFlashes = true, powerKnown = PowerKnown.NOT_SURE)
         val res = engine.evaluate(a, quick = QuickEstimate(QuickEye(-2.5, 40.0, QuickTarget.WHITE)))
         assertEquals(ReferralLevel.URGENT, res.assessment.referral.level)
-        assertNull(res.assessment.advice)
-        assertTrue(res.frames.isEmpty())
+        assertEquals(Source.PHONE_ESTIMATE, res.assessment.advice!!.powerSource)
+        assertTrue(res.frames.isNotEmpty())
     }
 
     @Test fun `staff full test outranks the quick estimate on the NOT SURE path`() {
