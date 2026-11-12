@@ -16,7 +16,7 @@ A small FastAPI + SQLite service. A shop using the Drishti Saathi app can send a
  "Reply received" + notification + sound ◀────────  status REVIEWED                    "Reply sent to the shop"
 ```
 
-- **Who opens what.** The shop's phone uses the server address set in staff mode → **Optometrist bridge settings**. The optometrist opens the same address in a browser, with a `/` at the end: for example `https://abc.trycloudflare.com/` or `http://192.168.1.5:8000/`. Both use the same token if one is set.
+- **Who opens what.** The shop's phone uses the server address set in **Shop tools → Optometrist bridge settings**. The optometrist opens the same address in a browser, with a `/` at the end: for example `https://abc.trycloudflare.com/` or `http://192.168.1.5:8000/`. Both use the same token if one is set.
 - **The case number** is the first 6 characters of the server's profile id, in capitals, for example `#3F9A0C`. The phone shows it in large text after sending, and the optometrist's list shows the same number. Use it when you talk about a case on the phone.
 - **Optometrist page.**
   - The list refreshes every 10 seconds.
@@ -85,7 +85,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## Connect the app
 
-1. On the home screen, turn on **staff mode** and tap **Optometrist bridge settings**.
+1. On the home screen, tap **Shop tools** → **Optometrist bridge settings**.
 2. Enter the server URL and the token, then tap **Test connection**.
 3. After a session: on the summary, tap **Send to optometrist**. Go through the consent screen.
 4. The card shows the case number and **Waiting**. It checks every 15 s and changes to **Reply received**, with a notification, when the optometrist submits advice. **Check for reply** checks at once.
@@ -187,12 +187,12 @@ Each turn makes three calls: speech-to-text, then chat, then text-to-speech. Ses
 A TTS failure is not an error: the question text comes back with `audio: null` and `tts_error: "TTS_FAILED"`, and the phone reads it with its own voice.
 
 **On the phone.**
-1. Staff mode → **Optometrist bridge settings**: the same server address and token as above (laptop IP on the same Wi-Fi, or the cloudflared / ngrok `https://` address).
+1. **Shop tools → Optometrist bridge settings**: the same server address and token as above (laptop IP on the same Wi-Fi, or the cloudflared / ngrok `https://` address).
 2. Start a check. Under the first question, tap **Voice interview (AI)**.
 3. Choose Hindi or English and read the consent. Then tap **Continue**, or **Use buttons instead**.
 4. For each question: tap the mic, speak, and tap again (it stops by itself at 15 s).
 5. When it ends, the standard interview continues at the first question still unanswered. The power question always comes back, so the power path runs as usual.
-6. Then the confirmation screen, where staff can correct anything, and the usual flow.
+6. Then any questions the interview did not cover, and the usual flow (staff can correct answers later under **For the shop → Edit answers**).
 
 If the backend fails twice in a row, the phone shows "Voice AI unavailable, continuing with the standard interview" and keeps the answers so far. It does the same at once for a missing key, a wrong token or no server.
 

@@ -111,3 +111,34 @@ class EyeCheckTest {
 
     @Test fun `the face hint waits 5 seconds`() = assertEquals(5_000L, FACE_HINT_AFTER_MS)
 }
+
+/** Precision mode letter chart: hard cap, two misses at one size, "Can't see" is a miss, always a result. */
+class LetterChartLimitsTest {
+    private val cfg = RulesConfig.parse(File("src/main/assets/rules.json").readText()).visionTests
+
+    @Test fun `a customer who sees nothing still ends with a result within 12 answers`() {
+        var a = AcuityProcedure.start(cfg, EDirection.UP)
+        var n = 0
+        while (!a.isDone) { a = a.answer(null, EDirection.LEFT, Confidence.HIGH); n++ }
+        assertTrue(n <= AcuityProcedure.MAX_TRIALS)
+        assertTrue(a.thresholds.isNotEmpty())
+    }
+
+    @Test fun `two misses at one size end that staircase at the smallest size read`() {
+        var a = AcuityProcedure.start(cfg, EDirection.UP)
+        a = a.answer(EDirection.UP, EDirection.UP, Confidence.HIGH)            // 0.7 read → 0.5
+        val lvl = a.staircase.level
+        a = a.answer(null, EDirection.UP, Confidence.HIGH)                      // miss at 0.5 → bigger
+        while (a.staircase.level != lvl) a = a.answer(a.shown, EDirection.UP, Confidence.HIGH)
+        a = a.answer(null, EDirection.UP, Confidence.HIGH)                      // second miss at 0.5
+        assertEquals(listOf(0.6), a.thresholds)                                // 0.6 was read on the way back
+    }
+
+    @Test fun `a guesser is stopped by the cap`() {
+        var a = AcuityProcedure.start(cfg, EDirection.UP)
+        val rnd = kotlin.random.Random(3)
+        var n = 0
+        while (!a.isDone) { a = a.answer(EDirection.random(rnd), EDirection.random(rnd), Confidence.HIGH); n++ }
+        assertTrue(n <= 12)
+    }
+}

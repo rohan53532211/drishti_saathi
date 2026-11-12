@@ -56,20 +56,36 @@ python -I tools/frames_cutout.py glasses/<photo folder> app/app/src/main/assets/
 
 The script writes the transparent PNGs that the try-on loads, plus their measurements. The frame data itself (`frames.json`, `frames/more_frames.json`) is committed.
 
+## Customer flow
+
+Home has two big buttons, **Start new customer** and **Past sessions**, and a small **Shop tools** link. There is no staff switch.
+
+1. Consent, then the language (Hindi or English).
+2. Questions: the AI voice interview when the backend answers, otherwise the scripted questions. Red flags come right after the main problem; the power question ends this part. No question numbers. Texts, follow-up rules and voice keywords are in `app/app/src/main/assets/anamnesis_questions.json`; the backend reads its interview topics from the same file.
+3. Power: known → enter it (optional "Quick check to compare" when the glasses are over 2 years old or still blurry). Not sure / No → the eye check, at once.
+4. Eye check, right eye then left: power check (BLUR at the distance where letters stop being sharp), line check (clock dial, one tap), grid check (wavy lines → urgent referral). Reading check for NEAR or BOTH at 38+. Each test has a header, Skip and a short result.
+5. Face measurement for frame fit (optional card on the forehead, can be skipped).
+6. The remaining lifestyle and frame questions (only unanswered ones).
+7. Results: vision profile, power and source, referral, lens package, frames, try-on and compare. Staff details are folded under **For the shop** (notes, measurements, transcript, verification, **Edit answers**).
+8. Send to optometrist, share PDFs, **Finish**.
+
+An urgent red flag (in the answers or the grid check) skips the rest and opens the referral.
+
+**Shop tools:** Phone setup (one time: bank-card screen size and a quick camera test; it opens by itself on first launch, "Skip for now" leaves a reminder on home), Demo mode, Optometrist bridge settings, Device checks (camera check, and precision mode with the full staff tests: blue/white far point, retakes, near point, letter chart with at most 12 answers, grid).
+
 ## Demo mode
 
 Demo mode is for demonstrations and recordings without a real customer:
 
-1. On the home screen, turn on **staff mode**.
+1. On the home screen, tap **Shop tools**.
 2. Tap **Demo mode: sample customers** and pick one:
    - Student, 21: distance blur, long screen use
    - Shopkeeper, 48: reading difficulty
    - Driver, 56: sudden flashes and floaters (shows the referral path)
-3. The flow opens at the confirmation screen with answers, camera measurements and screen-test results already filled in. From there you can go through the summary, frame ranking, try-on, comparison and the PDFs.
+3. The results open with answers, camera measurements and test results already filled in. From there you can go through the summary, frame ranking, try-on, comparison and the PDFs.
 
 Every demo screen and PDF is marked **DEMO**. The sample customers are not real people.
 
-Staff mode also has the camera check, screen calibration and the staff voice check line on the interview screen.
 
 ## Status
 

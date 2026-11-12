@@ -158,20 +158,51 @@ data class AcuityProcedure(
     val shown: EDirection,
     val thresholds: List<Double> = emptyList(),
     val worstConfidence: Confidence? = null,
+    /** Answers so far, over all repeats ([MAX_TRIALS] at most). */
+    val trials: Int = 0,
+    /** Misses per letter size in the current staircase ([MISSES_TO_STOP] at one size ends it). */
+    val missesAt: Map<Double, Int> = emptyMap(),
+    /** Smallest size read correctly in the current staircase. */
+    val smallestSeen: Double? = null,
+    /** Stopped at [MAX_TRIALS]. */
+    val capped: Boolean = false,
 ) {
-    val isDone: Boolean get() = thresholds.size >= repeats
+    val isDone: Boolean get() = capped || thresholds.size >= repeats
     val repeatIndex: Int get() = thresholds.size
 
-    /** [next] is the direction to show after this answer (chosen by the caller, e.g. EDirection.random). */
+    /**
+     * [next] is the direction to show after this answer (chosen by the caller, e.g. EDirection.random). "Can't see"
+     * ([dir] null) is a miss. A staircase also ends after [MISSES_TO_STOP] misses at one size (threshold: the
+     * smallest size read), and the whole test after [MAX_TRIALS] answers, so it always ends with a result.
+     */
     fun answer(dir: EDirection?, next: EDirection, readingConfidence: Confidence): AcuityProcedure {
         check(!isDone)
-        val s = staircase.answer(dir == shown)
+        val correct = dir == shown
+        val level = staircase.level
+        val s = staircase.answer(correct)
         val w = worst(worstConfidence, readingConfidence)
-        if (!s.isDone) return copy(staircase = s, shown = next, worstConfidence = w)
-        return copy(staircase = Staircase(params), shown = next, thresholds = thresholds + s.threshold(), worstConfidence = w)
+        val n = trials + 1
+        val misses = if (correct) missesAt else missesAt + (level to (missesAt[level] ?: 0) + 1)
+        val seen = if (correct) minOf(smallestSeen ?: level, level) else smallestSeen
+        val twoMisses = !correct && misses.getValue(level) >= MISSES_TO_STOP
+        val cap = n >= MAX_TRIALS
+        if (!s.isDone && !twoMisses && !cap) {
+            return copy(staircase = s, shown = next, worstConfidence = w, trials = n, missesAt = misses, smallestSeen = seen)
+        }
+        val threshold = when {
+            s.isDone -> s.threshold()
+            twoMisses -> seen ?: params.maxLogMar
+            else -> seen ?: s.threshold()
+        }
+        return copy(staircase = Staircase(params), shown = next, thresholds = thresholds + threshold, worstConfidence = w,
+            trials = n, missesAt = emptyMap(), smallestSeen = null, capped = cap)
     }
 
     companion object {
+        /** Hard cap for the whole letter chart (all repeats). */
+        const val MAX_TRIALS = 12
+        const val MISSES_TO_STOP = 2
+
         fun start(cfg: VisionTestConfig, first: EDirection): AcuityProcedure {
             val p = StaircaseParams.from(cfg)
             return AcuityProcedure(cfg.repeats, p, Staircase(p), first)
