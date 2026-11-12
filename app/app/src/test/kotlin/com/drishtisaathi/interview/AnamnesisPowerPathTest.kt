@@ -88,12 +88,12 @@ class AnamnesisPowerPathTest {
     }
 
     // ---- red flag stops everything ----
-    @Test fun `urgent red flag asks onset and eye, then hides the power path and all later questions`() {
+    @Test fun `urgent red flag asks onset and eye, and the interview goes on (no early end)`() {
         val a = problem(VisionProblem.DISTANCE).copy(wearsGlasses = true, redFlagFlashes = true)
         val v = ids(a)
         assertTrue("redFlagOnset" in v && "redFlagEye" in v)
-        assertEquals("redFlagEye", v.last())
-        assertFalse(Questions.POWER_KNOWN in v)
+        assertTrue(Questions.POWER_KNOWN in v)
+        assertTrue("screenHours" in v)
         val calm = ids(a.copy(redFlagFlashes = false, redFlagOther = false))
         assertFalse("redFlagOnset" in calm)
         assertTrue(Questions.POWER_KNOWN in calm)

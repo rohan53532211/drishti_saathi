@@ -153,3 +153,36 @@ object NearCheck {
         return Result(cm, null, expected, amplitude < vm.hofstetterMin(age))
     }
 }
+
+/**
+ * Far letters inside their fixed panel: distance-locked height from farPoint.letterArcmin (default 7.5' = 20/30,
+ * height = 2·d·tan(arcmin/2)), never below farPoint.minLetterPx; letter spacing = 1 letter width (Sloan letters
+ * are square); shrunk only if the row would not fit the panel width.
+ */
+object FarLetters {
+    /** Used until the first distance reading (and kept when the face is briefly lost), so the letters never vanish. */
+    const val DEFAULT_MM = 300.0
+
+    data class Layout(
+        val letters: String,
+        val letterPx: Double,
+        val letterMm: Double,
+        /** Centre x of each letter, from the panel's left edge (px). */
+        val centresPx: List<Double>,
+        val distanceMm: Double,
+    )
+
+    fun heightPx(distanceMm: Double, scale: ScreenScale, cfg: com.drishtisaathi.engine.config.FarPointConfig): Double =
+        maxOf(Sizing.arcminPx(distanceMm, cfg.letterArcmin, scale), cfg.minLetterPx)
+
+    fun layout(
+        letters: String, distanceMm: Double?, scale: ScreenScale, cfg: com.drishtisaathi.engine.config.FarPointConfig, panelWidthPx: Double,
+    ): Layout {
+        val d = distanceMm?.takeIf { it > 0 } ?: DEFAULT_MM
+        val n = letters.length.coerceAtLeast(1)
+        val fit = panelWidthPx / (2 * n - 1)
+        val h = minOf(heightPx(d, scale, cfg), fit)
+        val start = (panelWidthPx - (2 * n - 1) * h) / 2 + h / 2
+        return Layout(letters, h, h * scale.mmPerPx, List(letters.length) { start + it * 2 * h }, d)
+    }
+}

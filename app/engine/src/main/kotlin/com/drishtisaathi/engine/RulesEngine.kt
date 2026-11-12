@@ -217,7 +217,8 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
             reasons.isNotEmpty() -> ReferralLevel.ROUTINE
             else -> ReferralLevel.NONE
         }
-        val withheld = level == ReferralLevel.URGENT || ReferralReason.LOW_CONFIDENCE_REPEATED in reasons
+        // Urgent cases still get the lens and frame suggestions (shown as "for after the eye doctor visit").
+        val withheld = ReferralReason.LOW_CONFIDENCE_REPEATED in reasons
         return Referral(level, reasons, withheld)
     }
 

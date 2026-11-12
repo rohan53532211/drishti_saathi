@@ -67,13 +67,23 @@ object PowerPathText {
 
     /** The functional vision profile card: hours per zone, the main zone and the lens it points to. */
     fun profileLines(state: UiState, rules: RulesConfig): List<Txt> {
-        val p = FunctionalProfile.from(state.answers, rules)
-        return listOf(
-            SAnamnesis.profileNear.format(p.nearHours),
-            SAnamnesis.profileIntermediate.format(p.intermediateHours),
-            SAnamnesis.profileDistance.format(p.distanceHours),
-            SAnamnesis.profileDominant.withArg(SAnamnesis.zone(p.dominant)),
-            SAnamnesis.profileLens.withArg(SAnamnesis.profileLens(p.impliedLens)),
-        )
+        val a = state.answers
+        val p = FunctionalProfile.from(a, rules)
+        // A zone whose questions were skipped says "not answered" instead of an invented 0.0 h.
+        val nearAnswered = a.readingFrequency != null || a.nearTask != null || a.screenHours != null
+        val interAnswered = a.screenHours != null
+        val distAnswered = a.occupation != null || a.outdoorWork != null || a.nightDriving != null || a.distanceSituation != null
+        val na = com.drishtisaathi.i18n.SShop.notAnswered
+        fun zone(t: Txt, answered: Boolean, h: Double): Txt =
+            if (answered) t.format(h) else Txt(t.en.substringBefore(":") + ": " + na.en, t.hi.substringBefore(":") + ": " + na.hi)
+        return buildList {
+            add(zone(SAnamnesis.profileNear, nearAnswered, p.nearHours))
+            add(zone(SAnamnesis.profileIntermediate, interAnswered, p.intermediateHours))
+            add(zone(SAnamnesis.profileDistance, distAnswered, p.distanceHours))
+            if (nearAnswered || interAnswered || distAnswered) {
+                add(SAnamnesis.profileDominant.withArg(SAnamnesis.zone(p.dominant)))
+                add(SAnamnesis.profileLens.withArg(SAnamnesis.profileLens(p.impliedLens)))
+            }
+        }
     }
 }

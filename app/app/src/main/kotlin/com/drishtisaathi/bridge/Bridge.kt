@@ -112,6 +112,12 @@ object BridgeProfile {
                 put("material", adv?.materialId?.value?.let(::JsonPrimitive) ?: JsonNull)
                 put("coatings", enc(ListSerializer(com.drishtisaathi.engine.Coating.serializer()), adv?.coatings))
                 put("notes", enc(ListSerializer(com.drishtisaathi.engine.Note.serializer()), a.notes))
+                put("suggestedFrames", kotlinx.serialization.json.JsonArray(r.frames.take(5).map {
+                    JsonPrimitive("${it.frame.id} · ₹${it.frame.priceInr}")
+                }))
+                if (a.referral.level == com.drishtisaathi.engine.ReferralLevel.URGENT) {
+                    put("suggestionsNote", com.drishtisaathi.i18n.SShop.afterDoctor.en)
+                }
             })
         }
     }

@@ -130,8 +130,7 @@
       "id": "straightLinesBent",
       "stage": "CORE",
       "text": {"en": "Do straight lines like door frames or tiles look bent or wavy?", "hi": "क्या दरवाज़े की चौखट या टाइल जैसी सीधी लकीरें टेढ़ी या लहरदार दिखती हैं?"},
-      "kind": "yesNo",
-      "showIf": [{"flag": "notUrgent"}]
+      "kind": "yesNo"
     },
     {
       "id": "powerKnown",
@@ -194,8 +193,7 @@
         "RARELY": {"en": "Rarely", "hi": "कभी-कभार"},
         "SOMETIMES": {"en": "Sometimes, for short periods", "hi": "कभी-कभी, थोड़ी देर"},
         "DAILY_LONG": {"en": "Every day, for long periods", "hi": "रोज़, लंबे समय तक"}
-      },
-      "showIf": [{"flag": "notUrgent"}]
+      }
     },
     {
       "id": "screenHours",
@@ -206,22 +204,19 @@
         "H0_2": {"en": "0–2 hours", "hi": "0–2 घंटे"},
         "H2_4": {"en": "2–4 hours", "hi": "2–4 घंटे"},
         "H4_PLUS": {"en": "More than 4 hours", "hi": "4 घंटे से ज़्यादा"}
-      },
-      "showIf": [{"flag": "notUrgent"}]
+      }
     },
     {
       "id": "nightDriving",
       "stage": "LATER",
       "text": {"en": "Do you drive at night?", "hi": "क्या आप रात में गाड़ी चलाते हैं?"},
-      "kind": "yesNo",
-      "showIf": [{"flag": "notUrgent"}]
+      "kind": "yesNo"
     },
     {
       "id": "outdoorWork",
       "stage": "LATER",
       "text": {"en": "Do you mostly work outside in the sun?", "hi": "क्या आप ज़्यादातर बाहर धूप में काम करते हैं?"},
-      "kind": "yesNo",
-      "showIf": [{"flag": "notUrgent"}]
+      "kind": "yesNo"
     },
     {
       "id": "occupation",
@@ -238,8 +233,7 @@
         "STUDENT": {"en": "Student", "hi": "विद्यार्थी"},
         "SPORT_ACTIVE": {"en": "Sports / very active work", "hi": "खेल / भाग-दौड़ वाला काम"},
         "OTHER": {"en": "Other", "hi": "अन्य"}
-      },
-      "showIf": [{"flag": "notUrgent"}]
+      }
     },
     {
       "id": "budget",
@@ -250,8 +244,7 @@
         "LOW": {"en": "Low (up to ₹{low})", "hi": "कम (₹{low} तक)"},
         "MID": {"en": "Medium (₹{low} – ₹{mid})", "hi": "मध्यम (₹{low} – ₹{mid})"},
         "HIGH": {"en": "Premium (above ₹{mid})", "hi": "प्रीमियम (₹{mid} से ज़्यादा)"}
-      },
-      "showIf": [{"flag": "notUrgent"}]
+      }
     },
     {
       "id": "style",
@@ -264,8 +257,7 @@
         "BOLD": {"en": "Bold / thick frame", "hi": "बोल्ड / मोटा फ़्रेम"},
         "MINIMAL": {"en": "Light / simple", "hi": "हल्का / सादा"},
         "ANY": {"en": "Anything, show me", "hi": "कोई भी, दिखाइए"}
-      },
-      "showIf": [{"flag": "notUrgent"}]
+      }
     },
     {
       "id": "colourPreference",
@@ -278,8 +270,7 @@
         "METALLIC": {"en": "Gold / silver metal", "hi": "सुनहरा / चाँदी जैसा मेटल"},
         "COLOURFUL": {"en": "Colourful", "hi": "रंग-बिरंगा"},
         "ANY": {"en": "Any colour", "hi": "कोई भी रंग"}
-      },
-      "showIf": [{"flag": "notUrgent"}]
+      }
     },
     {
       "id": "lookPreference",
@@ -290,15 +281,13 @@
         "PROFESSIONAL": {"en": "Work / formal", "hi": "काम / औपचारिक"},
         "CASUAL": {"en": "Casual / everyday", "hi": "आम / रोज़ का"},
         "BOTH": {"en": "Both", "hi": "दोनों"}
-      },
-      "showIf": [{"flag": "notUrgent"}]
+      }
     },
     {
       "id": "lightweightPreference",
       "stage": "LATER",
       "text": {"en": "Do you want a very light frame?", "hi": "क्या आपको बहुत हल्का फ़्रेम चाहिए?"},
-      "kind": "yesNo",
-      "showIf": [{"flag": "notUrgent"}]
+      "kind": "yesNo"
     }
   ],
   "voiceKeywords": {

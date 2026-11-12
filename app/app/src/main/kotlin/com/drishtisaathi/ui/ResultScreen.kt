@@ -69,10 +69,15 @@ fun ResultScreen(
             // Order: functional vision profile, power and its source, referral, lens package, frames.
             // An urgent referral goes first.
             val urgent = a.referral.level == ReferralLevel.URGENT
-            // Urgent warning signs: a clear message at the very top, never hidden or softened.
+            // Urgent warning signs: ONE red card at the very top (message and reasons), never hidden or softened.
             if (urgent) SectionCard(S.referral[l], container = UrgentBg) {
                 Text(SShop.urgentTop[l], style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = UrgentRed)
+                a.referral.reasons.forEach {
+                    Text("• " + S.referralReason(it, rules)[l], style = MaterialTheme.typography.bodyLarge, color = UrgentRed)
+                }
             }
+            // Below it, the eye check, lens package and frames as for everyone else.
+            if (urgent) Text(SShop.afterDoctor[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             // The eye check runs for everyone: its ranges show even when lens advice is withheld.
             val eyeLines = PowerPathText.quickLines(state)
             if (eyeLines.isNotEmpty()) SectionCard(SShop.eyeCheckTitle[l]) {
@@ -81,7 +86,6 @@ fun ResultScreen(
             SectionCard(SAnamnesis.profileTitle[l]) {
                 PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
             }
-            if (urgent) ReferralBlock(a.referral, rules, l)
 
             val adv = a.advice
             if (adv == null) {

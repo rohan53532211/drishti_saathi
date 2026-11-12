@@ -143,6 +143,52 @@ class EyeCheckTest {
         assertTrue(paras(PdfContent.shopCopy(state, rules, ctx, Lang.EN)).isNotEmpty())
     }
 
+    @Test fun `far letters at 31 cm are at least minLetterPx tall and laid out in the panel`() {
+        val cfg = rules.farPoint
+        assertEquals(7.5, cfg.letterArcmin, 0.0)                // 20/30 by default, from rules.json
+        assertEquals(18.0, cfg.minLetterPx, 0.0)
+        val scale = ScreenScale(mmPerPx = 0.0635, fromCard = false)   // ~400 dpi phone
+        val panelW = 1000.0
+        val l = FarLetters.layout("CDHKN", 310.0, scale, cfg, panelW)
+        assertTrue(l.letterPx >= cfg.minLetterPx)
+        assertEquals("CDHKN", l.letters)
+        assertEquals(5, l.centresPx.size)
+        assertTrue(l.centresPx.all { it - l.letterPx / 2 >= 0 && it + l.letterPx / 2 <= panelW })
+        assertEquals(2 * l.letterPx, l.centresPx[1] - l.centresPx[0], 1e-9)    // spacing = 1 letter width
+        // distance-locked: 2·d·tan(3.75') at 60 cm, above the floor there
+        val far = FarLetters.layout("CDHKN", 600.0, scale, cfg, panelW)
+        assertEquals(2 * 600.0 * Math.tan(Math.toRadians(3.75 / 60.0)) / 0.0635, far.letterPx, 1e-6)
+        // no reading yet: still drawn at the default distance, never empty
+        val none = FarLetters.layout(LetterSet.start(Random(3)).letters, null, scale, cfg, panelW)
+        assertEquals(5, none.letters.length)
+        assertTrue(none.letterPx >= cfg.minLetterPx)
+    }
+
+    @Test fun `urgent path - the full interview, lens advice and frames, one red card`() {
+        val red = answers(VisionProblem.DISTANCE, 30).copy(redFlagFlashes = true)
+        val ids = com.drishtisaathi.interview.Questions.visible(red).map { it.id }
+        assertTrue(ids.toString(), "screenHours" in ids && "budget" in ids && "powerKnown" in ids)
+        val q = eyeCheckResult(PowerRange.farEye(300.0), PowerRange.farEye(400.0), null, primary = true)
+        val result = engine.evaluate(red, quick = q)
+        assertEquals(ReferralLevel.URGENT, result.assessment.referral.level)
+        assertTrue(result.assessment.advice != null)
+        assertTrue(result.frames.isNotEmpty())
+        val state = UiState(answers = red, quick = q, result = result)
+        val shop = PdfContent.shopCopy(state, rules, ctx, Lang.EN)
+        assertEquals(1, paras(shop).count { it == SShop.urgentTop.en })
+        assertTrue(SShop.afterDoctor.en in paras(shop))
+    }
+
+    @Test fun `skipped lifestyle questions say not answered instead of 0_0 h`() {
+        val st = UiState(answers = answers(VisionProblem.DISTANCE, 30))
+        val lines = PowerPathText.profileLines(st, rules).map { it.en }
+        assertTrue(lines.toString(), lines.take(3).all { it.endsWith("not answered") })
+        val answered = PowerPathText.profileLines(
+            UiState(answers = answers(VisionProblem.DISTANCE, 30).copy(screenHours = com.drishtisaathi.engine.ScreenHours.H4_PLUS)), rules,
+        ).map { it.en }
+        assertTrue(answered.toString(), answered[1].contains(" h a day"))
+    }
+
     @Test fun `bent straight lines (no grid in the eye check) still refer`() {
         val bent = answers(VisionProblem.DISTANCE, 30).copy(straightLinesBent = true)
         assertTrue(ReferralReason.AMSLER_DISTORTION in engine.evaluate(bent).assessment.referral.reasons)

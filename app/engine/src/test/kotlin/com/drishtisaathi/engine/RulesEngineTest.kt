@@ -26,18 +26,18 @@ class RulesEngineTest {
         assertEquals(LensType.NONE_SUGGESTED, r.advice!!.lensType.value)
     }
 
-    @Test fun `flashes or floaters - urgent, advice withheld`() {
+    @Test fun `flashes or floaters - urgent, advice still given for after the doctor visit`() {
         val r = engine.assess(base().copy(redFlagFlashes = true, distanceBlur = true))
         assertEquals(ReferralLevel.URGENT, r.referral.level)
-        assertTrue(r.referral.adviceWithheld)
-        assertNull(r.advice)
+        assertFalse(r.referral.adviceWithheld)
+        assertNotNull(r.advice)
         assertTrue(ReferralReason.FLASHES_FLOATERS_CURTAIN in r.referral.reasons)
     }
 
     @Test fun `sudden loss, pain, double vision - urgent`() {
         val r = engine.assess(base().copy(redFlagOther = true))
         assertEquals(ReferralLevel.URGENT, r.referral.level)
-        assertNull(r.advice)
+        assertNotNull(r.advice)
     }
 
     @Test fun `amsler distortion - urgent`() {

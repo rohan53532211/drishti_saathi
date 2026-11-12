@@ -142,9 +142,9 @@ object Questions {
         nearTask = a.nearTask.takeIf { v.near }, nearDistance = a.nearDistance.takeIf { v.near },
     )
 
-    /** Power path is asked unless an urgent flag stopped everything, or there is no trouble and no glasses. */
+    /** Power path is asked unless there is no trouble and no glasses (an urgent flag no longer stops it). */
     fun powerPathApplies(a: InterviewAnswers): Boolean =
-        !a.urgentRedFlag && a.visionProblem != null && !(a.visionProblem == VisionProblem.NONE && a.wearsGlasses == false)
+        a.visionProblem != null && !(a.visionProblem == VisionProblem.NONE && a.wearsGlasses == false)
 
     /** Onset and eye belong to the red flag; cleared when neither flag is set any more. */
     private fun clearOnset(a: InterviewAnswers): InterviewAnswers =
@@ -254,7 +254,7 @@ object Questions {
      * Every question that applies to these answers (summary, edit screen, PDF). After an urgent red flag only the
      * red-flag follow-ups are left: nothing else is asked, the referral comes first.
      */
-    fun visible(a: InterviewAnswers): List<Question> = all.filter { it.visibleIf(a) && (!a.urgentRedFlag || it.askWhenUrgent) }
+    fun visible(a: InterviewAnswers): List<Question> = all.filter { it.visibleIf(a) }
 
     /** The questions asked in [stage]. */
     fun visibleIn(stage: Stage, a: InterviewAnswers): List<Question> = visible(a).filter { it.stage == stage }

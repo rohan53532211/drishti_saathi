@@ -62,6 +62,8 @@ import kotlin.math.roundToInt
 import kotlin.math.pow
 import kotlin.math.min
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentSize
 import kotlin.random.Random
 
 /** Words that count as "Blur" when said during the quick estimate (Hindi, Hinglish, English). */
@@ -212,6 +214,8 @@ fun QuickEstimateFlow(
     modifier: Modifier = Modifier,
     voice: VoiceController? = null,
     onInstruction: (Txt) -> Unit = {},
+    /** Staff / device checks: show the far letters' size line. */
+    debug: Boolean = false,
 ) {
     DisposableEffect(distance) {
         distance.start()
@@ -271,7 +275,7 @@ fun QuickEstimateFlow(
                     speak = env.onInstruction,
                 )
                 step is QuickStep.Power -> key(step, attempt) {
-                    FarLetterScreen(env, step.eye, reading, voice, stepHeader(step), simulated, onSkip = { next() }) { eye ->
+                    FarLetterScreen(env, step.eye, reading, voice, stepHeader(step), simulated, debug, onSkip = { next() }) { eye ->
                         if (step.eye == TestEye.RIGHT) right = eye else left = eye
                         phase = QPhase.RESULT
                     }
@@ -370,6 +374,9 @@ private fun ReadScreen(
     env: TestEnv, eye: TestEye, reading: DistanceReading?, voice: VoiceController?, header: Txt, instruction: Txt,
     simulated: Boolean, onSkip: () -> Unit,
     second: Pair<Txt, (() -> Unit)?>? = null,
+    /** Far check: a 2-line instruction (full text behind "How to") and the target in its own fixed panel. */
+    shortInstruction: Txt? = null,
+    debugLine: String? = null,
     onTap: (mm: Double, atMs: Long, typed: Boolean) -> Unit,
     target: @Composable BoxScope.() -> Unit,
 ) {
@@ -391,11 +398,7 @@ private fun ReadScreen(
     }
     BlurKeyword(voice, tapNow)
 
-    TestLayout(
-        env, SAnamnesis.quickTitle, eye, instruction,
-        reading, status, 0, 1, onSkip, background = Color.White, bigDistance = true, header = header, quiet = true,
-        target = target,
-        controls = {
+    val controls: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.size(14.dp).background(if (live) Color(0xFF2E7D32) else Color(0xFF9E9E9E), CircleShape))
                 Text((if (live) SShop.measuring else SShop.noFaceDot)[l], style = MaterialTheme.typography.bodyMedium)
@@ -418,9 +421,62 @@ private fun ReadScreen(
                         onClick = { cm?.let { onTap(it * 10.0, System.currentTimeMillis(), true) } })
                 }
             }
-        },
+    }
+    if (shortInstruction != null) PanelLayout(env, header, shortInstruction, instruction, reading, debugLine, onSkip, target, controls)
+    else TestLayout(
+        env, SAnamnesis.quickTitle, eye, instruction,
+        reading, status, 0, 1, onSkip, background = Color.White, bigDistance = true, header = header, quiet = true,
+        target = target, controls = controls,
     )
 }
+
+/**
+ * Far check layout: header, a 2-line instruction with a "How to" link (the full text is spoken once and shown in a
+ * dialog), the live distance, then the letters in their own light grey panel (at least 35% of the screen height,
+ * white inside), then the buttons. One scrolling column: nothing overlaps.
+ */
+@Composable
+private fun PanelLayout(
+    env: TestEnv, header: Txt, short: Txt, full: Txt, reading: DistanceReading?, debugLine: String?, onSkip: () -> Unit,
+    target: @Composable BoxScope.() -> Unit, controls: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    val l = env.lang
+    var showHow by remember { mutableStateOf(false) }
+    LaunchedEffect(full) { env.onInstruction(full) }
+    val panelHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * PANEL_SHARE).dp
+    Column(
+        Modifier.fillMaxSize().background(Color.White).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(header[l], color = Color.Black, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(short[l], Modifier.weight(1f), color = Color.Black, style = MaterialTheme.typography.bodyLarge,
+                maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            TextButton(onClick = { showHow = true }) { Text(SShop.howTo[l]) }
+        }
+        val dist = reading?.takeIf { it.faceVisible }?.let { SVision.distanceNow.format((it.distanceMm / 10.0).roundToInt())[l] } ?: SVision.distanceUnknown[l]
+        Text(dist, color = Color.Black, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+        debugLine?.let { Text(it, color = Color(0xFF616161), style = MaterialTheme.typography.bodySmall) }
+        Box(
+            Modifier.fillMaxWidth().height(panelHeight)
+                .background(Color(0xFFE0E0E0), androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).padding(8.dp)
+                .background(Color.White, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+            content = target,
+        )
+        Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = controls)
+        TextButton(onClick = onSkip, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SVision.skipTest[l], color = Color.Black) }
+    }
+    if (showHow) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { showHow = false },
+        confirmButton = { TextButton(onClick = { showHow = false }) { Text(SShop.ok[l]) } },
+        title = { Text(SShop.howTo[l]) },
+        text = { Text(full[l], style = MaterialTheme.typography.bodyLarge) },
+    )
+}
+
+/** The far letter panel takes at least this share of the screen height. */
+const val PANEL_SHARE = 0.35f
 
 private fun atReach(r: DistanceReading?, rules: RulesConfig) =
     r != null && r.faceVisible && r.distanceMm >= rules.farPoint.selfHeldReachM * 1000.0
@@ -444,10 +500,14 @@ const val FAR_LETTER_LOGMAR = 0.0
 @Composable
 private fun FarLetterScreen(
     env: TestEnv, eye: TestEye, reading: DistanceReading?, voice: VoiceController?, header: Txt, simulated: Boolean,
-    onSkip: () -> Unit, onFrozen: (QuickEye) -> Unit,
+    debug: Boolean, onSkip: () -> Unit, onFrozen: (QuickEye) -> Unit,
 ) {
     val rules = env.rules
     val rnd = remember { Random(System.nanoTime()) }
+    // The last valid distance stays in use while the face is briefly lost, so the letters never disappear.
+    var lastMm by remember { mutableStateOf<Double?>(null) }
+    LaunchedEffect(reading) { reading?.takeIf { it.faceVisible && it.distanceMm > 0 }?.let { lastMm = it.distanceMm } }
+    var panelWidthPx by remember { mutableStateOf(0.0) }
     var letters by remember { mutableStateOf(LetterSet.start(rnd)) }
     var proc by remember { mutableStateOf(QuickFarProcedure()) }
     var firstMm by remember { mutableStateOf<Double?>(null) }
@@ -461,8 +521,16 @@ private fun FarLetterScreen(
     val setup = Txt(SShop.glassesOffCover.en.format(other.en), SShop.glassesOffCover.hi.format(other.hi))
     val instruction = if (firstMm != null) SShop.repeatOnce
         else Txt("${setup.en} ${SShop.farInstruction.en}", "${setup.hi} ${SShop.farInstruction.hi}")
+    val short = if (firstMm != null) SShop.repeatOnce else SShop.farShort.format(other.en).let {
+        Txt(it.en, SShop.farShort.hi.format(other.hi))
+    }
+    val shown = FarLetters.layout(letters.letters, lastMm, env.scale, rules.farPoint, panelWidthPx.takeIf { it > 0 } ?: 1000.0)
+    val debugLine = if (debug) "letter height %d px / %.1f mm at %d cm".format(
+        java.util.Locale.US, shown.letterPx.roundToInt(), shown.letterMm, (shown.distanceMm / 10.0).roundToInt(),
+    ) else null
     ReadScreen(
         env, eye, reading, voice, header, instruction, simulated, onSkip,
+        shortInstruction = short, debugLine = debugLine,
         second = SShop.stillReadableReach to (if (atReach(reading, rules)) ({ onFrozen(QuickEye(null, null, QuickTarget.WHITE, noMyopiaAtReach = true)) }) else null),
         onTap = { mm, t, typed ->
             val first = firstMm
@@ -474,20 +542,29 @@ private fun FarLetterScreen(
             }
         },
     ) {
-        val d = reading?.distanceMm
-        if (d != null) {
-            Text(
-                letters.letters.toList().joinToString(" "),
-                Modifier.align(Alignment.Center),
-                fontSize = letterFontSize(env, d, FAR_LETTER_LOGMAR, 5f),
-                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                maxLines = 1,
-            )
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            val w = with(density) { maxWidth.toPx() }.toDouble()
+            LaunchedEffect(w) { panelWidthPx = w }
+            val hDp = with(density) { shown.letterPx.toFloat().toDp() }
+            val font = with(density) { (shown.letterPx.toFloat() / 0.71f).toSp() }
+            // Black bold Sloan letters, spacing = 1 letter width.
+            Row(horizontalArrangement = Arrangement.spacedBy(hDp), verticalAlignment = Alignment.CenterVertically) {
+                shown.letters.forEach { c ->
+                    Box(Modifier.size(hDp), contentAlignment = Alignment.Center) {
+                        Text(
+                            c.toString(), Modifier.wrapContentSize(unbounded = true),
+                            fontSize = font, fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                            fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1, softWrap = false,
+                        )
+                    }
+                }
+            }
         }
     }
 }
+
+
 
 /** Near text letter size (logMAR), small print kept the same angular size at every distance. */
 const val READING_TEXT_LOGMAR = 0.3
@@ -533,18 +610,19 @@ fun CameraQuickEstimateFlow(
     voice: VoiceController? = null,
     onInstruction: (Txt) -> Unit = {},
     allowDemoWithoutCamera: Boolean = false,
+    debug: Boolean = false,
 ) {
     var demo by remember { mutableStateOf(false) }
     if (demo) {
         val fake = remember { FakeDistanceProvider() }
-        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction)
+        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug)
         return
     }
     CameraPermissionGate(lang, onSkip = { if (allowDemoWithoutCamera) demo = true else onSkip() }, autoRequest = true) {
         val relaxed = remember(rules) { powerCheckCamera(rules.camera) }
         val tracker = rememberFaceTracker(relaxed)
         val provider = remember(tracker) { CameraDistanceProvider(tracker, calibration, relaxed, controlsTracker = false) }
-        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction)
+        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug)
     }
 }
 

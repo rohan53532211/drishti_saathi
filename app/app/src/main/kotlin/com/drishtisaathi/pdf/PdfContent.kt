@@ -59,7 +59,11 @@ object PdfContent {
         out += Block.Para("${state.sessionId?.let { S.sessionNo.format(it.toInt())[l] + " · " } ?: ""}${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
         val urgent = a.referral.level == ReferralLevel.URGENT
-        if (urgent) out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
+        if (urgent) {
+            out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
+            reasonGroups(a.referral, rules, l, out)
+            out += Block.Para(com.drishtisaathi.i18n.SShop.afterDoctor[l], bold = true)
+        }
         out += Block.Rule
 
         // The eye check (compulsory): the known power if any, the phone ranges, the near result.
@@ -69,9 +73,11 @@ object PdfContent {
             quick.forEach { out += Block.Bullet(it[l]) }
         }
 
-        out += Block.Heading(S.referral[l])
-        out += Block.Para(S.referralLevel(a.referral.level)[l], bold = true, tone = referralTone(a.referral.level))
-        reasonGroups(a.referral, rules, l, out)
+        if (!urgent) {
+            out += Block.Heading(S.referral[l])
+            out += Block.Para(S.referralLevel(a.referral.level)[l], bold = true, tone = referralTone(a.referral.level))
+            reasonGroups(a.referral, rules, l, out)
+        }
         if (state.glassesOn) out += Block.Para(com.drishtisaathi.i18n.SFlow.glassesOnNote[l], bold = true, tone = Tone.ROUTINE)
 
         val adv = a.advice
@@ -171,17 +177,21 @@ object PdfContent {
         out += Block.Para("${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
         val urgent = a.referral.level == ReferralLevel.URGENT
-        if (urgent) out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
+        if (urgent) {
+            out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
+            reasonGroups(a.referral, rules, l, out)
+            out += Block.Para(com.drishtisaathi.i18n.SShop.afterDoctor[l], bold = true)
+        }
         out += Block.Para(S.customerIntro[l])
         out += Block.Rule
 
         val tone = referralTone(a.referral.level)
         when (a.referral.level) {
-            ReferralLevel.URGENT -> { out += Block.Heading(S.urgentTitle[l]); out += Block.Para(S.urgentBody[l], bold = true, tone = tone) }
+            ReferralLevel.URGENT -> Unit   // already at the top, once
             ReferralLevel.ROUTINE -> { out += Block.Heading(S.routineTitle[l]); out += Block.Para(S.routineBody[l], tone = tone) }
             ReferralLevel.NONE -> { out += Block.Heading(S.referral[l]); out += Block.Para(S.referralLevel(a.referral.level)[l], tone = tone) }
         }
-        reasonGroups(a.referral, rules, l, out)
+        if (!urgent) reasonGroups(a.referral, rules, l, out)
 
         a.advice?.let { adv ->
             out += Block.Heading(S.lensPackage[l])

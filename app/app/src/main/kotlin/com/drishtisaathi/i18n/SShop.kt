@@ -88,6 +88,17 @@ object SShop {
     val stillReadableReach = tx("Still readable at arm's length", "हाथ भर दूरी पर भी पढ़ पा रहे हैं")
     val stillReadableClose = tx("Still readable up close", "पास में भी पढ़ पा रहे हैं")
     val doAgain = tx("Do it again", "फिर से करें")
+    val farShort = tx(
+        "Glasses off, cover your %s eye.\nMove slowly away; tap when letters blur.",
+        "चश्मा उतारें, %s आँख ढकें।\nधीरे-धीरे दूर जाएँ; अक्षर धुंधले हों तो दबाएँ।",
+    )
+    val howTo = tx("How to", "कैसे करें")
+    val ok = tx("OK", "ठीक है")
+    val afterDoctor = tx(
+        "Suggestions for after your eye doctor visit. Do not delay the visit.",
+        "ये सुझाव आँखों के डॉक्टर को दिखाने के बाद के लिए हैं। डॉक्टर के पास जाने में देर न करें।",
+    )
+    val notAnswered = tx("not answered", "जवाब नहीं दिया")
     val farRange = tx(
         "Your approximate power: between %s and %s D (read up to %d cm; not a final glasses number, confirm with a trial lens)",
         "आपका अनुमानित चश्मे का नंबर: %s और %s D के बीच (%d cm तक पढ़ा; पक्का नंबर नहीं, ट्रायल लेंस से पक्का करें)",

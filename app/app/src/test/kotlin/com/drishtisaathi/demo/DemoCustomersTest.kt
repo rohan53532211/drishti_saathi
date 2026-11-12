@@ -72,10 +72,10 @@ class DemoCustomersTest {
         assertTrue(adv.confirmAddWithReadyReader)
     }
 
-    @Test fun `flashes case is an urgent referral with advice withheld`() {
+    @Test fun `flashes case is an urgent referral, suggestions still shown`() {
         val a = state(DemoCustomers.urgentFlashes).result!!.assessment
         assertEquals(ReferralLevel.URGENT, a.referral.level)
-        assertNull(a.advice)
+        assertTrue(a.advice != null)
     }
 
     @Test fun `both PDFs are marked DEMO, real sessions are not`() {

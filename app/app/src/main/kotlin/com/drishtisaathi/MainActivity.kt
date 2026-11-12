@@ -85,8 +85,8 @@ private object Routes {
     const val DIAGNOSTICS = "diagnostics"
     const val CAMERA_DEBUG = "cameraDebug"
     const val DEMO = "demo"
-    // Customer flow: consent â†’ language â†’ questions (AI voice or scripted) â†’ power / eye check â†’ face â†’ more
-    // questions â†’ results
+    // Customer flow: consent → language → questions (AI voice or scripted) → power / eye check → face → more
+    // questions → results
     const val CONSENT = "consent"
     const val LANGUAGE = "language"
     const val INTERVIEW = "interview"
@@ -101,7 +101,7 @@ private object Routes {
     const val CAPTURE_OUTCOME = "captureOutcome"
     const val REFERRAL = "referral"
     const val RESULT = "result"
-    /** "For the shop" â†’ Edit answers (the old confirmation screen). */
+    /** "For the shop" → Edit answers (the old confirmation screen). */
     const val EDIT = "editAnswers"
     const val TRY_ON = "tryOn?frame={frame}"
     const val HISTORY = "history"
@@ -166,11 +166,11 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     fun toFace() = nav.navigate(Routes.CARD) { popUpTo(Routes.LANGUAGE) }
 
     /**
-     * After the eye check: precision mode or an urgent red flag â†’ the results (the referral at the top); else the
-     * face measurement for frame fit and the remaining questions.
+     * After the eye check: precision mode → the results; everyone else (urgent cases too) → the face measurement
+     * for frame fit and the remaining questions, then the results (an urgent warning at the top).
      */
     fun afterEyeCheck() {
-        if (vm.state.value.precision || vm.needsUrgentReferral()) { vm.skipCapture(); computeAndShow() } else toFace()
+        if (vm.state.value.precision) { vm.skipCapture(); computeAndShow() } else toFace()
     }
 
     // ---- power path ----
@@ -372,6 +372,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     onInstruction = { voice.instructionSpeaker.speak(it, l) },
                     // Without camera permission: demo and precision mode use the distance slider (no dead end).
                     allowDemoWithoutCamera = state.demo || state.precision,
+                    // Staff / device checks: the far letters' size line
+                    debug = state.precision || state.demo,
                 )
             }
         }
@@ -385,7 +387,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             )
         }
 
-        // ---- face measurement for frame fit: forehead card (optional) â†’ capture â†’ outcome ----
+        // ---- face measurement for frame fit: forehead card (optional) → capture → outcome ----
         composable(Routes.CARD) {
             val l = state.lang
             StepFrame(l, vm::setLang, SFlow.stepCard[l], onBack = { nav.popBackStack() }) {

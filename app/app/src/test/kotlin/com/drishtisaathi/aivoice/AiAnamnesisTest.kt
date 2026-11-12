@@ -20,6 +20,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,17 +90,17 @@ class AiAnamnesisTest {
         val m = AiProfileMapper.map(InterviewAnswers(), profile("""{"age": 60, "visionProblem": "DISTANCE", "redFlagFlashes": true}"""))
         assertTrue(m.answers.urgentRedFlag)
         assertTrue("redFlagFlashes" in m.answered)
-        // the existing interview still asks onset and eye; nothing after the red flags is shown
+        // the interview asks onset and eye, and no longer ends early: the rest is still asked
         val visible = Questions.visible(m.answers).map { it.id }
         assertTrue("redFlagOnset" in visible && "redFlagEye" in visible)
-        assertFalse(Questions.POWER_KNOWN in visible)
-        assertFalse("budget" in visible)
+        assertTrue(Questions.POWER_KNOWN in visible)
+        assertTrue("budget" in visible)
 
         val engine = DrishtiEngine.fromJson(File("src/main/assets/rules.json").readText(), File("src/main/assets/anthro_priors.json").readText(),
             File("src/main/assets/frames.json").readText(), File("src/main/assets/frames/more_frames.json").readText())
         val r = engine.evaluate(m.answers)
         assertEquals(com.drishtisaathi.engine.ReferralLevel.URGENT, r.assessment.referral.level)
-        assertNull(r.assessment.advice) // urgent stops advice, exactly as today
+        assertNotNull(r.assessment.advice) // urgent: suggestions still given, for after the doctor visit
     }
 
     @Test fun `a general yes to the warning signs counts as a red flag`() {
