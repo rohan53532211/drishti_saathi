@@ -122,6 +122,16 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     val voice = rememberVoiceController()
 
     fun goHome() = nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
+
+    // Tapped a "Reply received" notification: open that session's summary.
+    val activity = LocalContext.current as? android.app.Activity
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val id = activity?.intent?.getLongExtra(com.drishtisaathi.bridge.ReplyNotifier.EXTRA_SESSION, -1L) ?: -1L
+        if (id > 0) {
+            activity?.intent?.removeExtra(com.drishtisaathi.bridge.ReplyNotifier.EXTRA_SESSION)
+            vm.openSession(id) { nav.navigate(Routes.RESULT) }
+        }
+    }
     fun toConfirm() = nav.navigate(Routes.CONFIRM) { popUpTo(Routes.HOME) }
 
     // ---- power path: side screens opened from the POWER_KNOWN question, then back to the interview ----
@@ -405,6 +415,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                         state, configured = bridge.isValid,
                         onSend = { vm.clearBridgeError(); nav.navigate(Routes.BRIDGE_CONSENT) },
                         onCheck = { vm.checkReview() },
+                        onPoll = { vm.checkReview(silent = true) },
                     )
                 },
             )
@@ -453,8 +464,11 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         composable(Routes.HISTORY) {
             val sessions by vm.sessions.collectAsState(initial = emptyList())
+            val remote by vm.remoteReviews.collectAsState(initial = emptyMap())
+            // Check sent sessions for replies when Past sessions opens, then every 15 s while it is open.
+            androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { vm.checkAllWaiting(); kotlinx.coroutines.delay(15_000) } }
             HistoryScreen(
-                state.lang, sessions, vm::setLang,
+                state.lang, sessions, vm::setLang, remote = remote,
                 onOpen = { id -> vm.openSession(id) { nav.navigate(Routes.RESULT) } },
                 onDelete = { id -> vm.deleteSession(id) },
                 onBack = { nav.popBackStack() },

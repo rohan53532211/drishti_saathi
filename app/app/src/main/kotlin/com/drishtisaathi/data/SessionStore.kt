@@ -117,6 +117,8 @@ data class RemoteReviewEntity(
     val checkedAt: Long? = null,
 ) {
     val reviewed: Boolean get() = status == "REVIEWED"
+    /** Short case number, the same one the optometrist's page shows. */
+    val caseId: String get() = com.drishtisaathi.bridge.BridgeProfile.caseId(remoteId)
 }
 
 @Dao
@@ -124,6 +126,9 @@ interface RemoteReviewDao {
     @Query("SELECT * FROM remote_reviews WHERE sessionId = :sessionId") suspend fun get(sessionId: Long): RemoteReviewEntity?
     @Upsert suspend fun upsert(e: RemoteReviewEntity)
     @Query("DELETE FROM remote_reviews WHERE sessionId = :sessionId") suspend fun delete(sessionId: Long)
+    /** Sent sessions still waiting for the optometrist (checked when Past sessions is open). */
+    @Query("SELECT * FROM remote_reviews WHERE status != 'REVIEWED'") suspend fun waiting(): List<RemoteReviewEntity>
+    @Query("SELECT * FROM remote_reviews") fun observeAll(): Flow<List<RemoteReviewEntity>>
 }
 
 @Dao

@@ -128,6 +128,14 @@ class BridgeProfileTest {
         assertEquals(server, BridgeProfile.forbiddenKeys)
     }
 
+    @Test fun `case number matches the one the optometrist's page shows`() {
+        assertEquals("3F9A0C", BridgeProfile.caseId("3f9a0c7d1e2b4a5c8d9e0f1a2b3c4d5e"))
+        val e = com.drishtisaathi.data.RemoteReviewEntity(1, "ab12cdef", "http://x", 0, 0, "WAITING")
+        assertEquals("AB12CD", e.caseId)
+        // backend/app/main.py: case_id(pid) = pid[:6].upper()
+        assertTrue(File("../../backend/app/main.py").readText().contains("return pid[:6].upper()"))
+    }
+
     // ---- Room v5 ----
     private fun schema(v: Int) = Json.parseToJsonElement(File("schemas/com.drishtisaathi.data.AppDatabase/$v.json").readText())
         .jsonObject["database"]!!.jsonObject

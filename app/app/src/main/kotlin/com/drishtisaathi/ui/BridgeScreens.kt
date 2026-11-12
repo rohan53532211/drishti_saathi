@@ -86,17 +86,37 @@ fun BridgeConsentScreen(
     }
 }
 
-/** Summary card: send button, then Waiting / Reviewed with the optometrist's reply. */
+/**
+ * Summary card: send button; once sent, the case number (large), where the optometrist reviews it, and Waiting until
+ * the reply arrives. While the card is on screen it checks every 15 s ([onPoll], quiet); the view model posts a
+ * "Reply received" notification with sound when the reply comes in.
+ */
 @Composable
 fun RemoteReviewCard(
     state: UiState,
     configured: Boolean,
     onSend: () -> Unit,
     onCheck: () -> Unit,
+    onPoll: () -> Unit = onCheck,
 ) {
     val l = state.lang
     val r = state.remote
-    LaunchedEffect(r?.sessionId) { if (r != null && !r.reviewed) onCheck() } // refresh once when the summary opens
+    val poll by androidx.compose.runtime.rememberUpdatedState(onPoll)
+    LaunchedEffect(r?.sessionId, r?.reviewed) {
+        if (r != null && !r.reviewed) while (true) { poll(); kotlinx.coroutines.delay(15_000) }
+    }
+    // Android 13+: ask once for notifications so "Reply received" can alert the shop.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var askedNotif by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val notifLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { askedNotif = true }
+    LaunchedEffect(r?.sessionId, r?.reviewed) {
+        if (r != null && !r.reviewed && !askedNotif && android.os.Build.VERSION.SDK_INT >= 33 &&
+            !com.drishtisaathi.bridge.ReplyNotifier.canNotify(context)) {
+            askedNotif = true
+            notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     SectionCard(SBridge.cardTitle[l], container = if (r?.needsInPersonExam == true) UrgentBg else androidx.compose.ui.graphics.Color.White) {
         when {
             r == null -> {
@@ -104,13 +124,18 @@ fun RemoteReviewCard(
                 else Text(SBridge.notConfigured[l], style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
             }
             !r.reviewed -> {
+                Text(SBridge.sentCase.format(r.caseId)[l], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(SBridge.caseNo.format(r.caseId)[l], style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = Teal)
+                Text(SBridge.reviewsAt.format(r.backendUrl)[l], style = MaterialTheme.typography.bodyLarge)
                 Text(SBridge.waiting[l], style = MaterialTheme.typography.titleMedium, color = RoutineAmber, fontWeight = FontWeight.SemiBold)
-                Text(SBridge.sentAt.format(time(r.sentAt))[l], style = MaterialTheme.typography.bodySmall)
+                Text(SBridge.sentAt.format(time(r.sentAt))[l] + " · " + SBridge.autoCheck[l],
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                 BigButton(if (state.bridgeBusy) SBridge.checking[l] else SBridge.checkReply[l], onCheck, enabled = !state.bridgeBusy)
             }
             else -> {
-                Text(SBridge.reviewed[l], style = MaterialTheme.typography.titleMedium, color = OkGreen, fontWeight = FontWeight.SemiBold)
-                r.reviewedAt?.let { Text(time(it), style = MaterialTheme.typography.bodySmall) }
+                Text(SBridge.reviewed[l], style = MaterialTheme.typography.headlineSmall, color = OkGreen, fontWeight = FontWeight.Bold)
+                Text(SBridge.caseNo.format(r.caseId)[l] + (r.reviewedAt?.let { " · " + time(it) } ?: ""),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 if (r.needsInPersonExam == true) {
                     Text("! " + SBridge.needsInPerson[l], style = MaterialTheme.typography.titleMedium, color = UrgentRed, fontWeight = FontWeight.Bold)
                 } else {

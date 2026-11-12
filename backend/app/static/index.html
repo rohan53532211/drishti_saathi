@@ -5,51 +5,87 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Optometrist Bridge</title>
 <style>
-  :root { --bg:#f6f7f8; --card:#fff; --fg:#1b1f23; --muted:#5f6b76; --line:#dde2e6; --teal:#00796b; --red:#b3261e; --amber:#9a6200; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#121417; --card:#1c2024; --fg:#e8eaed; --muted:#9aa4ad; --line:#2e343a; --teal:#4db6ac; --red:#f2b8b5; --amber:#ffcc80; } }
+  :root { --bg:#f6f7f8; --card:#fff; --fg:#1b1f23; --muted:#5f6b76; --line:#dde2e6; --teal:#00796b; --red:#b3261e; --amber:#9a6200; --new:#1565c0; --okbg:#e8f5e9; --ok:#1b5e20; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121417; --card:#1c2024; --fg:#e8eaed; --muted:#9aa4ad; --line:#2e343a; --teal:#4db6ac; --red:#f2b8b5; --amber:#ffcc80; --new:#90caf9; --okbg:#1e3324; --ok:#a5d6a7; } }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; }
   header { padding:14px 16px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-  header h1 { font-size:18px; margin:0; flex:1; }
-  main { display:grid; grid-template-columns:minmax(260px, 360px) 1fr; gap:16px; padding:16px; max-width:1200px; margin:0 auto; }
+  header h1 { font-size:18px; margin:0; flex:1; min-width:200px; }
+  main { display:grid; grid-template-columns:minmax(260px, 380px) 1fr; gap:16px; padding:16px; max-width:1240px; margin:0 auto; }
   @media (max-width: 760px) { main { grid-template-columns:1fr; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
-  .list button { display:block; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--line); padding:10px 4px; color:inherit; font:inherit; cursor:pointer; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; min-width:0; }
+  .list button { display:block; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--line); padding:10px 6px; color:inherit; font:inherit; cursor:pointer; }
   .list button:hover, .list button.sel { background:color-mix(in srgb, var(--teal) 10%, transparent); }
+  .list button.isnew { border-left:4px solid var(--new); }
+  .case { font-weight:700; font-size:16px; letter-spacing:.5px; }
   .tag { display:inline-block; font-size:12px; padding:1px 8px; border-radius:99px; border:1px solid currentColor; margin-left:6px; }
+  .tag.newtag { background:var(--new); color:#fff; border-color:var(--new); font-weight:700; }
   .waiting { color:var(--amber); } .reviewed { color:var(--teal); } .urgent { color:var(--red); } .demo { color:var(--red); }
   .muted { color:var(--muted); font-size:13px; }
-  h2 { font-size:16px; margin:14px 0 6px; }
-  table { border-collapse:collapse; width:100%; } td { border-top:1px solid var(--line); padding:4px 6px; vertical-align:top; }
-  td:first-child { color:var(--muted); width:42%; word-break:break-word; }
+  h2 { font-size:16px; margin:16px 0 6px; }
+  .bigcase { font-size:28px; font-weight:800; letter-spacing:1px; margin:0; }
+  .summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin:10px 0; }
+  .summary div { border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .summary b { display:block; font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
+  table { border-collapse:collapse; width:100%; } td { border-top:1px solid var(--line); padding:4px 6px; vertical-align:top; word-break:break-word; }
+  td:first-child { color:var(--muted); width:40%; }
+  details summary { cursor:pointer; margin-top:12px; font-weight:600; }
   textarea { width:100%; min-height:140px; font:inherit; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:inherit; }
   input[type=password] { font:inherit; padding:6px 8px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:inherit; }
   .btn { background:var(--teal); color:#fff; border:0; border-radius:8px; padding:9px 16px; font:inherit; cursor:pointer; }
   .btn.secondary { background:none; color:var(--teal); border:1px solid var(--teal); }
   .note { border-left:3px solid var(--amber); padding:6px 10px; margin:8px 0; }
+  .flag { border-left:3px solid var(--red); padding:6px 10px; margin:8px 0; color:var(--red); font-weight:600; }
+  .sent { background:var(--okbg); color:var(--ok); border-radius:8px; padding:10px 12px; margin-top:10px; font-weight:600; }
 </style>
 </head>
 <body>
 <header>
   <h1>Drishti Saathi · Optometrist Bridge</h1>
   <label class="muted">Token <input type="password" id="token" placeholder="if the server needs one"></label>
+  <button class="btn secondary" id="sound" title="Browsers only play sound after a click on the page">Sound: off</button>
   <button class="btn secondary" id="refresh">Refresh</button>
 </header>
 <main>
   <section class="card">
     <div class="muted" id="count">Loading…</div>
+    <div class="muted" id="updated"></div>
     <div class="list" id="list"></div>
   </section>
-  <section class="card" id="detail"><p class="muted">Open a profile on the left.</p></section>
+  <section class="card" id="detail"><p class="muted">Open a case on the left. The list refreshes every 10 seconds; new cases get a NEW badge.</p></section>
 </main>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
 let selected = null;
+let known = null;          // ids seen in the previous refresh (null = first load)
+let soundOn = false;
+let audio = null;
 
-function storedToken() { try { return localStorage.getItem("bridgeToken") || ""; } catch (e) { return ""; } }
-$("token").value = storedToken();
-$("token").addEventListener("change", () => { try { localStorage.setItem("bridgeToken", $("token").value); } catch (e) {} load(); });
+// ---- per-browser memory: token and which cases were opened (for the NEW badge) ----
+function getStore(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }
+function setStore(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function openedSet() { try { return new Set(JSON.parse(getStore("openedCases", "[]"))); } catch (e) { return new Set(); } }
+function markOpened(id) { const s = openedSet(); s.add(id); setStore("openedCases", JSON.stringify([...s].slice(-500))); }
+
+$("token").value = getStore("bridgeToken", "");
+$("token").addEventListener("change", () => { setStore("bridgeToken", $("token").value); known = null; load(); });
+
+// ---- sound: a short two-tone beep (browsers allow audio only after a click, hence the button) ----
+$("sound").onclick = () => {
+  soundOn = !soundOn;
+  $("sound").textContent = "Sound: " + (soundOn ? "on" : "off");
+  if (soundOn) { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); beep(); } catch (e) {} }
+};
+function beep() {
+  if (!soundOn || !audio) return;
+  [0, 0.18].forEach((t, i) => {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = i ? 1046 : 784; g.gain.value = 0.15;
+    o.connect(g); g.connect(audio.destination);
+    o.start(audio.currentTime + t); o.stop(audio.currentTime + t + 0.15);
+  });
+}
 
 async function api(path, opts = {}) {
   const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
@@ -62,19 +98,39 @@ async function api(path, opts = {}) {
 
 function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
 function when(ms) { return ms ? new Date(ms).toLocaleString() : ""; }
+const PROBLEM = { DISTANCE: "Far", NEAR: "Near", BOTH: "Far and near", NONE: "No trouble" };
+const SOURCE = { KNOWN_POWER: "Customer's known power", PHONE_ESTIMATE: "Phone quick estimate (approximate)",
+                 MEASURED: "Phone far-point test", OLD_GLASSES_NUMBERS: "Old glasses numbers" };
+const problem = (p) => p ? (PROBLEM[p] || p) : "—";
+const source = (s) => s ? (SOURCE[s] || s) : "None (no power estimate)";
+const nice = (s) => String(s).replace(/_/g, " ").toLowerCase();
 
 async function load() {
   try {
     const rows = await api("/profiles");
-    $("count").textContent = rows.length + " profile(s) · " + rows.filter(r => r.status === "WAITING").length + " waiting";
+    const opened = openedSet();
+    const ids = new Set(rows.map(r => r.id));
+    const arrived = known ? rows.filter(r => !known.has(r.id)) : [];
+    known = ids;
+    if (arrived.length) beep();
+    const fresh = rows.filter(r => !opened.has(r.id)).length;
+    document.title = (fresh ? "(" + fresh + " new) " : "") + "Optometrist Bridge";
+    $("count").textContent = rows.length + " case(s) · " + rows.filter(r => r.status === "WAITING").length + " waiting · " + fresh + " new";
+    $("updated").textContent = "Updated " + new Date().toLocaleTimeString() + " · refreshes every 10 s";
     const list = $("list"); list.replaceChildren();
     rows.forEach(r => {
-      const b = el("button"); if (r.id === selected) b.className = "sel";
-      b.append(el("strong", "Age " + (r.age ?? "?") + " · " + (r.visionProblem ?? "—")));
-      b.append(el("span", r.status === "WAITING" ? "Waiting" : "Reviewed", "tag " + (r.status === "WAITING" ? "waiting" : "reviewed")));
-      if (r.referralLevel === "URGENT") b.append(el("span", "Urgent referral", "tag urgent"));
-      if (r.demo) b.append(el("span", "DEMO", "tag demo"));
-      b.append(el("div", when(r.receivedAt) + " · power: " + (r.powerSource ?? "none"), "muted"));
+      const isNew = !opened.has(r.id);
+      const b = el("button"); b.className = (r.id === selected ? "sel " : "") + (isNew ? "isnew" : "");
+      const top = el("div");
+      top.append(el("span", "Case #" + (r.caseId || r.id.slice(0, 6).toUpperCase()), "case"));
+      if (isNew) top.append(el("span", "NEW", "tag newtag"));
+      top.append(el("span", r.status === "WAITING" ? "Waiting" : "Reviewed", "tag " + (r.status === "WAITING" ? "waiting" : "reviewed")));
+      if (r.referralLevel === "URGENT") top.append(el("span", "Urgent referral", "tag urgent"));
+      else if (r.referralLevel && r.referralLevel !== "NONE") top.append(el("span", nice(r.referralLevel) + " referral", "tag waiting"));
+      if (r.demo) top.append(el("span", "DEMO", "tag demo"));
+      b.append(top);
+      b.append(el("div", "Age " + (r.age ?? "?") + " · " + problem(r.visionProblem) + (r.dominantZone ? " · mostly " + nice(r.dominantZone) : "")));
+      b.append(el("div", when(r.receivedAt) + " · " + source(r.powerSource), "muted"));
       b.onclick = () => open(r.id);
       list.append(b);
     });
@@ -92,47 +148,89 @@ function table(obj) {
   return t;
 }
 
+function box(label, value) { const d = el("div"); d.append(el("b", label), document.createTextNode(value)); return d; }
+
+function powerLines(p) {
+  const pw = p.power || {}, out = [];
+  (pw.eyes || []).forEach(e => {
+    const s = e.startingTrialLens && e.startingTrialLens.value, b = e.band && e.band.value;
+    let t = (e.eye === "RIGHT" ? "R" : e.eye === "LEFT" ? "L" : e.eye) + ": ";
+    t += s ? "starting trial lens " + s.sph + (s.cyl ? " / " + s.cyl + (s.axis != null ? " × " + s.axis : "") : "") : "—";
+    if (b) t += " (estimated band " + b.lowD + " to " + b.highD + ")";
+    if (e.phoneNoMyopiaAtReach) t += " (still clear at arm's length)";
+    out.push(t);
+  });
+  if (pw.addD && pw.addD.value) out.push("Add: " + pw.addD.value.lowD + " to " + pw.addD.value.highD);
+  return out;
+}
+
 async function open(id) {
   selected = id;
+  markOpened(id);
   const d = $("detail"); d.replaceChildren(el("p", "Loading…", "muted"));
   try {
-    const { profile: p, review, receivedAt } = await api("/profiles/" + id);
+    const { profile: p, review, receivedAt, caseId } = await api("/profiles/" + id);
+    const a = p.answers || {}, fp = p.functionalProfile || {}, est = p.estimates || {};
     d.replaceChildren();
-    d.append(el("h2", "Profile received " + when(receivedAt)));
+    d.append(el("p", "Case #" + (caseId || id.slice(0, 6).toUpperCase()), "bigcase"));
+    d.append(el("div", "Received " + when(receivedAt) + " · no name or photo is ever sent · phone values are estimates, confirmed with the trial lens", "muted"));
     if (p.demo) d.append(el("div", "DEMO session: sample customer, not a real person.", "note"));
-    d.append(el("div", "No name or photo is ever sent. Phone values are estimates, to be confirmed with the trial lens.", "muted"));
-    d.append(el("h2", "Power source: " + (p.powerSource ?? "none")));
-    d.append(table(p.power));
-    d.append(el("h2", "Estimates (lens, referral, notes)")); d.append(table(p.estimates));
-    d.append(el("h2", "Functional vision profile")); d.append(table(p.functionalProfile));
-    d.append(el("h2", "Measurements")); d.append(table(p.measurements));
-    d.append(el("h2", "Interview answers")); d.append(table(p.answers));
-    d.append(el("h2", "Consent")); d.append(table(p.consent));
 
+    // ---- at a glance ----
+    const sum = el("div", null, "summary");
+    sum.append(box("Age", a.age != null ? String(a.age) : "?"));
+    sum.append(box("Problem", problem(a.visionProblem)));
+    sum.append(box("Functional vision (hours / day)",
+      "near " + (fp.nearHours ?? "?") + " · intermediate " + (fp.intermediateHours ?? "?") + " · distance " + (fp.distanceHours ?? "?")));
+    sum.append(box("Main zone → lens", (fp.dominant ? nice(fp.dominant) : "?") + " → " + (fp.impliedLens ? nice(fp.impliedLens) : "?")));
+    sum.append(box("Power source", source(p.powerSource)));
+    sum.append(box("Referral", est.referralLevel ? nice(est.referralLevel) : "none"));
+    d.append(sum);
+
+    const flags = [];
+    if (est.referralLevel === "URGENT") flags.push("URGENT referral: the app stopped lens advice.");
+    (est.referralReasons || []).forEach(r => flags.push("Flag: " + (typeof r === "object" ? JSON.stringify(r) : nice(r))));
+    if (a.redFlagFlashes) flags.push("Red flag: flashes / floaters / curtain");
+    if (a.redFlagOther) flags.push("Red flag: sudden vision loss, pain, redness or double vision");
+    if (a.diabetesOrBp) flags.push("Diabetes or BP");
+    flags.forEach(f => d.append(el("div", f, "flag")));
+
+    const pl = powerLines(p);
+    if (pl.length) { d.append(el("h2", "Power (" + source(p.powerSource) + ")")); pl.forEach(t => d.append(el("div", t))); }
+
+    // ---- reply ----
     d.append(el("h2", "Your advice to the shop"));
-    if (review.status === "REVIEWED") d.append(el("div", "Reviewed " + when(review.reviewedAt) + ". Submitting again replaces it.", "muted"));
+    if (review.status === "REVIEWED") d.append(el("div", "Replied " + when(review.reviewedAt) + ". Submitting again replaces it.", "muted"));
     const ta = el("textarea"); ta.maxLength = 4000; ta.value = review.advice || ""; d.append(ta);
     const lab = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!review.needsInPersonExam;
     lab.append(cb, document.createTextNode(" Needs an in-person eye exam"));
     const flagRow = el("div"); flagRow.append(lab); d.append(flagRow);
-    const btn = el("button", "Submit advice", "btn"); const msg = el("span", "", "muted");
+    const btn = el("button", "Submit advice", "btn"); const msg = el("div", "", "muted");
     btn.onclick = async () => {
-      if (!ta.value.trim()) { msg.textContent = " Write some advice first."; return; }
+      if (!ta.value.trim()) { msg.className = "muted"; msg.textContent = "Write some advice first."; return; }
       btn.disabled = true;
       try {
         await api("/profiles/" + id + "/review", { method: "POST", body: JSON.stringify({ advice: ta.value, needsInPersonExam: cb.checked }) });
-        msg.textContent = " Sent. The shop sees it when they refresh."; load();
-      } catch (e) { msg.textContent = " Failed: " + e.message; }
+        msg.className = "sent";
+        msg.textContent = "Reply sent to the shop. It appears on the shop's phone within about 15 seconds.";
+        load();
+      } catch (e) { msg.className = "muted"; msg.textContent = "Failed: " + e.message; }
       btn.disabled = false;
     };
-    const row = el("div"); row.style.marginTop = "10px"; row.append(btn, msg); d.append(row);
+    const row = el("div"); row.style.marginTop = "10px"; row.append(btn); d.append(row, msg);
+
+    // ---- everything else ----
+    [["Estimates (lens, referral, notes)", p.estimates], ["Power values", p.power], ["Functional vision profile", p.functionalProfile],
+     ["Measurements", p.measurements], ["Interview answers", p.answers], ["Consent", p.consent]].forEach(([title, obj]) => {
+      const det = el("details"); det.append(el("summary", title), table(obj)); d.append(det);
+    });
   } catch (e) { d.replaceChildren(el("p", "Could not open: " + e.message, "muted")); }
   load();
 }
 
 $("refresh").onclick = load;
 load();
-setInterval(load, 30000);
+setInterval(load, 10000);
 </script>
 </body>
 </html>

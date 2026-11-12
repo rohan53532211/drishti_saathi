@@ -37,6 +37,8 @@ import com.drishtisaathi.bridge.BridgeException
 import com.drishtisaathi.bridge.BridgeHealth
 import com.drishtisaathi.bridge.BridgeProfile
 import com.drishtisaathi.bridge.BridgeSettings
+import com.drishtisaathi.bridge.ReplyNotifier
+import kotlinx.coroutines.flow.map
 import com.drishtisaathi.data.RemoteReviewEntity
 import com.drishtisaathi.i18n.SBridge
 import com.drishtisaathi.i18n.Txt
@@ -218,20 +220,43 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearBridgeError() = _state.update { it.copy(bridgeError = null) }
 
-    /** "Check for reply": asks the server the profile was sent to. */
-    fun checkReview() = viewModelScope.launch {
+    /** Sent sessions and their status, for Waiting / Reviewed in Past sessions. */
+    val remoteReviews: Flow<Map<Long, RemoteReviewEntity>> = remoteDao.observeAll().map { rows -> rows.associateBy { it.sessionId } }
+
+    /** Asks the server for one sent session's reply, stores it, and notifies when it has just arrived. */
+    private suspend fun fetchReview(r: RemoteReviewEntity): RemoteReviewEntity {
+        val cfg = bridgeSettings.config.value.copy(url = r.backendUrl)
+        val rv = withContext(Dispatchers.IO) { BridgeClient(cfg).review(r.remoteId) }
+        val e = r.copy(status = rv.status, advice = rv.advice, needsInPersonExam = rv.needsInPersonExam,
+            reviewedAt = rv.reviewedAt, checkedAt = System.currentTimeMillis())
+        remoteDao.upsert(e)
+        if (!r.reviewed && e.reviewed) {
+            ReplyNotifier.replyReceived(getApplication(), _state.value.lang, e.sessionId, e.caseId, e.needsInPersonExam == true)
+        }
+        _state.update { if (it.remote?.sessionId == e.sessionId) it.copy(remote = e) else it }
+        return e
+    }
+
+    /**
+     * "Check for reply" (and the 15 s check while the summary is open). [silent]: background checks do not show
+     * network errors, so a short Wi-Fi drop does not flash red on the summary.
+     */
+    fun checkReview(silent: Boolean = false) = viewModelScope.launch {
         val r = _state.value.remote ?: return@launch
         if (_state.value.bridgeBusy) return@launch
-        _state.update { it.copy(bridgeBusy = true, bridgeError = null) }
+        _state.update { it.copy(bridgeBusy = true, bridgeError = if (silent) it.bridgeError else null) }
         try {
-            val cfg = bridgeSettings.config.value.copy(url = r.backendUrl)
-            val rv = withContext(Dispatchers.IO) { BridgeClient(cfg).review(r.remoteId) }
-            val e = r.copy(status = rv.status, advice = rv.advice, needsInPersonExam = rv.needsInPersonExam,
-                reviewedAt = rv.reviewedAt, checkedAt = System.currentTimeMillis())
-            remoteDao.upsert(e)
-            _state.update { if (it.remote?.sessionId == e.sessionId) it.copy(remote = e, bridgeBusy = false) else it.copy(bridgeBusy = false) }
+            fetchReview(r)
+            _state.update { it.copy(bridgeBusy = false, bridgeError = null) }
         } catch (e: BridgeException) {
-            _state.update { it.copy(bridgeBusy = false, bridgeError = errorText(e)) }
+            _state.update { it.copy(bridgeBusy = false, bridgeError = if (silent) it.bridgeError else errorText(e)) }
+        }
+    }
+
+    /** Past sessions: checks every sent session that is still waiting (quietly; errors are ignored). */
+    fun checkAllWaiting() = viewModelScope.launch {
+        for (r in remoteDao.waiting()) {
+            try { fetchReview(r) } catch (_: BridgeException) {}
         }
     }
 

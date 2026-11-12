@@ -69,6 +69,11 @@ class ReviewIn(BaseModel):
     needsInPersonExam: bool
 
 
+def case_id(pid: str) -> str:
+    """Short case number shown to the shop and the optometrist (first 6 characters of the profile id)."""
+    return pid[:6].upper()
+
+
 def _norm(k: str) -> str:
     return k.lower().replace("-", "").replace(" ", "")
 
@@ -180,7 +185,7 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
         with db() as con:
             con.execute("INSERT INTO profiles (id, received_at, payload) VALUES (?, ?, ?)",
                         (pid, received, profile.model_dump_json()))
-        return {"id": pid, "status": "WAITING", "receivedAt": received}
+        return {"id": pid, "caseId": case_id(pid), "status": "WAITING", "receivedAt": received}
 
     @app.get("/profiles", dependencies=[Depends(check_token)])
     def list_profiles() -> list[dict[str, Any]]:
@@ -190,11 +195,15 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
             for r in rows:
                 p = json.loads(r["payload"])
                 a = p.get("answers", {})
+                est = p.get("estimates", {}) or {}
+                fp = p.get("functionalProfile") or {}
                 rv = review_of(con, r["id"])
                 out.append({
-                    "id": r["id"], "receivedAt": r["received_at"], "status": rv["status"], "demo": p.get("demo", False),
+                    "id": r["id"], "caseId": case_id(r["id"]), "receivedAt": r["received_at"], "status": rv["status"],
+                    "demo": p.get("demo", False),
                     "age": a.get("age"), "visionProblem": a.get("visionProblem"), "powerSource": p.get("powerSource"),
-                    "referralLevel": p.get("estimates", {}).get("referralLevel"),
+                    "dominantZone": fp.get("dominant"), "impliedLens": fp.get("impliedLens"),
+                    "referralLevel": est.get("referralLevel"), "referralReasons": est.get("referralReasons") or [],
                     "needsInPersonExam": rv.get("needsInPersonExam"),
                 })
             return out
@@ -203,7 +212,7 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
     def get_profile(pid: str) -> dict[str, Any]:
         with db() as con:
             r = get_row(con, pid)
-            return {"id": pid, "receivedAt": r["received_at"], "profile": json.loads(r["payload"]),
+            return {"id": pid, "caseId": case_id(pid), "receivedAt": r["received_at"], "profile": json.loads(r["payload"]),
                     "review": review_of(con, pid)}
 
     @app.delete("/profiles/{pid}", status_code=204, dependencies=[Depends(check_token)])

@@ -5,6 +5,31 @@ A small FastAPI + SQLite service. A shop using the Drishti Saathi app can send a
 > यह चिकित्सीय निदान या पर्चा नहीं है / Not a medical diagnosis or prescription.
 > The optometrist sees phone estimates that still have to be confirmed with the shop's trial lens.
 
+## How the optometrist bridge works
+
+```
+ shop phone (app)                      laptop / server (this backend)                optometrist (browser)
+ ───────────────                       ─────────────────────────────                 ─────────────────────
+ Summary → Send to optometrist ──POST /profiles──▶  stored, case #3F9A0C  ◀──every 10 s── opens  <server>/
+ card: "Case #3F9A0C, Waiting"                                                        sees NEW case, writes advice,
+ checks every 15 s ──GET /profiles/{id}/review──▶  reply stored  ◀──POST /profiles/{id}/review── Submit advice
+ "Reply received" + notification + sound ◀────────  status REVIEWED                    "Reply sent to the shop"
+```
+
+- **Who opens what.** The shop's phone uses the server address set in staff mode → **Optometrist bridge settings**. The optometrist opens the same address in a browser, with a `/` at the end: for example `https://abc.trycloudflare.com/` or `http://192.168.1.5:8000/`. Both use the same token if one is set.
+- **The case number** is the first 6 characters of the server's profile id, in capitals, for example `#3F9A0C`. The phone shows it in large text after sending, and the optometrist's list shows the same number. Use it when you talk about a case on the phone.
+- **Optometrist page.**
+  - The list refreshes every 10 seconds.
+  - A case not yet opened in this browser has a **NEW** badge, and a short sound plays when one arrives. Click **Sound: on** once, because browsers only play sound after a click.
+  - Opening a case shows at the top: the case number, age, problem, the functional vision profile, the power source and values, and any referral or red flags. The full data is underneath.
+  - After **Submit advice**, the page shows "Reply sent to the shop".
+- **How the reply reaches the app.** Nothing is pushed to the phone; the phone asks the server.
+  - It asks every 15 seconds while that session's summary is open.
+  - It asks when **Past sessions** opens, and every 15 seconds while that list is open.
+  - When a reply arrives, the card changes to **Reply received** and Android shows a notification with sound. The notification gives only the case number; tapping it opens the session. Android 13+ asks once for permission to show notifications.
+  - Past sessions shows "Waiting" or "Reply received" for every session that was sent.
+  - If the app is closed, nothing is checked until it is opened again.
+
 ## What is sent, and what never is
 
 A profile contains:
@@ -63,7 +88,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 1. On the home screen, turn on **staff mode** and tap **Optometrist bridge settings**.
 2. Enter the server URL and the token, then tap **Test connection**.
 3. After a session: on the summary, tap **Send to optometrist**. Go through the consent screen.
-4. The card shows **Waiting** until the optometrist submits advice. Tap **Check for reply** to see it.
+4. The card shows the case number and **Waiting**. It checks every 15 s and changes to **Reply received**, with a notification, when the optometrist submits advice. **Check for reply** checks at once.
 
 **Same Wi-Fi (quickest for a demo).**
 - URL: `http://<laptop IP>:8000`. Find the IP with `ipconfig` (Windows) or `ip addr`.

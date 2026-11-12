@@ -39,7 +39,13 @@ def test_profile_round_trip_and_list(client):
     assert rows[0] == {**rows[0], "id": pid, "status": "WAITING", "age": 48, "visionProblem": "NEAR",
                        "powerSource": "PHONE_ESTIMATE", "referralLevel": "NONE"}
 
+    case = r.json()["caseId"]
+    assert case == pid[:6].upper() and len(case) == 6
+    assert rows[0]["caseId"] == case
+    assert (rows[0]["dominantZone"], rows[0]["impliedLens"], rows[0]["referralReasons"]) == ("NEAR", "READING", [])
+
     full = client.get(f"/profiles/{pid}").json()
+    assert full["caseId"] == case
     assert full["profile"]["power"]["addD"] == 1.5
     assert full["review"] == {"status": "WAITING"}
 
@@ -145,6 +151,9 @@ def test_optometrist_page_is_served(client):
     assert r.status_code == 200
     assert "Optometrist Bridge" in r.text
     assert "textContent" in r.text  # values are inserted as text, never as HTML
+    assert "innerHTML" not in r.text
+    assert "setInterval(load, 10000)" in r.text  # list refreshes every 10 s
+    assert "Reply sent to the shop" in r.text
 
 
 def test_profile_built_by_the_app_is_accepted(client):

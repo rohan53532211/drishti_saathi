@@ -52,6 +52,9 @@ data class BridgeConsent(val consentAt: Long, val spoken: Boolean, val tapped: B
  */
 object BridgeProfile {
     const val CONSENT_TEXT_VERSION = "bridge-1"
+
+    /** Short case number: first 6 characters of the server id, upper case (backend/app/main.py case_id). */
+    fun caseId(remoteId: String): String = remoteId.take(6).uppercase()
     /** Keep in sync with backend/app/main.py FORBIDDEN_KEYS. */
     val forbiddenKeys = setOf(
         "name", "firstname", "lastname", "fullname", "customername", "photo", "photos", "image", "images", "picture",
