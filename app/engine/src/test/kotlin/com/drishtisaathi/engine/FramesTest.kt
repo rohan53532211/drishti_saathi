@@ -1,0 +1,284 @@
+package com.drishtisaathi.engine
+
+import kotlinx.serialization.json.Json
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class FramesTest {
+    private val rules = TestAssets.rules
+    private val catalog = FrameCatalog.parse(TestAssets.text("frames.json"))
+    private val ranker = FrameRanker(rules)
+
+    private fun est(v: Double, c: Confidence = Confidence.MEDIUM) = Estimate(v, c, Source.STAFF_ENTRY)
+    private fun frame(id: String) = catalog.frames.first { it.id == id }
+
+    @Test fun `placeholder catalogue has 10 valid frames`() {
+        assertEquals(10, catalog.frames.size)
+        assertTrue(catalog.frames.all { it.lensWidthMm in 40.0..62.0 && it.bridgeMm in 12.0..24.0 && it.priceInr > 0 })
+    }
+
+    @Test fun `frame width from printed size`() {
+        // 52-18 with 6 mm end pieces each side: 104 + 18 + 12 = 134
+        assertEquals(134.0, ranker.frameWidthMm(frame("F01")), 1e-9)
+    }
+
+    @Test fun `thickness in ranking matches the brief check`() {
+        // −4.00 D, PD 62, 52-18 frame (F01) in CR-39 → ≈ 5.6 mm edge
+        val r = ranker.rank(listOf(frame("F01")), est(134.0), est(62.0), listOf(est(-4.0)), "CR39", StylePref.ANY, Budget.HIGH).single()
+        assertEquals(5.6, r.thickestMm!!, 0.05)
+        assertTrue(r.thickestIsEdge)
+        assertEquals(FitVerdict.GOOD, r.fit)
+    }
+
+    @Test fun `high minus favours smaller lens width`() {
+        val ranked = ranker.rank(catalog.frames, est(134.0), est(62.0), listOf(est(-6.0)), "CR39", StylePref.ANY, Budget.HIGH, topN = 10)
+        val f09 = ranked.first { it.frame.id == "F09" } // 58 mm half-rim
+        val f08 = ranked.first { it.frame.id == "F08" } // 49 mm compact
+        assertTrue(f09.thickestMm!! > f08.thickestMm!!)
+        assertTrue(f08.thinScore > f09.thinScore)
+    }
+
+    @Test fun `wide face prefers wider frames, narrow face narrower`() {
+        val wide = ranker.rank(catalog.frames, est(150.0), est(64.0), emptyList(), "CR39", StylePref.ANY, Budget.HIGH, topN = 1).single()
+        val narrow = ranker.rank(catalog.frames, est(118.0), est(56.0), emptyList(), "CR39", StylePref.ANY, Budget.HIGH, topN = 1).single()
+        assertTrue(wide.frameWidthMm > narrow.frameWidthMm)
+    }
+
+    @Test fun `no power known - no thickness shown, thinness neutral`() {
+        val r = ranker.rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", null, null)
+        assertTrue(r.all { it.thickestMm == null && it.thinScore == 1.0 })
+        assertEquals(5, r.size)
+    }
+
+    @Test fun `low budget pushes expensive frames down`() {
+        val r = ranker.rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", StylePref.ANY, Budget.LOW, topN = 10)
+        assertTrue(r.none { it.frame.id == "F06" }) // ₹5200: far over a ₹1500 cap, hidden
+        assertTrue(r.take(3).all { it.withinBudget })
+    }
+
+    @Test fun `style preference lifts matching frames but fit still matters`() {
+        val r = ranker.rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", StylePref.BOLD, Budget.HIGH, topN = 10)
+        assertTrue(r.first().styleMatch)
+        assertTrue(r.filter { it.styleMatch }.all { it.styleScore == 1.0 })
+        // Same frame scores higher when the style matches
+        val f03Bold = r.first { it.frame.id == "F03" }.score
+        val f03Minimal = ranker.rank(listOf(frame("F03")), est(134.0), est(62.0), emptyList(), "CR39", StylePref.MINIMAL, Budget.HIGH).single().score
+        assertTrue(f03Bold > f03Minimal)
+    }
+
+    @Test fun `thickness confidence is the weakest input`() {
+        val r = ranker.rank(listOf(frame("F01")), est(134.0), est(62.0, Confidence.LOW), listOf(est(-2.0, Confidence.MEDIUM)), "CR39", null, null).single()
+        assertEquals(Confidence.LOW, r.thicknessConfidence)
+    }
+
+    // ---- facade --------------------------------------------------------------------------------
+
+    private val engine = DrishtiEngine(rules, TestAssets.anthro, catalog)
+
+    @Test fun `facade - urgent referral gives no frames`() {
+        val res = engine.evaluate(InterviewAnswers(age = 50, redFlagFlashes = true))
+        assertNull(res.assessment.advice)
+        assertTrue(res.frames.isEmpty())
+    }
+
+    @Test fun `facade - high myope gets 1_60 and thickness on every frame`() {
+        val a = InterviewAnswers(age = 30, glassesAgeYears = 1, distanceBlur = true,
+            knownRx = KnownRx(EyeRx(-5.0), EyeRx(-4.5)), budget = Budget.MID, style = StylePref.ANY)
+        val res = engine.evaluate(a, StaffMeasurements(pdMm = 62.0))
+        assertEquals("HI_160", res.assessment.advice!!.materialId.value)
+        assertEquals(5, res.frames.size)
+        assertTrue(res.frames.all { it.thickestMm != null && it.materialId == "HI_160" })
+    }
+
+    @Test fun `session result round-trips through JSON (Room storage)`() {
+        val res = engine.evaluate(InterviewAnswers(age = 46, nearBlur = true, budget = Budget.LOW))
+        val json = Json.encodeToString(SessionResult.serializer(), res)
+        assertEquals(res, Json.decodeFromString(SessionResult.serializer(), json))
+    }
+
+    // ---- Addition 2: labels and reasons -------------------------------------------------------
+
+    @Test fun `labels follow score cut-offs from rules json`() {
+        val all = ranker.rank(catalog.frames, est(134.0), est(62.0), listOf(est(-4.0)), "CR39", StylePref.BOLD, Budget.LOW, topN = 10)
+        all.forEach { rf ->
+            val expected = when {
+                rf.score >= rules.frameScoring.labelHighFrom -> MatchLabel.HIGHLY_RECOMMENDED
+                rf.score >= rules.frameScoring.labelModerateFrom -> MatchLabel.MODERATE
+                else -> MatchLabel.LOWER
+            }
+            assertEquals(expected, rf.label)
+        }
+        // A good-fitting, in-budget, thin frame with no style constraint is highly recommended
+        val best = ranker.rank(listOf(frame("F01")), est(134.0), est(62.0), listOf(est(-1.0)), "CR39", StylePref.ANY, Budget.MID).single()
+        assertEquals(MatchLabel.HIGHLY_RECOMMENDED, best.label)
+    }
+
+    @Test fun `reasons come from components - fit first, numbers attached, 2 to 4 bullets`() {
+        val r = ranker.rank(listOf(frame("F01")), est(134.0), est(62.0), listOf(est(-4.0)), "CR39", StylePref.BOLD, Budget.MID).single()
+        assertTrue(r.reasons.size in 2..rules.frameScoring.maxReasons)
+        val fit = r.reasons.first { it.code == ReasonCode.FITS_FACE }
+        assertEquals(134.0, fit.a!!, 1e-9)
+        assertEquals(134.0, fit.b!!, 1e-9)
+        val thick = r.reasons.first { it.code == ReasonCode.THIN_LENS || it.code == ReasonCode.THICK_LENS }
+        assertEquals(5.6, thick.a!!, 0.05)
+        assertEquals("CR39", thick.materialId)
+        assertTrue(r.reasons.any { it.code == ReasonCode.STYLE_MISMATCH && !it.positive })
+        // positives listed before negatives
+        assertEquals(r.reasons.sortedByDescending { it.positive }, r.reasons)
+    }
+
+    @Test fun `over budget reason carries the amount over`() {
+        val r = ranker.rank(listOf(frame("F06")), est(134.0), est(62.0), emptyList(), "CR39", StylePref.ANY, Budget.MID).single()
+        val over = r.reasons.first { it.code == ReasonCode.OVER_BUDGET }
+        assertEquals(1200.0, over.a!!, 1e-9) // 5200 - 4000
+        assertTrue(!over.positive)
+    }
+
+    @Test fun `narrow face gets a wide-for-face reason`() {
+        val r = ranker.rank(listOf(frame("F09")), est(118.0), est(58.0), emptyList(), "CR39", null, null).single()
+        assertEquals(ReasonCode.WIDE_FOR_FACE, r.reasons.first().code)
+        assertTrue(r.reasons.none { it.code == ReasonCode.IN_BUDGET || it.code == ReasonCode.STYLE_MATCH }) // no prefs → no such bullets
+    }
+
+    // ---- Addition 3: comparison helper ----------------------------------------------------------
+
+    @Test fun `thickness by material for comparison matches the brief check`() {
+        val a = InterviewAnswers(age = 30, glassesAgeYears = 1, knownRx = KnownRx(EyeRx(-4.0), EyeRx(-3.0)))
+        val res = engine.evaluate(a, StaffMeasurements(pdMm = 62.0))
+        val t = engine.thicknessByMaterial(frame("F01"), res.assessment)!!
+        assertEquals(5.6, t.getValue("CR39"), 0.05)   // thicker eye (−4.00) drives it
+        assertEquals(4.2, t.getValue("HI_167"), 0.05)
+        assertTrue(t.getValue("HI_167") < t.getValue("HI_160") && t.getValue("HI_160") < t.getValue("CR39"))
+    }
+
+    @Test fun `no power - no thickness table`() {
+        val res = engine.evaluate(InterviewAnswers(age = 30))
+        assertNull(engine.thicknessByMaterial(frame("F01"), res.assessment))
+    }
+
+    // ---- Addition 4: new preferences ------------------------------------------------------------
+
+    private fun one(id: String, prefs: FramePrefs, face: Double = 134.0) =
+        ranker.rank(listOf(frame(id)), est(face), est(62.0), emptyList(), "CR39", prefs).single()
+
+    @Test fun `colour preference - match scores higher and says so`() {
+        val match = one("F03", FramePrefs(colour = ColourPref.BROWN_TORTOISE))
+        val miss = one("F03", FramePrefs(colour = ColourPref.COLOURFUL))
+        assertTrue(match.score > miss.score)
+        assertTrue(match.reasons.any { it.code == ReasonCode.COLOUR_MATCH })
+        assertTrue(miss.reasons.any { it.code == ReasonCode.COLOUR_MISMATCH && !it.positive })
+        // ANY -> neutral, no colour bullet
+        assertTrue(one("F03", FramePrefs(colour = ColourPref.ANY)).reasons.none { it.code.name.startsWith("COLOUR") })
+    }
+
+    @Test fun `lightweight or first-time wearer favours light frames`() {
+        val light = one("F06", FramePrefs(lightweight = true))   // 10 g
+        val heavy = one("F05", FramePrefs(lightweight = true))   // 30 g
+        assertEquals(1.0, light.weightScore, 1e-9)
+        assertTrue(heavy.weightScore < 0.3)
+        assertTrue(light.reasons.any { it.code == ReasonCode.LIGHTWEIGHT && it.a == 10.0 })
+        assertEquals(heavy.weightScore, one("F05", FramePrefs(firstTimeWearer = true)).weightScore, 1e-9)
+        assertEquals(1.0, one("F05", FramePrefs()).weightScore, 1e-9) // no preference -> neutral
+    }
+
+    @Test fun `look preference`() {
+        assertTrue(one("F01", FramePrefs(look = LookPref.PROFESSIONAL)).score > one("F01", FramePrefs(look = LookPref.CASUAL)).score)
+        assertEquals(1.0, one("F01", FramePrefs(look = LookPref.BOTH)).lookScore, 1e-9)
+    }
+
+    @Test fun `progressive needs minimum lens height`() {
+        val short = one("F08", FramePrefs(lensType = LensType.PROGRESSIVE))  // 26 mm
+        assertEquals(rules.frameScoring.shortLensHeightPenalty, short.lensHeightPenalty, 1e-9)
+        val low = short.reasons.first { it.code == ReasonCode.LENS_HEIGHT_LOW }
+        assertEquals(26.0, low.a!!, 1e-9)
+        assertEquals(28.0, low.b!!, 1e-9)
+        val sv = one("F08", FramePrefs(lensType = LensType.SINGLE_VISION))
+        assertEquals(0.0, sv.lensHeightPenalty, 1e-9)
+        assertTrue(sv.score > short.score)
+        assertTrue(one("F01", FramePrefs(lensType = LensType.PROGRESSIVE)).reasons.any { it.code == ReasonCode.LENS_HEIGHT_OK })
+    }
+
+    @Test fun `facade passes interview preferences into ranking`() {
+        val a = InterviewAnswers(age = 30, colourPreference = ColourPref.COLOURFUL, lightweightPreference = true)
+        val top = engine.evaluate(a).frames
+        assertTrue(top.flatMap { it.reasons }.any { it.code == ReasonCode.COLOUR_MATCH || it.code == ReasonCode.COLOUR_MISMATCH })
+        assertTrue(top.flatMap { it.reasons }.any { it.code == ReasonCode.LIGHTWEIGHT || it.code == ReasonCode.HEAVIER })
+    }
+
+    @Test fun `catalogue rejects ANY as a frame colour`() {
+        val bad = TestAssets.text("frames.json").replaceFirst("\"colours\": [\"COLOURFUL\"]", "\"colours\": [\"ANY\"]")
+        assertThrows(IllegalArgumentException::class.java) { FrameCatalog.parse(bad) }
+    }
+
+    @Test fun `catalogue requires the addition 4 fields`() {
+        val missing = TestAssets.text("frames.json").replaceFirst(", \"weightGrams\": 16", "")
+        assertThrows(IllegalArgumentException::class.java) { FrameCatalog.parse(missing) }
+    }
+
+    @Test fun `sessions stored before addition 4 still decode`() {
+        val res = engine.evaluate(InterviewAnswers(age = 46, nearBlur = true, budget = Budget.LOW))
+        val json = Json { encodeDefaults = true }.encodeToString(SessionResult.serializer(), res)
+        // Strip the new frame and ranking fields, as an older build would have written them
+        val old = json
+            .replace(Regex(""","colours":\[[^\]]*\]"""), "")
+            .replace(Regex(""","looks":\[[^\]]*\]"""), "")
+            .replace(Regex(""","weightGrams":\d+"""), "")
+            .replace(Regex(""","lensHeightMm":[\d.]+"""), "")
+            .replace(Regex(""","(colourScore|weightScore|lookScore|lensHeightPenalty)":[\d.]+"""), "")
+        assertTrue(!old.contains("weightGrams"))
+        val decoded = Json { ignoreUnknownKeys = true }.decodeFromString(SessionResult.serializer(), old)
+        assertEquals(res.frames.map { it.frame.id }, decoded.frames.map { it.frame.id })
+    }
+
+    // ---- Review fix 1: budget ordering and hiding ----------------------------------------------
+
+    @Test fun `in-budget frames always rank above over-budget frames`() {
+        for (budget in listOf(Budget.LOW, Budget.MID)) {
+            for (power in listOf(emptyList(), listOf(est(-6.0)))) {
+                val r = ranker.rank(catalog.frames, est(140.0), est(64.0), power, "CR39", StylePref.BOLD, budget, topN = 10)
+                val firstOver = r.indexOfFirst { !it.withinBudget }
+                if (firstOver >= 0) assertTrue("$budget: in-budget frame after over-budget one", r.drop(firstOver).none { it.withinBudget })
+            }
+        }
+    }
+
+    @Test fun `PDF review case - low budget never puts a 1600 frame above the in-budget ones`() {
+        // Average face (not measured), low budget: the reported bug had ₹1,600 at #1 and ₹3,200 at #5.
+        val res = engine.evaluate(InterviewAnswers(age = 35, distanceBlur = true, budget = Budget.LOW, style = StylePref.ANY))
+        val prices = res.frames.map { it.frame.priceInr }
+        val cap = rules.frameScoring.budgetMaxPriceInrLow
+        val inBudget = res.frames.takeWhile { it.withinBudget }
+        assertEquals(res.frames.count { it.withinBudget }, inBudget.size)
+        assertTrue(res.frames.first().frame.priceInr <= cap)
+        assertTrue("prices $prices", prices.none { it > cap * (1 + rules.frameScoring.hideOverBudgetFraction) })
+    }
+
+    @Test fun `frames more than 30 percent over budget are hidden, threshold from rules json`() {
+        val low = ranker.rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", null, Budget.LOW, topN = 10)
+        val limit = rules.frameScoring.budgetMaxPriceInrLow * (1 + rules.frameScoring.hideOverBudgetFraction) // 1950
+        assertTrue(low.all { it.frame.priceInr <= limit })
+        assertTrue(low.any { it.frame.id == "F05" })          // ₹1600: 7 % over, still shown (below in-budget ones)
+        assertTrue(low.none { it.frame.id == "F07" })         // ₹2100: 40 % over, hidden
+        // No cap for premium budget: all 10 shown
+        assertEquals(10, ranker.rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", null, Budget.HIGH, topN = 10).size)
+        // Raising the threshold in rules.json brings ₹2100 back
+        val loose = RulesConfig.parse(TestAssets.text("rules.json").replace("\"hideOverBudgetFraction\": 0.30", "\"hideOverBudgetFraction\": 0.50"))
+        assertTrue(FrameRanker(loose).rank(catalog.frames, est(134.0), est(62.0), emptyList(), "CR39", null, Budget.LOW, topN = 10)
+            .any { it.frame.id == "F07" })
+    }
+
+    // ---- Review fix 2: fit against an assumed average face ----------------------------------------
+
+    @Test fun `fit reason is marked assumed when face width or PD is a population average`() {
+        val avg = engine.evaluate(InterviewAnswers(age = 35)).frames
+        assertTrue(avg.all { rf -> rf.reasons.first { it.code.name.endsWith("FACE") }.assumed })
+        val measured = engine.evaluate(InterviewAnswers(age = 35), StaffMeasurements(pdMm = 62.0, faceWidthMm = 136.0)).frames
+        assertTrue(measured.all { rf -> !rf.reasons.first { it.code.name.endsWith("FACE") }.assumed })
+        // PD measured but face width not → still assumed
+        val half = engine.evaluate(InterviewAnswers(age = 35), StaffMeasurements(pdMm = 62.0)).frames
+        assertTrue(half.all { rf -> rf.reasons.first { it.code.name.endsWith("FACE") }.assumed })
+    }
+}

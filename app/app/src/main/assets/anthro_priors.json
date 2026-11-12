@@ -1,0 +1,40 @@
+{
+  "source": "ANSUR II",
+  "n": 6068,
+  "pd_mm": {
+    "mean": 63.26,
+    "sd": 3.65,
+    "p1": 54.5,
+    "p99": 72.0
+  },
+  "face_width_mm": {
+    "mean": 139.72,
+    "sd": 7.31,
+    "p1": 124.0,
+    "p99": 156.0
+  },
+  "pd_to_face_ratio": {
+    "mean": 0.45,
+    "sd": 0.02,
+    "p1": 0.397,
+    "p99": 0.512
+  },
+  "pd_from_face_width": {
+    "slope": 0.26,
+    "intercept": 26.94,
+    "resid_sd_mm": 3.12,
+    "corr": 0.52
+  },
+  "by_sex": {
+    "Female": {
+      "n": 1986,
+      "pd_mean": 61.71,
+      "fw_mean": 133.77
+    },
+    "Male": {
+      "n": 4082,
+      "pd_mean": 64.02,
+      "fw_mean": 142.62
+    }
+  }
+}

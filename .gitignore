@@ -1,0 +1,39 @@
+# datasets (large / licence unknown) - never commit
+glasses/
+frames30/
+ansur2.csv
+
+# Kaggle Glasses dataset cut-outs (licence unknown, demo use only) - kept locally, not in git.
+# Regenerate with tools/frames_cutout.py (see README). more_frames.json stays tracked.
+app/app/src/main/assets/frames/*.png
+
+# secrets / machine-local config
+local.properties
+*.keystore
+*.jks
+keystore.properties
+secrets.properties
+.env
+.env.*
+google-services.json
+*api_key*
+*apikey*
+
+# build outputs
+.gradle/
+build/
+**/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+__pycache__/
+
+# IDE / tools
+.idea/
+*.iml
+.claude/

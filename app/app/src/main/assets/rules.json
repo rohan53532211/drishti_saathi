@@ -1,0 +1,378 @@
+{
+  "_comment": "Drishti Saathi clinical constants and rules. DRAFT: every number here must be reviewed by an optometrist before field use. Edit values here, not in code. Unknown keys are rejected so typos fail loudly in the unit tests.",
+  "version": 1,
+
+  "optics": {
+    "letterArcmin": 5.0,
+    "lcaBlueOffsetD": 0.67,
+    "farPointAgreementMaxD": 0.50,
+    "whiteFarPointMaxM": 0.80,
+    "workingDistanceDefaultM": 0.40,
+    "workingDistanceFineWorkM": 0.33,
+    "hofstetterMinIntercept": 15.0,
+    "hofstetterMinSlopePerYear": 0.25,
+    "powerStepD": 0.25,
+    "addMinD": 0.75,
+    "addMaxD": 3.00,
+    "repeatSpreadHighMaxD": 0.25,
+    "repeatSpreadMediumMaxD": 0.50
+  },
+
+  "ages": {
+    "presbyopiaFrom": 40,
+    "nearPointTestFrom": 38,
+    "childReferralUnder": 12,
+    "polycarbonateUnder": 18
+  },
+
+  "addAgeTable": [
+    { "minAge": 40, "maxAge": 44, "lowD": 0.75, "highD": 1.00 },
+    { "minAge": 45, "maxAge": 49, "lowD": 1.25, "highD": 1.50 },
+    { "minAge": 50, "maxAge": 54, "lowD": 1.75, "highD": 2.00 },
+    { "minAge": 55, "maxAge": 150, "lowD": 2.25, "highD": 2.50 }
+  ],
+
+  "oldNumbers": {
+    "freshMaxYears": 2,
+    "bandHalfWidthFreshD": 0.50,
+    "bandHalfWidthStaleD": 1.00,
+    "significantDistanceSeD": 0.50,
+    "significantCylinderD": 0.50
+  },
+
+  "materials": [
+    { "id": "CR39", "index": 1.50, "centreThicknessMinusMm": 2.0, "minEdgePlusMm": 1.0 },
+    { "id": "POLYCARBONATE", "index": 1.59, "centreThicknessMinusMm": 1.5, "minEdgePlusMm": 1.0 },
+    { "id": "HI_160", "index": 1.60, "centreThicknessMinusMm": 1.5, "minEdgePlusMm": 1.0 },
+    { "id": "HI_167", "index": 1.67, "centreThicknessMinusMm": 1.5, "minEdgePlusMm": 1.0 }
+  ],
+
+  "materialRules": {
+    "defaultMaterial": "CR39",
+    "impactMaterial": "POLYCARBONATE",
+    "impactOccupations": ["SPORT_ACTIVE"],
+    "highIndexFromAbsSeD": 4.0,
+    "highIndexMaterial": "HI_160",
+    "veryHighIndexFromAbsSeD": 6.0,
+    "veryHighIndexMaterial": "HI_167"
+  },
+
+  "lensTypeRules": {
+    "progressiveOccupations": ["OFFICE_COMPUTER", "SHOP_BUSINESS"],
+    "progressiveScreenHours": ["H4_PLUS"],
+    "lowBudgets": ["LOW"],
+    "progressiveReadingFrequencies": ["DAILY_LONG"],
+    "separatePairsReadingFrequencies": ["RARELY"]
+  },
+
+  "coatingRules": [
+    { "id": "screen-time", "when": { "screenHours": ["H4_PLUS"] }, "coatings": ["ANTI_REFLECTIVE", "BLUE_FILTER_OPTIONAL"] },
+    { "id": "night-driving", "when": { "nightDriving": true }, "coatings": ["ANTI_REFLECTIVE"] },
+    { "id": "outdoor-work", "when": { "outdoorWork": true }, "coatings": ["PHOTOCHROMIC_OR_TINT"] }
+  ],
+
+  "referral": {
+    "lowConfidenceCountForReferral": 2,
+    "oldGlassesStrainOlderThanYears": 2
+  },
+
+  "frameScoring": {
+    "weightFit": 0.28,
+    "weightThinness": 0.24,
+    "weightStyle": 0.10,
+    "weightBudget": 0.16,
+    "weightColour": 0.08,
+    "weightWeight": 0.07,
+    "weightLook": 0.07,
+    "endpieceMmEachSide": 6.0,
+    "idealFrameToFaceWidthRatio": 1.0,
+    "fitToleranceMm": 15.0,
+    "bridgeFitShare": 0.3,
+    "bridgeGoodWithinMm": 2.0,
+    "bridgeFitToleranceMm": 5.0,
+    "goodFitWithinMm": 6.0,
+    "thinnestMm": 2.0,
+    "thickestMm": 8.0,
+    "styleMismatchScore": 0.3,
+    "budgetMaxPriceInrLow": 1500,
+    "budgetMaxPriceInrMid": 4000,
+    "overBudgetFalloffFraction": 0.5,
+    "hideOverBudgetFraction": 0.30,
+    "topN": 5,
+    "labelHighFrom": 0.85,
+    "labelModerateFrom": 0.70,
+    "thinPositiveFrom": 0.5,
+    "maxReasons": 4,
+    "colourMismatchScore": 0.3,
+    "lookMismatchScore": 0.4,
+    "lightestGrams": 10,
+    "heaviestGrams": 35,
+    "lightPositiveFrom": 0.5,
+    "progressiveMinLensHeightMm": 28,
+    "shortLensHeightPenalty": 0.15
+  },
+
+  "plausibility": {
+    "pdResidualSdMultiplier": 3.0
+  },
+
+
+  "distance": {
+    "_comment": "Track A. Eye-to-camera distance d = f_px * irisMm / irisPx (MediaPipe Iris, 11.7 +/- 0.5 mm). Personal iris from the card photo when available. FOV fallback is a typical front camera along the image's long side; it makes the estimate LOW confidence.",
+    "irisDiameterPriorMm": 11.7,
+    "irisDiameterPriorSdMm": 0.5,
+    "personalIrisSdMm": 0.25,
+    "personalIrisMinMm": 10.0,
+    "personalIrisMaxMm": 13.5,
+    "fallbackLongSideFovDeg": 70.0,
+    "irisPixelSdPx": 0.5,
+    "minIrisPx": 5.0,
+    "irisPairMaxRatio": 1.15,
+    "highMaxRelativeSd": 0.035,
+    "mediumMaxRelativeSd": 0.07,
+    "smootherWindow": 7,
+    "smootherEmaAlpha": 0.5,
+    "smootherMaxAgeMs": 1000,
+    "applyScreenCentreOffset": false,
+    "screenCentreOffsetXMm": 0.0,
+    "screenCentreOffsetYMm": 70.0
+  },
+
+
+  "bayes": {
+    "_comment": "Innovation 10: posterior over SE = age prior (India prevalence) ^ priorWeight x Gaussian likelihood (sigma 0.80 D from the real studies, not the simulated value); most probable 1 D band. Adults 30+ prevalence from the Sightsavers review (myopia 27.7 %, hyperopia 22.9 %, emmetropia 49.4 %). Under-30 row and all shape parameters are DRAFT for an optometrist to review. priorWeight 0.5 softens a whole-population prior for people who come because of blur.",
+    "enabled": true,
+    "gridMinD": -12.0,
+    "gridMaxD": 8.0,
+    "gridStepD": 0.25,
+    "bandWidthD": 1.5,
+    "likelihoodSigmaD": 0.80,
+    "priorWeight": 0.5,
+    "myopiaMaxD": -0.5,
+    "hyperopiaMinD": 0.5,
+    "myopiaMagnitudePrior": { "type": "EXPONENTIAL", "meanD": 1.5, "note": "assumption, replace with pilot data" },
+    "assumedAgeWhenUnknown": 35,
+    "agePriors": [
+      { "_comment": "DRAFT: young adults, more myopia, little manifest hyperopia", "minAge": 0, "maxAge": 29,
+        "myopiaPrevalence": 0.35, "hyperopiaPrevalence": 0.08, "emmetropiaPrevalence": 0.57, "hyperopiaScaleD": 0.75,
+        "emmetropiaMeanD": 0.0, "emmetropiaSdD": 0.35 },
+      { "_comment": "India adults 30+ (systematic review)", "minAge": 30, "maxAge": 150,
+        "myopiaPrevalence": 0.277, "hyperopiaPrevalence": 0.229, "emmetropiaPrevalence": 0.494, "hyperopiaScaleD": 1.0,
+        "emmetropiaMeanD": 0.0, "emmetropiaSdD": 0.35 }
+    ],
+    "bandProbabilityHigh": 0.80,
+    "minBandProbabilityToShow": 0.60,
+    "addFusion": {
+      "_comment": "Innovation 5. Hofstetter amplitude: min 15-0.25*age (optics), mean 18.5-0.30*age, max 25-0.40*age. Measured add and age-expected add are fused by inverse variance; an amplitude outside [min-tol, max+tol] inflates the measured sigma.",
+      "hofstetterMeanIntercept": 18.5,
+      "hofstetterMeanSlopePerYear": 0.30,
+      "hofstetterMaxIntercept": 25.0,
+      "hofstetterMaxSlopePerYear": 0.40,
+      "amplitudeToleranceD": 1.0,
+      "measuredAddSigmaD": 0.4,
+      "ageAddSigmaD": 0.6,
+      "implausibleSigmaMultiplier": 3.0
+    }
+  },
+
+
+  "faceGeometry": {
+    "_comment": "Track A. MediaPipe Face Landmarker (478 points) indices and face-shape thresholds. Face shape is for style suggestions only. Shape and pose ratios are first guesses; tune on pilot frames.",
+    "landmarks": {
+      "_comment": "468/473 iris centres with rings 469-472 / 474-477; 234/454 cheek contour (face width); 10/152 forehead top/chin (face length); 172/397 jaw angles; 54/284 upper forehead at temples; 122/351 nose sides beside bridge point 6 (frame pad height); 33/263 outer eye corners (roll); 1 nose tip (yaw/pitch).",
+      "irisRightCentre": 468,
+      "irisRightRing": [469, 470, 471, 472],
+      "irisLeftCentre": 473,
+      "irisLeftRing": [474, 475, 476, 477],
+      "faceWidthRight": 234,
+      "faceWidthLeft": 454,
+      "faceTop": 10,
+      "chin": 152,
+      "jawRight": 172,
+      "jawLeft": 397,
+      "foreheadRight": 54,
+      "foreheadLeft": 284,
+      "bridgeRight": 122,
+      "bridgeLeft": 351,
+      "eyeOuterRight": 33,
+      "eyeOuterLeft": 263,
+      "noseTip": 1
+    },
+    "shape": {
+      "longMaxWidthToLength": 0.75,
+      "squareMinJawToCheek": 0.85,
+      "roundMinWidthToLength": 0.90,
+      "heartMaxJawToCheek": 0.72,
+      "heartMinForeheadToCheek": 0.80,
+      "borderlineMargin": 0.02,
+      "suggestedFrames": {
+        "ROUND": ["RECTANGLE", "SQUARE", "WAYFARER"],
+        "SQUARE": ["ROUND", "OVAL", "AVIATOR"],
+        "OVAL": ["RECTANGLE", "WAYFARER", "AVIATOR", "SQUARE", "ROUND"],
+        "LONG": ["SQUARE", "WAYFARER", "AVIATOR"],
+        "HEART": ["AVIATOR", "OVAL", "ROUND"]
+      }
+    },
+    "pose": {
+      "_comment": "Used only when the transformation matrix is missing. Nose-tip depth ratios from the MediaPipe canonical face, approximate.",
+      "noseDepthToFaceWidth": 0.55,
+      "noseDepthToFaceLength": 0.45,
+      "noseTipNeutralFraction": 0.50
+    },
+    "aggregate": {
+      "targetFrames": 30,
+      "minFrames": 10,
+      "outlierMadK": 3.0,
+      "outlierMinAbsMm": 0.5,
+      "pdSpreadHighMaxMm": 0.5,
+      "pdSpreadMediumMaxMm": 1.0,
+      "widthSpreadHighMaxFraction": 0.01,
+      "widthSpreadMediumMaxFraction": 0.025,
+      "capCardScale": "HIGH",
+      "capPersonalIrisScale": "MEDIUM",
+      "capPriorIrisScale": "LOW"
+    }
+  },
+
+
+  "camera": {
+    "_comment": "Track B. Gates per Section 5 M2. Sharpness/brightness thresholds need tuning on real phones (see CameraDebugScreen).",
+    "analysisWidthPx": 1280,
+    "analysisHeightPx": 720,
+    "photoWidthPx": 1920,
+    "photoHeightPx": 1080,
+    "minFaceDetectionConfidence": 0.5,
+    "minFacePresenceConfidence": 0.5,
+    "minTrackingConfidence": 0.5,
+    "fallbackHorizontalFovDeg": 62.0,
+    "maxAbsYawDeg": 5.0,
+    "maxAbsRollDeg": 5.0,
+    "minEyeAspectRatio": 0.18,
+    "minLaplacianVariance": 30.0,
+    "minMeanBrightness": 70.0,
+    "maxMeanBrightness": 210.0,
+    "maxCentreOffsetFraction": 0.15,
+    "minFaceWidthFraction": 0.30,
+    "maxFaceWidthFraction": 0.80,
+    "captureFrameCount": 30,
+    "speakStableMs": 700,
+    "speakMinGapMs": 2500,
+    "speakRepeatMs": 7000,
+    "provisionalIrisDiameterMm": 11.7,
+    "distanceSmoothingFrames": 5,
+    "cardWidthMm": 85.60,
+    "cardHeightMm": 53.98,
+    "cardAspectTolerance": 0.10,
+    "cardMinWidthFraction": 0.15,
+    "cardMaxWidthFraction": 0.95,
+    "cardMaxSideMismatch": 0.12,
+    "cardBlurKernelPx": 5,
+    "cardCannyLow": 40.0,
+    "cardCannyHigh": 120.0,
+    "cardApproxEpsilonFraction": 0.02,
+    "irisMinMm": 10.0,
+    "irisMaxMm": 13.5,
+    "screenMinMmPerPx": 0.02,
+    "screenMaxMmPerPx": 0.25
+  },
+
+
+  "visionTests": {
+    "_comment": "Track C: how the on-screen tests are run (sizes, distances, staircase, repeats). DRAFT, optometrist review needed. Distances in mm eye-to-screen; logMAR 0.0 = 5 arcmin (20/20) letter.",
+    "repeats": 2,
+    "maxRetriesWhenLow": 1,
+    "capByDistanceConfidence": true,
+    "fallbackScreenScaleCap": "MEDIUM",
+
+    "nearAcuityPerEye": true,
+    "nearAcuityMinMm": 300.0,
+    "nearAcuityMaxMm": 500.0,
+    "staircaseStartLogMar": 0.7,
+    "staircaseMinLogMar": -0.2,
+    "staircaseMaxLogMar": 1.0,
+    "staircaseInitialStepLogMar": 0.2,
+    "staircaseStepLogMar": 0.1,
+    "staircaseCorrectToStepDown": 2,
+    "staircaseReversals": 6,
+    "staircaseThresholdLastReversals": 4,
+    "staircaseMaxTrials": 40,
+    "staircaseBoundaryRuns": 3,
+    "nearAcuityReferAboveLogMar": 0.7,
+    "acuityRepeatHighMaxLogMar": 0.1,
+    "acuityRepeatMediumMaxLogMar": 0.2,
+
+    "farPointLetterLogMar": 0.2,
+    "farPointLetterCount": 3,
+    "farPointStartMaxMm": 150.0,
+    "farPointMinMm": 100.0,
+    "farPointBlueRgb": "#0000FF",
+    "farPointWhiteRgb": "#FFFFFF",
+
+    "clockDialBeyondFarPointMm": 100.0,
+    "clockDialToleranceMm": 60.0,
+    "clockDialNoFarPointMm": 600.0,
+    "clockDialLineArcmin": 2.0,
+    "clockDialAxisToleranceDeg": 30,
+
+    "nearPointLetterHeightMm": 1.0,
+    "nearPointStartMinMm": 350.0,
+    "nearPointMinMm": 70.0,
+    "nearPointMaxMm": 700.0,
+
+    "amslerMinMm": 250.0,
+    "amslerMaxMm": 400.0,
+    "amslerSquareDeg": 1.0,
+    "amslerYesCountForAbnormal": 1
+  },
+
+
+  "tryOn": {
+    "lensCentreAbovePupilMm": 2.0,
+    "frontOffsetMm": 12.0,
+    "defaultPdMm": 63.0,
+    "faceWidthLandmarkLeft": 234,
+    "faceWidthLandmarkRight": 454,
+    "useTransformMatrix": true,
+    "maxYawDeg": 45.0,
+    "maxPitchDeg": 30.0,
+    "perspective": true,
+    "defaultFocalLengthFraction": 0.7,
+    "widthScale": 1.0,
+    "smoothingAlpha": 0.5,
+    "smoothingResetFraction": 0.35
+  },
+
+
+  "farPoint": {
+    "_comment": "Simulation-tuned far-point rules (rules_update.md, tools/far_point_simulation.py). The blue LCA offset (doc blueLcaD), white limit (whiteMaxDistanceM) and blue/white threshold (consistencyThresholdD) are optics.lcaBlueOffsetD / whiteFarPointMaxM / farPointAgreementMaxD; the repeat threshold (repeatSpreadThresholdD) is optics.repeatSpreadMediumMaxD.",
+    "selfHeldReachM": 0.60,
+    "staffHeldMaxM": 2.0,
+    "irisDistanceMaxM": 0.60,
+    "beyondIrisUse": "CARD_CALIBRATED_PD",
+    "consistencyAction": "RETAKE_ONCE_THEN_LOW_CONFIDENCE",
+    "repeatSpreadAction": "THIRD_READING_MEDIAN"
+  },
+
+
+  "pdMeasurement": {
+    "_comment": "PD shown as 'about X mm (+/- sd)'. Card-calibrated = scale from the forehead card or the card-measured iris. Without the card no frame-fit claims.",
+    "sdNoCardMm": 3.3,
+    "sdCardMm": 1.2,
+    "frameFitClaimsRequireCard": true
+  },
+
+
+  "readingAdd": {
+    "verifyWithReadyReader": true
+  },
+  "deviceCorrection": {
+    "_comment": "Learning loop: per phone model, fit final trial lens SE = intercept + slope x raw measured far-point SE from verified sessions (demo sessions excluded) and apply it to new far-point estimates. Starting values, not tuned: review with pilot data.",
+    "enabled": true,
+    "minVerifiedSessions": 5,
+    "minMeasuredSpreadD": 0.5,
+    "slopeMin": 0.7,
+    "slopeMax": 1.3,
+    "excludePairAbsDiffOverD": 3.0,
+    "maxCorrectionD": 1.0
+  }
+}
