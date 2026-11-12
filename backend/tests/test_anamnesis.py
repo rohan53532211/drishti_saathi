@@ -3,6 +3,7 @@ error codes and the Sarvam client's request format."""
 import base64
 import io
 import json
+import os
 import wave
 
 import httpx
@@ -211,6 +212,21 @@ def test_stops_when_all_topics_covered_after_minimum(client, fake):
     assert r1["topic"] == "red_flags"   # everything else answered: the red-flag question is still asked
     r2 = turn(client, sid).json()
     assert r2["should_continue"] is False
+
+
+def test_topics_come_from_the_app_questions_file():
+    assert os.path.exists(an.DEFAULT_QUESTIONS_PATH)
+    loaded = an.load_topics(an.DEFAULT_QUESTIONS_PATH)
+    assert loaded == an.BUILTIN_TOPICS          # same topics, so the AI and scripted interviews cover the same ground
+    assert an.TOPICS == loaded
+
+
+def test_missing_or_bad_questions_file_falls_back_to_built_in(tmp_path):
+    assert an.load_topics(str(tmp_path / "nope.json")) == an.BUILTIN_TOPICS
+    bad = tmp_path / "bad.json"
+    bad.write_text('{"aiTopics": [{"id": "x", "fields": ["shoeSize"], "about": "a", '
+                   '"scripted": {"en-IN": "q", "hi-IN": "q"}}]}', encoding="utf-8")
+    assert an.load_topics(str(bad)) == an.BUILTIN_TOPICS
 
 
 def test_tracker_never_stops_before_red_flags_are_asked():

@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import os
 import re
 import secrets
 import threading
@@ -66,7 +67,8 @@ class Topic:
 
 
 # Ask order = priority. red_flags is placed at RED_FLAG_POSITION by the tracker, whatever its place here.
-TOPICS: list[Topic] = [
+# Built-in copy; the shared app file (anamnesis_questions.json, "aiTopics") is used when it is found.
+BUILTIN_TOPICS: list[Topic] = [
     Topic("age_group", ("age",), "the customer's age in years",
           {"en-IN": "How old are you?", "hi-IN": "आपकी उम्र क्या है?"}),
     Topic("main_difficulty", ("visionProblem",), "whether seeing far, near (reading, phone) or both is difficult, or neither",
@@ -102,6 +104,33 @@ TOPICS: list[Topic] = [
           {"en-IN": "Do you mostly work outside in the sun, or indoors?",
            "hi-IN": "क्या आप ज़्यादातर बाहर धूप में काम करते हैं, या अंदर?"}),
 ]
+# The app's question file: same topics for the phone's scripted questions and the AI interview.
+DEFAULT_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "app", "app", "src", "main", "assets",
+                                      "anamnesis_questions.json")
+KNOWN_FIELDS = set(ENUMS) | set(BOOLS) | set(INTS)
+
+
+def load_topics(path: Optional[str] = None) -> list[Topic]:
+    """Topics from the shared questions file (ANAMNESIS_QUESTIONS env, else the app's assets file).
+
+    Falls back to [BUILTIN_TOPICS] when the file is missing or invalid: every topic needs an id, known fields,
+    and a scripted question in both languages, and red_flags must be there.
+    """
+    p = path or os.environ.get("ANAMNESIS_QUESTIONS") or DEFAULT_QUESTIONS_PATH
+    try:
+        with open(p, encoding="utf-8") as f:
+            raw = json.load(f)["aiTopics"]
+        topics = [Topic(str(t["id"]), tuple(t["fields"]), str(t["about"]),
+                        {k: str(t["scripted"][k]) for k in LANGUAGES}) for t in raw]
+    except (OSError, KeyError, TypeError, ValueError):
+        return list(BUILTIN_TOPICS)
+    ids = [t.id for t in topics]
+    ok = (topics and "red_flags" in ids and len(set(ids)) == len(ids)
+          and all(t.fields and set(t.fields) <= KNOWN_FIELDS for t in topics))
+    return topics if ok else list(BUILTIN_TOPICS)
+
+
+TOPICS: list[Topic] = load_topics()
 TOPIC_BY_ID = {t.id: t for t in TOPICS}
 
 CLOSING = {

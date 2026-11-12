@@ -53,6 +53,7 @@ import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.interview.ChoiceContext
 import com.drishtisaathi.interview.Question
 import com.drishtisaathi.interview.Questions
+import com.drishtisaathi.interview.Stage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
@@ -77,13 +78,14 @@ data class Verification(
 
 data class UiState(
     val lang: Lang = Lang.HI,
-    val staffMode: Boolean = false,
+    /** CORE = questions before the eye check; LATER = lifestyle and frame questions after the face measurement. */
+    val stage: Stage = Stage.CORE,
     val answers: InterviewAnswers = InterviewAnswers(),
     /** Question ids answered (a "Don't know" counts as answered). */
     val answered: Set<String> = emptySet(),
     val staff: StaffMeasurements = StaffMeasurements(),
     val questionIndex: Int = 0,
-    /** True while editing one answer from the confirmation screen. */
+    /** True while editing one answer from the edit-answers screen ("For the shop"). */
     val editingFromConfirm: Boolean = false,
     val result: SessionResult? = null,
     val sessionId: Long? = null,
@@ -104,8 +106,6 @@ data class UiState(
     val glassesOn: Boolean = false,
     /** Power path quick estimate (primary = power source; otherwise a comparison for staff). */
     val quick: QuickEstimate? = null,
-    /** Staff: also run the full far-point test (and clock dial) in the screen tests. */
-    val fullFarTest: Boolean = false,
     /** Remote Optometrist Bridge: what was sent for this session and the reply; null = not sent. */
     val remote: RemoteReviewEntity? = null,
     val bridgeBusy: Boolean = false,
@@ -113,8 +113,11 @@ data class UiState(
     /** AI voice interview transcript for this session (staff and shop PDF only); null = not used. */
     val aiInterview: com.drishtisaathi.aivoice.AiInterviewRecord? = null,
 ) {
+    /** Every question asked for these answers (summary, edit screen, PDF); after an urgent flag only the red-flag ones. */
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
-    val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
+    /** The questions of the current step: one stage, or all of them while editing. */
+    val stageQuestions: List<Question> get() = if (editingFromConfirm) visibleQuestions else Questions.visibleIn(stage, answers)
+    val currentQuestion: Question? get() = stageQuestions.getOrNull(questionIndex)
     val allAnswered: Boolean get() = visibleQuestions.all { it.id in answered }
 }
 
@@ -309,10 +312,10 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         var all = false
         _state.update { s ->
             val m = AiProfileMapper.map(s.answers, profile, s.answered)
-            val visible = Questions.visible(m.answers)
+            val visible = Questions.visibleIn(Stage.CORE, m.answers)
             val next = visible.indexOfFirst { it.id !in m.answered }
             all = next < 0
-            s.copy(answers = m.answers, answered = m.answered, questionIndex = if (next < 0) 0 else next,
+            s.copy(answers = m.answers, answered = m.answered, stage = Stage.CORE, questionIndex = if (next < 0) 0 else next,
                 editingFromConfirm = false, aiInterview = record, result = null)
         }
         onDone(all)
@@ -331,18 +334,33 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setLang(lang: Lang) = _state.update { it.copy(lang = lang) }
-    fun setStaffMode(on: Boolean) = _state.update { it.copy(staffMode = on) }
 
-    /** Fresh session; keeps language and staff mode. Forgets the previous customer's iris calibration. */
+    /** Fresh session; keeps the language. Forgets the previous customer's iris calibration. */
     fun startNew() {
         calibration.clearCustomer()
-        _state.update { UiState(lang = it.lang, staffMode = it.staffMode) }
+        _state.update { UiState(lang = it.lang) }
     }
 
     /** Customer tapped "I agree": a fresh session starts with the consent time recorded. */
     fun giveConsent() {
         calibration.clearCustomer()
-        _state.update { UiState(lang = it.lang, staffMode = it.staffMode, consentAt = System.currentTimeMillis()) }
+        _state.update { UiState(lang = it.lang, consentAt = System.currentTimeMillis()) }
+    }
+
+    // ---- phone setup (once per phone) ---------------------------------------------------------
+
+    val phoneSetup = PhoneSetup(app)
+
+    /**
+     * The AI voice interview is used when a server is set and answers within 3 s (it needs the backend and its
+     * Sarvam key); otherwise the scripted questions run on the phone.
+     */
+    suspend fun aiReachable(): Boolean {
+        val cfg = bridgeSettings.config.value
+        if (!cfg.isValid) return false
+        return withContext(Dispatchers.IO) {
+            try { BridgeClient(cfg, timeoutMs = 3_000).health().let { it.ok && it.tokenOk } } catch (_: Exception) { false }
+        }
     }
 
     // ---- demo mode ---------------------------------------------------------------------------
@@ -352,7 +370,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         calibration.clearCustomer()
         _state.update {
             UiState(
-                lang = it.lang, staffMode = it.staffMode,
+                lang = it.lang,
                 answers = c.answers,
                 answered = Questions.visible(c.answers).map { q -> q.id }.toSet(),
                 face = c.face,
@@ -376,6 +394,12 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         return engine.evaluate(s.answers, s.staff).assessment.referral.level == ReferralLevel.URGENT
     }
 
+    /** After the eye check: urgent from the answers or the checks (e.g. wavy grid lines) → straight to the referral. */
+    fun needsUrgentReferral(): Boolean {
+        val s = _state.value
+        return engine.evaluate(s.answers, s.staff, s.tests, quick = quickFor(s)).assessment.referral.level == ReferralLevel.URGENT
+    }
+
     /** M2: measures PD, face width, bridge, shape from the accepted frames (landmarks only; frames dropped after). */
     fun setCapture(frames: List<FaceFrame>): FaceCapture.Status {
         val out = faceCapture.analyse(frames, calibration.calibration.value.irisDiameterMm)
@@ -396,15 +420,21 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- interview -------------------------------------------------------------------------
 
-    /** Records an answer. Returns true when the interview should go to the confirmation screen. */
+    /**
+     * Records an answer and moves to the next unanswered question of this stage. Returns true when the stage is
+     * finished (or, while editing, every question is answered again).
+     */
     fun answer(questionId: String, update: (InterviewAnswers) -> InterviewAnswers): Boolean {
         var toConfirm = false
         _state.update { s ->
             val answers = update(s.answers)
-            val visible = Questions.visible(answers)
-            val answered = (s.answered + questionId).filter { id -> visible.any { it.id == id } }.toSet()
-            val nextIdx = visible.indexOfFirst { it.id == questionId } + 1
-            toConfirm = (s.editingFromConfirm && visible.all { it.id in answered }) || nextIdx >= visible.size
+            val all = Questions.visible(answers)
+            val answered = (s.answered + questionId).filter { id -> all.any { it.id == id } }.toSet()
+            val next = s.copy(answers = answers, answered = answered)
+            val list = next.stageQuestions
+            val cur = list.indexOfFirst { it.id == questionId }
+            val nextIdx = (cur + 1 until list.size).firstOrNull { list[it].id !in answered } ?: list.size
+            toConfirm = (s.editingFromConfirm && next.allAnswered) || nextIdx >= list.size
             s.copy(
                 answers = answers, answered = answered,
                 questionIndex = if (toConfirm) s.questionIndex else nextIdx,
@@ -413,6 +443,18 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         return toConfirm
+    }
+
+    /** Starts [stage] at its first unanswered question. Returns false when nothing is left to ask in it. */
+    fun startStage(stage: Stage): Boolean {
+        var any = false
+        _state.update { s ->
+            val list = Questions.visibleIn(stage, s.answers)
+            val first = list.indexOfFirst { it.id !in s.answered }
+            any = first >= 0
+            s.copy(stage = stage, questionIndex = first.coerceAtLeast(0), editingFromConfirm = false)
+        }
+        return any
     }
 
     fun setKnownRx(rx: KnownRx?) = _state.update { it.copy(answers = it.answers.copy(knownRx = rx), result = null) }
@@ -434,7 +476,6 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setQuick(q: QuickEstimate?) = _state.update { it.copy(quick = q, result = null) }
 
-    fun setFullFarTest(on: Boolean) = _state.update { it.copy(fullFarTest = on) }
 
     /** The quick estimate only counts while the power path still applies (an urgent flag clears it). */
     private fun quickFor(s: UiState): QuickEstimate? = s.quick?.takeIf { !s.answers.urgentRedFlag && s.answers.powerKnown != null }

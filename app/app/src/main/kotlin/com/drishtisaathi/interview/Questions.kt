@@ -16,19 +16,39 @@ import com.drishtisaathi.engine.RedFlagOnset
 import com.drishtisaathi.engine.ScreenHours
 import com.drishtisaathi.engine.StylePref
 import com.drishtisaathi.engine.VisionProblem
-import com.drishtisaathi.i18n.S
-import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.i18n.Txt
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import java.util.Locale
 
-/** One M1 interview question. Answers are stored straight into [InterviewAnswers]. */
-sealed class Question(val id: String, val text: Txt, val visibleIf: (InterviewAnswers) -> Boolean = { true }) {
+/**
+ * CORE questions come before the eye check (age, the problem, red flags, near-task follow-ups, glasses, power);
+ * LATER questions come after the face measurement (lifestyle and frame preferences).
+ */
+enum class Stage { CORE, LATER }
+
+/** One interview question. Texts, options, stage and follow-up rules come from `assets/anamnesis_questions.json`. */
+sealed class Question(
+    val id: String,
+    val text: Txt,
+    val visibleIf: (InterviewAnswers) -> Boolean = { true },
+    val stage: Stage = Stage.CORE,
+    /** Still asked after an urgent red flag (everything else waits: the referral comes first). */
+    val askWhenUrgent: Boolean = false,
+) {
 
     class YesNo(
         id: String, text: Txt,
         val get: (InterviewAnswers) -> Boolean?,
         val set: (InterviewAnswers, Boolean) -> InterviewAnswers,
         visibleIf: (InterviewAnswers) -> Boolean = { true },
-    ) : Question(id, text, visibleIf)
+        stage: Stage = Stage.CORE, askWhenUrgent: Boolean = false,
+    ) : Question(id, text, visibleIf, stage, askWhenUrgent)
 
     class Number(
         id: String, text: Txt,
@@ -38,7 +58,8 @@ sealed class Question(val id: String, val text: Txt, val visibleIf: (InterviewAn
         val get: (InterviewAnswers) -> Int?,
         val set: (InterviewAnswers, Int?) -> InterviewAnswers,
         visibleIf: (InterviewAnswers) -> Boolean = { true },
-    ) : Question(id, text, visibleIf)
+        stage: Stage = Stage.CORE, askWhenUrgent: Boolean = false,
+    ) : Question(id, text, visibleIf, stage, askWhenUrgent)
 
     class Choice<T : Any>(
         id: String, text: Txt,
@@ -47,20 +68,64 @@ sealed class Question(val id: String, val text: Txt, val visibleIf: (InterviewAn
         val get: (InterviewAnswers) -> T?,
         val set: (InterviewAnswers, T) -> InterviewAnswers,
         visibleIf: (InterviewAnswers) -> Boolean = { true },
-    ) : Question(id, text, visibleIf)
+        stage: Stage = Stage.CORE, askWhenUrgent: Boolean = false,
+    ) : Question(id, text, visibleIf, stage, askWhenUrgent)
 
-    /** Yes → staff type the old glasses numbers on a separate screen; No → none. (No longer in [Questions.all].) */
+    /** Yes → staff type the old glasses numbers on a separate screen; No → none. (Not in the question file.) */
     class OldNumbers(id: String, text: Txt) : Question(id, text)
 }
 
 /** Values the option labels need from rules.json (e.g. budget caps). */
 data class ChoiceContext(val budgetLowCap: Int, val budgetMidCap: Int)
 
+// ---- the question file ------------------------------------------------------------------------
+
+@Serializable data class QText(val en: String, val hi: String) { val txt: Txt get() = Txt(en, hi) }
+
+/** One follow-up rule: `answer` = saved answer field whose value must be one of `in`; `flag` = urgent / notUrgent / powerPath. */
+@Serializable data class QCondition(val answer: String? = null, val `in`: List<String> = emptyList(), val flag: String? = null)
+
+@Serializable data class QSpec(
+    val id: String,
+    val stage: Stage,
+    val askWhenUrgent: Boolean = false,
+    val text: QText,
+    val kind: String,
+    val hint: QText? = null,
+    val range: List<Int>? = null,
+    val allowUnknown: Boolean = false,
+    val options: Map<String, QText> = emptyMap(),
+    val showIf: List<QCondition> = emptyList(),
+)
+
+@Serializable data class QuestionsFile(
+    val schemaVersion: Int,
+    val notes: String = "",
+    val questions: List<QSpec>,
+    /** The voice keyword lexicon ([com.drishtisaathi.voice.VoiceLexicon]). */
+    val voiceKeywords: JsonObject,
+    /** Topics the backend's AI interview covers (read by backend/app/anamnesis.py). */
+    val aiTopics: JsonArray,
+) {
+    companion object {
+        private val json = Json { ignoreUnknownKeys = false }
+        fun parse(text: String): QuestionsFile = json.decodeFromString(serializer(), text)
+    }
+}
+
+/** Where the question file comes from: the app sets [loader] to its assets; unit tests read the source tree. */
+object QuestionBank {
+    const val ASSET = "anamnesis_questions.json"
+    @Volatile var loader: () -> String = { java.io.File("src/main/assets/$ASSET").readText(Charsets.UTF_8) }
+    val text: String by lazy { loader() }
+    val file: QuestionsFile by lazy { QuestionsFile.parse(text) }
+}
+
 /**
- * The adaptive, voice-first anamnesis (12 Nov). Follow-ups appear only when they apply:
+ * The adaptive, voice-first anamnesis. Follow-ups appear only when they apply (the file's showIf rules):
  * far: situation and since when; near: task and usual distance; glasses: age and satisfaction (else first pair);
  * a red flag: onset and which eye, and then nothing else is asked (urgent, the referral comes first).
- * The power path question ([POWER_KNOWN]) routes to the old-glasses screen (YES) or the quick estimate (NOT SURE / NO).
+ * The power path question ([POWER_KNOWN]) routes to the old-glasses screen (YES) or the eye check (NOT SURE / NO).
  */
 object Questions {
     const val AGE = "age"
@@ -69,8 +134,6 @@ object Questions {
     const val KNOWN_RX = "knownRx"
     const val VISION_PROBLEM = "visionProblem"
     const val POWER_KNOWN = "powerKnown"
-
-    private val notUrgent: (InterviewAnswers) -> Boolean = { !it.urgentRedFlag }
 
     /** Sets the problem and the old yes/no fields the rules use; clears follow-ups that no longer apply. */
     fun setVisionProblem(a: InterviewAnswers, v: VisionProblem): InterviewAnswers = a.copy(
@@ -87,65 +150,111 @@ object Questions {
     private fun clearOnset(a: InterviewAnswers): InterviewAnswers =
         if (a.urgentRedFlag) a else a.copy(redFlagOnset = null, redFlagEye = null)
 
-    val all: List<Question> = listOf(
-        Question.Number(AGE, S.qAge, S.ageHint, 3..110, allowUnknown = false,
-            get = { it.age }, set = { a, v -> a.copy(age = v) }),
-        Question.Choice(VISION_PROBLEM, SAnamnesis.qVisionProblem, VisionProblem.entries.toList(), { v, _ -> SAnamnesis.visionProblem(v) },
-            { it.visionProblem }, { a, v -> setVisionProblem(a, v) }),
-        Question.Choice("distanceSituation", SAnamnesis.qDistanceSituation, DistanceSituation.entries.toList(),
-            { v, _ -> SAnamnesis.distanceSituation(v) }, { it.distanceSituation }, { a, v -> a.copy(distanceSituation = v) },
-            visibleIf = { it.visionProblem?.distance == true }),
-        Question.Choice("distanceSince", SAnamnesis.qDistanceSince, ProblemSince.entries.toList(), { v, _ -> SAnamnesis.since(v) },
-            { it.distanceSince }, { a, v -> a.copy(distanceSince = v) }, visibleIf = { it.visionProblem?.distance == true }),
-        Question.Choice("nearTask", SAnamnesis.qNearTask, NearTask.entries.toList(), { v, _ -> SAnamnesis.nearTask(v) },
-            { it.nearTask }, { a, v -> a.copy(nearTask = v) }, visibleIf = { it.visionProblem?.near == true }),
-        Question.Choice("nearDistance", SAnamnesis.qNearDistance, NearDistance.entries.toList(), { v, _ -> SAnamnesis.nearDistance(v) },
-            { it.nearDistance }, { a, v -> a.copy(nearDistance = v) }, visibleIf = { it.visionProblem?.near == true }),
-        Question.YesNo("wearsGlasses", S.qWearsGlasses, { it.wearsGlasses }, { a, v ->
+    // ---- how each question id reads and writes InterviewAnswers (texts and rules are in the file) ----
+
+    private sealed interface Binding
+    private class YesNoB(val get: (InterviewAnswers) -> Boolean?, val set: (InterviewAnswers, Boolean) -> InterviewAnswers) : Binding
+    private class NumberB(val get: (InterviewAnswers) -> Int?, val set: (InterviewAnswers, Int?) -> InterviewAnswers) : Binding
+    private class ChoiceB<T : Enum<T>>(
+        val values: List<T>, val get: (InterviewAnswers) -> T?, val set: (InterviewAnswers, T) -> InterviewAnswers,
+    ) : Binding
+
+    private val bindings: Map<String, Binding> = mapOf(
+        AGE to NumberB({ it.age }, { a, v -> a.copy(age = v) }),
+        VISION_PROBLEM to ChoiceB(VisionProblem.entries, { it.visionProblem }, { a, v -> setVisionProblem(a, v) }),
+        "distanceSituation" to ChoiceB(DistanceSituation.entries, { it.distanceSituation }, { a, v -> a.copy(distanceSituation = v) }),
+        "distanceSince" to ChoiceB(ProblemSince.entries, { it.distanceSince }, { a, v -> a.copy(distanceSince = v) }),
+        "nearTask" to ChoiceB(NearTask.entries, { it.nearTask }, { a, v -> a.copy(nearTask = v) }),
+        "nearDistance" to ChoiceB(NearDistance.entries, { it.nearDistance }, { a, v -> a.copy(nearDistance = v) }),
+        "wearsGlasses" to YesNoB({ it.wearsGlasses }, { a, v ->
             // Clearing the follow-ups keeps stale data out if the answer flips.
             if (v) a.copy(wearsGlasses = true, firstTimeWearer = null)
             else a.copy(wearsGlasses = false, glassesAgeYears = null, happyWithGlasses = null)
         }),
-        Question.Number(GLASSES_AGE, S.qGlassesAge, S.yearsHint, 0..60, allowUnknown = true,
-            get = { it.glassesAgeYears }, set = { a, v -> a.copy(glassesAgeYears = v) },
-            visibleIf = { it.wearsGlasses == true }),
-        Question.YesNo("happyWithGlasses", SAnamnesis.qHappyWithGlasses, { it.happyWithGlasses }, { a, v -> a.copy(happyWithGlasses = v) },
-            visibleIf = { it.wearsGlasses == true }),
-        // Addition 4: only asked when they do not wear glasses now
-        Question.YesNo("firstTimeWearer", S.qFirstTime, { it.firstTimeWearer }, { a, v -> a.copy(firstTimeWearer = v) },
-            visibleIf = { it.wearsGlasses == false }),
-        Question.YesNo("headacheStrain", S.qHeadache, { it.headacheStrain }, { a, v -> a.copy(headacheStrain = v) }),
-        Question.YesNo("diabetesOrBp", S.qDiabetesBp, { it.diabetesOrBp }, { a, v -> a.copy(diabetesOrBp = v) }),
-        Question.YesNo("redFlagFlashes", S.qRedFlagFlashes, { it.redFlagFlashes }, { a, v -> clearOnset(a.copy(redFlagFlashes = v)) }),
-        Question.YesNo("redFlagOther", S.qRedFlagOther, { it.redFlagOther }, { a, v -> clearOnset(a.copy(redFlagOther = v)) }),
-        Question.Choice("redFlagOnset", SAnamnesis.qRedFlagOnset, RedFlagOnset.entries.toList(), { v, _ -> SAnamnesis.onset(v) },
-            { it.redFlagOnset }, { a, v -> a.copy(redFlagOnset = v) }, visibleIf = { it.urgentRedFlag }),
-        Question.Choice("redFlagEye", SAnamnesis.qRedFlagEye, AffectedEye.entries.toList(), { v, _ -> SAnamnesis.eye(v) },
-            { it.redFlagEye }, { a, v -> a.copy(redFlagEye = v) }, visibleIf = { it.urgentRedFlag }),
-        // ---- everything below is skipped once an urgent flag is set ----
-        Question.Choice(POWER_KNOWN, SAnamnesis.qPowerKnown, PowerKnown.entries.toList(), { v, _ -> SAnamnesis.powerKnown(v) },
-            { it.powerKnown }, { a, v -> a.copy(powerKnown = v, knownRx = a.knownRx.takeIf { v == PowerKnown.YES }) },
-            visibleIf = { powerPathApplies(it) }),
-        Question.Choice("readingFrequency", S.qReadingFreq, ReadingFrequency.entries.toList(), { v, _ -> S.readingFrequency(v) },
-            { it.readingFrequency }, { a, v -> a.copy(readingFrequency = v) }, visibleIf = notUrgent),
-        Question.Choice("screenHours", S.qScreenHours, ScreenHours.entries.toList(), { v, _ -> S.screenHours(v) },
-            { it.screenHours }, { a, v -> a.copy(screenHours = v) }, visibleIf = notUrgent),
-        Question.YesNo("nightDriving", S.qNightDriving, { it.nightDriving }, { a, v -> a.copy(nightDriving = v) }, visibleIf = notUrgent),
-        Question.YesNo("outdoorWork", S.qOutdoorWork, { it.outdoorWork }, { a, v -> a.copy(outdoorWork = v) }, visibleIf = notUrgent),
-        Question.Choice("occupation", S.qOccupation, Occupation.entries.toList(), { v, _ -> S.occupation(v) },
-            { it.occupation }, { a, v -> a.copy(occupation = v) }, visibleIf = notUrgent),
-        Question.Choice("budget", S.qBudget, Budget.entries.toList(), { v, c -> S.budget(v, c.budgetLowCap, c.budgetMidCap) },
-            { it.budget }, { a, v -> a.copy(budget = v) }, visibleIf = notUrgent),
-        Question.Choice("style", S.qStyle, StylePref.entries.toList(), { v, _ -> S.style(v) },
-            { it.style }, { a, v -> a.copy(style = v) }, visibleIf = notUrgent),
-        // Addition 4: frame preferences
-        Question.Choice("colourPreference", S.qColour, ColourPref.entries.toList(), { v, _ -> S.colour(v) },
-            { it.colourPreference }, { a, v -> a.copy(colourPreference = v) }, visibleIf = notUrgent),
-        Question.Choice("lookPreference", S.qLook, LookPref.entries.toList(), { v, _ -> S.look(v) },
-            { it.lookPreference }, { a, v -> a.copy(lookPreference = v) }, visibleIf = notUrgent),
-        Question.YesNo("lightweightPreference", S.qLightweight, { it.lightweightPreference }, { a, v -> a.copy(lightweightPreference = v) },
-            visibleIf = notUrgent),
+        GLASSES_AGE to NumberB({ it.glassesAgeYears }, { a, v -> a.copy(glassesAgeYears = v) }),
+        "happyWithGlasses" to YesNoB({ it.happyWithGlasses }, { a, v -> a.copy(happyWithGlasses = v) }),
+        "firstTimeWearer" to YesNoB({ it.firstTimeWearer }, { a, v -> a.copy(firstTimeWearer = v) }),
+        "headacheStrain" to YesNoB({ it.headacheStrain }, { a, v -> a.copy(headacheStrain = v) }),
+        "diabetesOrBp" to YesNoB({ it.diabetesOrBp }, { a, v -> a.copy(diabetesOrBp = v) }),
+        "redFlagFlashes" to YesNoB({ it.redFlagFlashes }, { a, v -> clearOnset(a.copy(redFlagFlashes = v)) }),
+        "redFlagOther" to YesNoB({ it.redFlagOther }, { a, v -> clearOnset(a.copy(redFlagOther = v)) }),
+        "redFlagOnset" to ChoiceB(RedFlagOnset.entries, { it.redFlagOnset }, { a, v -> a.copy(redFlagOnset = v) }),
+        "redFlagEye" to ChoiceB(AffectedEye.entries, { it.redFlagEye }, { a, v -> a.copy(redFlagEye = v) }),
+        POWER_KNOWN to ChoiceB(PowerKnown.entries, { it.powerKnown },
+            { a, v -> a.copy(powerKnown = v, knownRx = a.knownRx.takeIf { v == PowerKnown.YES }) }),
+        "readingFrequency" to ChoiceB(ReadingFrequency.entries, { it.readingFrequency }, { a, v -> a.copy(readingFrequency = v) }),
+        "screenHours" to ChoiceB(ScreenHours.entries, { it.screenHours }, { a, v -> a.copy(screenHours = v) }),
+        "nightDriving" to YesNoB({ it.nightDriving }, { a, v -> a.copy(nightDriving = v) }),
+        "outdoorWork" to YesNoB({ it.outdoorWork }, { a, v -> a.copy(outdoorWork = v) }),
+        "occupation" to ChoiceB(Occupation.entries, { it.occupation }, { a, v -> a.copy(occupation = v) }),
+        "budget" to ChoiceB(Budget.entries, { it.budget }, { a, v -> a.copy(budget = v) }),
+        "style" to ChoiceB(StylePref.entries, { it.style }, { a, v -> a.copy(style = v) }),
+        "colourPreference" to ChoiceB(ColourPref.entries, { it.colourPreference }, { a, v -> a.copy(colourPreference = v) }),
+        "lookPreference" to ChoiceB(LookPref.entries, { it.lookPreference }, { a, v -> a.copy(lookPreference = v) }),
+        "lightweightPreference" to YesNoB({ it.lightweightPreference }, { a, v -> a.copy(lightweightPreference = v) }),
     )
 
-    fun visible(a: InterviewAnswers): List<Question> = all.filter { it.visibleIf(a) }
+    private val answersJson = Json { encodeDefaults = true; explicitNulls = true }
+
+    /** The file's showIf rules: every condition must hold. */
+    fun shows(conditions: List<QCondition>, a: InterviewAnswers): Boolean {
+        if (conditions.isEmpty()) return true
+        val obj by lazy { answersJson.encodeToJsonElement(InterviewAnswers.serializer(), a).jsonObject }
+        return conditions.all { c ->
+            when {
+                c.flag == "urgent" -> a.urgentRedFlag
+                c.flag == "notUrgent" -> !a.urgentRedFlag
+                c.flag == "powerPath" -> powerPathApplies(a)
+                c.flag != null -> error("unknown flag ${c.flag}")
+                c.answer != null -> {
+                    val v = obj[c.answer] ?: error("unknown answer field ${c.answer}")
+                    v !is JsonNull && (v as JsonPrimitive).content in c.`in`
+                }
+                else -> error("empty condition")
+            }
+        }
+    }
+
+    private fun fill(s: String, c: ChoiceContext) =
+        s.replace("{low}", String.format(Locale.US, "%,d", c.budgetLowCap)).replace("{mid}", String.format(Locale.US, "%,d", c.budgetMidCap))
+
+    private fun <T : Enum<T>> choice(spec: QSpec, b: ChoiceB<T>, vis: (InterviewAnswers) -> Boolean): Question {
+        val labels = b.values.associateWith { v -> requireNotNull(spec.options[v.name]) { "${spec.id}: no label for ${v.name}" } }
+        require(spec.options.keys == b.values.map { it.name }.toSet()) { "${spec.id}: options ${spec.options.keys}" }
+        return Question.Choice(spec.id, spec.text.txt, b.values, { v, c -> labels.getValue(v).let { Txt(fill(it.en, c), fill(it.hi, c)) } },
+            b.get, b.set, vis, spec.stage, spec.askWhenUrgent)
+    }
+
+    /** Builds the questions from [file]; throws when the file and the bindings do not match. */
+    fun build(file: QuestionsFile): List<Question> {
+        val ids = file.questions.map { it.id }
+        require(ids.toSet() == bindings.keys && ids.size == ids.toSet().size) { "question ids ${ids.toSet() xor bindings.keys}" }
+        return file.questions.map { spec ->
+            val vis: (InterviewAnswers) -> Boolean = { shows(spec.showIf, it) }
+            shows(spec.showIf, InterviewAnswers()) // fails early on unknown fields or flags
+            when (val b = bindings.getValue(spec.id)) {
+                is YesNoB -> { require(spec.kind == "yesNo") { spec.id }; Question.YesNo(spec.id, spec.text.txt, b.get, b.set, vis, spec.stage, spec.askWhenUrgent) }
+                is NumberB -> {
+                    require(spec.kind == "number") { spec.id }
+                    val r = requireNotNull(spec.range) { "${spec.id}: range" }
+                    Question.Number(spec.id, spec.text.txt, requireNotNull(spec.hint) { "${spec.id}: hint" }.txt, r[0]..r[1],
+                        spec.allowUnknown, b.get, b.set, vis, spec.stage, spec.askWhenUrgent)
+                }
+                is ChoiceB<*> -> { require(spec.kind == "choice") { spec.id }; @Suppress("UNCHECKED_CAST") choice(spec, b as ChoiceB<VisionProblem>, vis) }
+            }
+        }
+    }
+
+    private infix fun <T> Set<T>.xor(o: Set<T>) = (this - o) + (o - this)
+
+    val all: List<Question> by lazy { build(QuestionBank.file) }
+
+    /**
+     * Every question that applies to these answers (summary, edit screen, PDF). After an urgent red flag only the
+     * red-flag follow-ups are left: nothing else is asked, the referral comes first.
+     */
+    fun visible(a: InterviewAnswers): List<Question> = all.filter { it.visibleIf(a) && (!a.urgentRedFlag || it.askWhenUrgent) }
+
+    /** The questions asked in [stage]. */
+    fun visibleIn(stage: Stage, a: InterviewAnswers): List<Question> = visible(a).filter { it.stage == stage }
 }

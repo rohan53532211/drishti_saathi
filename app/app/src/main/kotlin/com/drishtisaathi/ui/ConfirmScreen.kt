@@ -80,7 +80,7 @@ fun ConfirmScreen(
     onFullFarTest: (Boolean) -> Unit = {},
 ) {
     val l = state.lang
-    AppScaffold(l, onLang, title = S.confirmTitle[l], onBack = onBack) { pad ->
+    AppScaffold(l, onLang, title = com.drishtisaathi.i18n.SShop.editAnswers[l], onBack = onBack) { pad ->
         Column(
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -99,14 +99,7 @@ fun ConfirmScreen(
                     HorizontalDivider()
                 }
             }
-            if (state.staffMode) StaffMeasurementsCard(l, state.staff, onStaffMeasurements)
-            // The power path replaces the full far-point test; staff can still run it.
-            if (state.staffMode && state.answers.powerKnown != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = state.fullFarTest, onCheckedChange = onFullFarTest)
-                    Text(SAnamnesis.fullFarTest[l], style = MaterialTheme.typography.bodyLarge)
-                }
-            }
+            StaffMeasurementsCard(l, state.staff, onStaffMeasurements)
             if (!state.allAnswered) Text(S.answerAllFirst[l], color = MaterialTheme.colorScheme.error)
             BigButton(S.seeResults[l], onSeeResults, enabled = state.allAnswered, container = Teal)
             Disclaimer()

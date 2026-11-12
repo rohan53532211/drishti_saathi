@@ -55,7 +55,6 @@ fun CompareScreen(state: UiState, engine: DrishtiEngine, rules: RulesConfig, onL
                 )
             }
             Section(S.rowSize[l]) { TextPair(a.frame.sizeMark, b.frame.sizeMark) }
-            if (state.staffMode) Text(S.demoCatalogue[l], style = MaterialTheme.typography.bodySmall, color = RoutineAmber)
             // rules_update.md rule 6: no "your face" claim when the camera measurement is not card-calibrated
             val widthRow = if (assessment.fitMeasurementsUncalibrated) S.rowWidthUncal else S.rowWidth
             Section(widthRow.format(assessment.faceWidthMm.value)[l]) {
@@ -89,7 +88,6 @@ fun CompareScreen(state: UiState, engine: DrishtiEngine, rules: RulesConfig, onL
             Section(S.rowWhy[l]) {
                 Pair({ Column { ReasonBullets(a, l) } }, { Column { ReasonBullets(b, l) } })
             }
-            if (state.staffMode) Section(S.rowScores[l]) { TextPair(scores(a), scores(b), better = compareBy(-a.score, -b.score)) }
             Disclaimer()
         }
     }

@@ -7,7 +7,7 @@ import java.io.File
 
 object VoiceTestSupport {
     val lexiconText: String by lazy { File("src/main/assets/${VoiceLexicon.ASSET}").readText(Charsets.UTF_8) }
-    val lexicon: VoiceLexicon by lazy { VoiceLexicon.parse(lexiconText) }
+    val lexicon: VoiceLexicon by lazy { VoiceLexicon.fromQuestionsFile(lexiconText) }
     val parser: VoiceParser by lazy { VoiceParser(lexicon) }
     val ctx = ChoiceContext(budgetLowCap = 2000, budgetMidCap = 5000)
 

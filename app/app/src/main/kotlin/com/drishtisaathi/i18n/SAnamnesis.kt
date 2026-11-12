@@ -87,7 +87,7 @@ object SAnamnesis {
         "The glasses are old or vision is still blurry. A 1-minute phone check can be shown to staff next to the known power.",
         "चश्मा पुराना है या अब भी धुंधला दिखता है। 1 मिनट की फ़ोन जाँच स्टाफ़ को पुराने नंबर के साथ दिखाई जा सकती है।",
     )
-    val compareYes = tx("Do the quick check", "झटपट जाँच करें")
+    val compareYes = tx("Quick check to compare", "तुलना के लिए झटपट जाँच")
     val compareNo = tx("Skip", "छोड़ें")
 
     val quickTitle = tx("Quick estimate", "झटपट अनुमान")
@@ -108,7 +108,7 @@ object SAnamnesis {
     val quickBlur = tx("Blur (dhundhla)", "धुंधला")
     val quickStillClear = tx("Still clear at arm's length", "हाथ भर दूरी पर भी साफ़")
     val quickFrozen = tx("Blur at %d cm, about %s D (approximate, confirm with trial lens)", "%d cm पर धुंधला, लगभग %s D (अनुमान, ट्रायल लेंस से पक्का करें)")
-    val quickNoMyopia = tx("No myopia found at arm's length, check with trial lens", "हाथ भर दूरी तक कोई कमज़ोर दूर-नज़र नहीं मिली, ट्रायल लेंस से जाँचें")
+    val quickNoMyopia = tx("No short-sight found at arm's length, check with trial lens", "हाथ भर दूरी तक कोई कमज़ोर दूर-नज़र नहीं मिली, ट्रायल लेंस से जाँचें")
     val quickNearFrozen = tx("Near point %d cm: reading add about %s D. Confirm with a ready-reader at the counter.", "पास का बिंदु %d cm: पढ़ने का ऐड लगभग %s D। काउंटर पर रेडी-रीडर से पक्का करें।")
     val quickNearNone = tx("Near point not found: confirm with a ready-reader at the counter.", "पास का बिंदु नहीं मिला: काउंटर पर रेडी-रीडर से पक्का करें।")
     val quickLongSight = tx("Possible long-sightedness, check with trial lens", "दूर-दृष्टि (लॉन्ग-साइट) हो सकती है, ट्रायल लेंस से जाँचें")

@@ -48,33 +48,33 @@ class VoiceLexiconTest {
 
     @Test fun `unknown keys are rejected`() {
         val bad = lexiconText.replaceFirst("\"version\": 1,", "\"version\": 1, \"surprise\": true,")
-        assertThrows { VoiceLexicon.parse(bad) }
+        assertThrows { VoiceLexicon.fromQuestionsFile(bad) }
     }
 
     @Test fun `same keyword for two options is rejected`() {
         val bad = lexiconText.replaceFirst("\"black\", \"dark\", \"kala\"", "\"black\", \"dark\", \"kala\", \"brown\"")
-        val e = assertThrows { VoiceLexicon.parse(bad) }
+        val e = assertThrows { VoiceLexicon.fromQuestionsFile(bad) }
         assertTrue(e.message!!.contains("brown"))
     }
 
     @Test fun `Latin text in a hi list is rejected`() {
         val bad = lexiconText.replaceFirst("\"काला\",", "\"kaala\",")
-        assertThrows { VoiceLexicon.parse(bad) }
+        assertThrows { VoiceLexicon.fromQuestionsFile(bad) }
     }
 
     @Test fun `a word that is both yes and no is rejected`() {
         val bad = lexiconText.replaceFirst("\"yes\", \"yeah\"", "\"yes\", \"nope\"")
-        assertThrows { VoiceLexicon.parse(bad) }
+        assertThrows { VoiceLexicon.fromQuestionsFile(bad) }
     }
 
     @Test fun `range options need a range`() {
         val bad = lexiconText.replaceFirst("\"range\": [3, 4]", "\"priority\": 0")
-        assertThrows { VoiceLexicon.parse(bad) }
+        assertThrows { VoiceLexicon.fromQuestionsFile(bad) }
     }
 
     @Test fun `overlapping ranges are rejected`() {
         val bad = lexiconText.replaceFirst("\"range\": [3, 4]", "\"range\": [2, 4]")
-        assertThrows { VoiceLexicon.parse(bad) }
+        assertThrows { VoiceLexicon.fromQuestionsFile(bad) }
     }
 
     // ---- normaliser ----

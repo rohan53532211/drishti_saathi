@@ -25,7 +25,6 @@ import com.drishtisaathi.i18n.SFlow
 fun GlassesOffScreen(
     l: Lang,
     onLang: (Lang) -> Unit,
-    staffMode: Boolean,
     speaker: InstructionSpeaker,
     onOff: () -> Unit,
     onKeepOn: () -> Unit,
@@ -40,7 +39,7 @@ fun GlassesOffScreen(
             Text(SFlow.glassesOffTitle[l], style = MaterialTheme.typography.headlineMedium, color = Teal)
             Text(SFlow.glassesOffBody[l], style = MaterialTheme.typography.bodyLarge)
             BigButton(SFlow.glassesOffDone[l], { speaker.stop(); onOff() }, container = Teal)
-            if (staffMode) TextButton(onClick = { speaker.stop(); onKeepOn() }) { Text(SFlow.glassesOnStaff[l]) }
+            TextButton(onClick = { speaker.stop(); onKeepOn() }) { Text(SFlow.glassesOnStaff[l]) }
         }
     }
 }

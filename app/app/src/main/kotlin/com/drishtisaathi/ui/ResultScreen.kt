@@ -32,6 +32,8 @@ import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
 import com.drishtisaathi.i18n.SFlow
 import com.drishtisaathi.i18n.SAnamnesis
+import com.drishtisaathi.i18n.SShop
+import androidx.compose.foundation.clickable
 
 /** M6: one screen with profile, bands + confidence, starting trial lens, lens package, frames, referral status. */
 @Composable
@@ -50,6 +52,8 @@ fun ResultScreen(
     onTryOn: ((String?) -> Unit)? = null,
     /** Remote Optometrist Bridge card (send / waiting / reviewed). */
     remoteCard: @Composable () -> Unit = {},
+    /** "For the shop" → Edit answers. */
+    onEditAnswers: (() -> Unit)? = null,
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -62,23 +66,18 @@ fun ResultScreen(
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // ---- Referral status ----
-            val (fg, bg) = when (a.referral.level) {
-                ReferralLevel.URGENT -> UrgentRed to UrgentBg
-                ReferralLevel.ROUTINE -> RoutineAmber to RoutineBg
-                ReferralLevel.NONE -> OkGreen to OkBg
+            // Order: functional vision profile, power and its source, referral, lens package, frames.
+            // An urgent referral goes first.
+            val urgent = a.referral.level == ReferralLevel.URGENT
+            SectionCard(SAnamnesis.profileTitle[l]) {
+                PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
             }
-            SectionCard(S.referral[l], container = bg) {
-                Text(S.referralLevel(a.referral.level)[l], color = fg, style = MaterialTheme.typography.titleMedium)
-            }
-            ReferralReasonGroups(a.referral, rules, l)
-            if (state.glassesOn) SectionCard(SFlow.glassesOnStaff[l], container = RoutineBg) {
-                Text(SFlow.glassesOnNote[l], color = RoutineAmber)
-            }
+            if (urgent) ReferralBlock(a.referral, rules, l)
 
             val adv = a.advice
             if (adv == null) {
                 SectionCard(S.lensPackage[l]) { Text(S.adviceWithheld[l], fontWeight = FontWeight.SemiBold) }
+                if (!urgent) ReferralBlock(a.referral, rules, l)
             } else {
                 // ---- Estimated band + starting trial lens ----
                 SectionCard(S.startingTrialLens[l]) {
@@ -119,10 +118,7 @@ fun ResultScreen(
                     }
                 }
 
-                // ---- Functional vision profile ----
-                SectionCard(SAnamnesis.profileTitle[l]) {
-                    PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
-                }
+                if (!urgent) ReferralBlock(a.referral, rules, l)
 
                 // ---- Lens package ----
                 SectionCard(S.lensPackage[l]) {
@@ -134,8 +130,6 @@ fun ResultScreen(
 
                 // ---- Frames ----
                 SectionCard(S.suggestedFrames[l]) {
-                    if (state.staffMode) Text(S.demoCatalogue[l], style = MaterialTheme.typography.bodySmall, color = RoutineAmber,
-                        fontWeight = FontWeight.SemiBold)
                     if (onTryOn != null && r.frames.any { it.frame.overlay != null }) {
                         BigButton(SFlow.tryOnAll[l], { onTryOn(null) }, container = Teal)
                     }
@@ -153,10 +147,6 @@ fun ResultScreen(
                         if (onTryOn != null && rf.frame.overlay != null) {
                             TextButton({ onTryOn(rf.frame.id) }) { Text(SFlow.tryOn[l]) }
                         }
-                        if (state.staffMode) Text(
-                            "${S.score[l]} ${"%.2f".format(rf.score)} · ${S.confidence(rf.thicknessConfidence)[l]}",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary,
-                        )
                     }
                     if (r.frames.size >= 2) {
                         HorizontalDivider()
@@ -168,7 +158,16 @@ fun ResultScreen(
 
             remoteCard()
 
-            // ---- Notes + measurements ----
+            // ---- For the shop (folded: the customer may be looking at this screen) ----
+            var shopOpen by remember { mutableStateOf(false) }
+            SectionCard(SShop.forShop[l], modifier = Modifier.clickable { shopOpen = !shopOpen }) {
+                Text((if (shopOpen) "− " else "+ ") + SShop.forShopHint[l], style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary)
+            }
+            if (shopOpen) {
+            if (state.glassesOn) SectionCard(SFlow.glassesOnStaff[l], container = RoutineBg) {
+                Text(SFlow.glassesOnNote[l], color = RoutineAmber)
+            }
             if (a.notes.isNotEmpty()) {
                 SectionCard(S.notesForStaff[l]) {
                     a.notes.forEach { Text("• " + S.note(it, rules.oldNumbers.freshMaxYears)[l]) }
@@ -194,13 +193,20 @@ fun ResultScreen(
                 Labeled(SFlow.screenTests[l], if (state.testsDone) SFlow.testsDone[l] else SFlow.testsNotDone[l], null)
             }
 
-            // AI interview transcript: staff mode only (the customer may be looking at this screen)
-            if (state.staffMode) state.aiInterview?.let { AiTranscriptCard(it, l) }
-
-            if (state.staffMode && state.sessionId != null) VerificationCard(l, state.verification, onSaveVerification)
+            if (r.frames.isNotEmpty()) SectionCard(S.suggestedFrames[l]) {
+                Text(S.demoCatalogue[l], style = MaterialTheme.typography.bodySmall, color = RoutineAmber, fontWeight = FontWeight.SemiBold)
+                r.frames.forEach { rf ->
+                    Text("${rf.frame.name}: ${S.score[l]} ${"%.2f".format(rf.score)} · ${S.confidence(rf.thicknessConfidence)[l]}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+            state.aiInterview?.let { AiTranscriptCard(it, l) }
+            if (state.sessionId != null) VerificationCard(l, state.verification, onSaveVerification)
+            onEditAnswers?.let { BigButton(SShop.editAnswers[l], it) }
+            }
 
             extraActions()
-            BigButton(S.done[l], onDone, container = Teal)
+            BigButton(SShop.finish[l], onDone, container = Teal)
             BigButton(S.deleteSession[l], { confirmDelete = true }, container = UrgentRed)
             Disclaimer()
         }
@@ -244,4 +250,18 @@ private fun VerificationCard(l: Lang, v: Verification, onSave: (Verification) ->
         BigButton(S.saveVerification[l], { onSave(Verification(right.trim(), left.trim(), add.trim(), pd.toDoubleOrNull())) })
         v.verifiedAt?.let { Text("✓ " + S.verified[l], color = OkGreen, fontWeight = FontWeight.SemiBold) }
     }
+}
+
+/** Referral status and its reasons. */
+@Composable
+private fun ReferralBlock(referral: com.drishtisaathi.engine.Referral, rules: RulesConfig, l: Lang) {
+    val (fg, bg) = when (referral.level) {
+        ReferralLevel.URGENT -> UrgentRed to UrgentBg
+        ReferralLevel.ROUTINE -> RoutineAmber to RoutineBg
+        ReferralLevel.NONE -> OkGreen to OkBg
+    }
+    SectionCard(S.referral[l], container = bg) {
+        Text(S.referralLevel(referral.level)[l], color = fg, style = MaterialTheme.typography.titleMedium)
+    }
+    ReferralReasonGroups(referral, rules, l)
 }
