@@ -94,7 +94,7 @@ fun CameraDebugScreen(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     lines.forEach {
-                        Text(it, color = Color.White, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                        Text(it, color = Color.White, style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"))
                     }
                 }
             }

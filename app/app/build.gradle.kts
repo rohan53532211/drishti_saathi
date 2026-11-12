@@ -63,6 +63,8 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+    // Encrypted Room database (SQLCipher); the key is wrapped by an Android Keystore key (data/DbEncryption.kt).
+    implementation(libs.sqlcipher.android)
 
     implementation(libs.kotlinx.serialization.json)
 

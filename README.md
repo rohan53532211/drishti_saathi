@@ -18,6 +18,7 @@ The app:
 - Camera frames are processed in memory and never saved.
 - Nothing is uploaded without spoken and tapped consent, and uploads never include the customer's name or photo.
 - Any session can be deleted.
+- Stored sessions are encrypted (SQLCipher, with the key protected by the Android Keystore), and backups are turned off.
 
 `PROJECT_BRIEF.md` is the spec. `PLAN.md` holds the build status, the decisions made since the brief, and the open items.
 
@@ -28,7 +29,7 @@ The app:
 | `app/engine` | Pure Kotlin engine: priors, far-point protocol, Bayesian band, referral rules, frame ranking. No Android dependencies. |
 | `app/app` | Android app (Kotlin, Jetpack Compose, minSdk 26): interview, voice, camera (MediaPipe face landmarker), screen tests, try-on, Room storage, PDFs |
 | `app/app/src/main/assets/rules.json` | Every threshold and clinical constant (strictly parsed) |
-| `tools/` | Python scripts: ANSUR II priors analysis, far-point simulation, frame cut-outs for try-on |
+| `tools/` | Python scripts: ANSUR II priors analysis, far-point simulation, frame cut-outs for try-on, bundled font build (`build_fonts.py`) |
 
 ## Build
 

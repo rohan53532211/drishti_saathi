@@ -117,6 +117,20 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 - Old-glasses numbers and demo customers are never corrected. Demo sessions never count towards the fit.
 - The fit always uses the raw measured SE, so it cannot feed on itself. It is refitted at app start, after a verification is saved and after a session is deleted, and stored in Room table `device_corrections` (database v4).
 
+**Fixes from phone testing (12 Nov):**
+1. Old-glasses steppers: the value sits in a fixed-width, single-line slot, with the buttons on their own row, so "−1.75" no longer wraps.
+2. AXIS stepper (0–180, steps of 5) per eye, shown only when CYL is not 0.
+3. Saving with every value at 0 asks "No numbers available?": either "No numbers" or "Save as plain (0.00)".
+4. Referral screen, summary and both PDFs: urgent reasons go in a red "Urgent" group and routine reasons in a separate amber "Routine" group.
+5. A "Please take off your glasses" step (also read aloud) comes before the card check, face capture and screen tests. Staff mode can choose "continue with glasses on". That choice is stored with the session and shown as a note on the summary and the shop PDF. The engine does not adjust for it.
+6. Bundled font: Noto Sans + Noto Sans Devanagari merged into one file per weight (`tools/build_fonts.py`, SIL OFL), used by every text style, the canvas labels and the PDFs. A unit test checks that every character in the sources and assets has a glyph.
+7. Room database encrypted with SQLCipher 4.6.1:
+   - The passphrase is 32 random bytes, wrapped by an AES-GCM key in the Android Keystore.
+   - An existing plain database is encrypted in place with `sqlcipher_export`. The copy is checked (row counts and schema version) before it replaces the plain file.
+   - On failure the plain database is opened unchanged and encryption is retried at the next start.
+   - If the key can no longer be read, an encrypted database is moved aside, not deleted.
+8. "Demo catalogue: sizes are typical, not measured" on the frame list (staff mode), the comparison screen (staff mode) and the shop PDF.
+
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:
@@ -129,8 +143,8 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 3. Tune on-device guesses in `rules.json` from real readings: sharpness/brightness gates, face-shape thresholds, bridge landmarks, landmark pose ratios.
 4. Under-30 Bayesian prior row is a draft; myopia magnitude prior is an assumption: replace with pilot data.
 5. Hindi proofread by a native speaker (all S*, SFlow, SVision, SVoice, SCamera, STryOn strings and the voice lexicon).
-6. Room encryption for stored sessions.
-7. APK size (~54 MB, mostly OpenCV + MediaPipe): consider dropping armeabi-v7a (~15 MB).
+6. ~~Room encryption for stored sessions~~ **Done (12 Nov):** SQLCipher with a Keystore-wrapped key. The plain-to-encrypted migration still has to be checked on the phone with existing sessions (open History after installing).
+7. APK size (~59 MB since SQLCipher and the fonts, mostly OpenCV + MediaPipe): consider dropping armeabi-v7a (~15 MB).
 8. Frame images (Kaggle Glasses dataset) have an unknown licence: demo use only.
 9. Every clinical number in `rules.json` still needs optometrist review before field use.
 10. Addition 7 (temple length from a ~45° side capture) is not implemented.
@@ -140,4 +154,4 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 1. Phone: install via adb, voice check, then the checklist above; feed measured values back into `rules.json`.
 2. 9 Nov: record the mid-sprint update with demo mode (try-on uses the live camera).
 3. Fix whatever the phone test finds; re-tune thresholds; native-speaker Hindi pass.
-4. Then: Room encryption, APK size, pilot data for the priors.
+4. Then: APK size, pilot data for the priors.

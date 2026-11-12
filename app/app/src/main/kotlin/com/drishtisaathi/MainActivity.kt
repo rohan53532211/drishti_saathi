@@ -47,6 +47,7 @@ import com.drishtisaathi.ui.ReferralScreen
 import com.drishtisaathi.ui.ResultScreen
 import com.drishtisaathi.ui.StepFrame
 import com.drishtisaathi.ui.DemoScreen
+import com.drishtisaathi.ui.GlassesOffScreen
 import com.drishtisaathi.ui.DemoBadge
 import com.drishtisaathi.demo.DemoCustomers
 import com.drishtisaathi.vision.CameraVisionTestFlow
@@ -66,6 +67,7 @@ private object Routes {
     const val OLD_NUMBERS = "oldNumbers"
     const val CONFIRM = "confirm"
     // Integrated flow: card check (optional) → face capture → outcome → screen tests → results
+    const val GLASSES_OFF = "glassesOff"
     const val CARD = "card"
     const val CAPTURE = "capture"
     const val CAPTURE_OUTCOME = "captureOutcome"
@@ -166,12 +168,21 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     // Red flags from the interview: no camera, no screen tests, straight to the referral.
                     if (vm.interviewNeedsUrgentReferral()) {
                         vm.skipCapture(); vm.skipVisionTests(); computeAndShow()
-                    } else nav.navigate(Routes.CARD)
+                    } else nav.navigate(Routes.GLASSES_OFF)
                 },
                 onBack = { goHome() },
             )
         }
 
+        // ---- glasses off before any camera step or screen test (staff may override) ----
+        composable(Routes.GLASSES_OFF) {
+            GlassesOffScreen(
+                state.lang, vm::setLang, state.staffMode, voice.instructionSpeaker,
+                onOff = { vm.setGlassesOn(false); nav.navigate(Routes.CARD) },
+                onKeepOn = { vm.setGlassesOn(true); nav.navigate(Routes.CARD) },
+                onBack = { nav.popBackStack() },
+            )
+        }
         // ---- M0 per customer: forehead card → personal iris size (optional) ----
         composable(Routes.CARD) {
             val l = state.lang

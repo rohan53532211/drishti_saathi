@@ -34,6 +34,19 @@ object PdfContent {
         ReferralLevel.NONE -> Tone.ACCENT
     }
 
+    /** Urgent reasons (red) and routine reasons (amber) as separate labelled groups. */
+    private fun reasonGroups(r: com.drishtisaathi.engine.Referral, rules: RulesConfig, l: Lang, out: MutableList<Block>) {
+        val g = com.drishtisaathi.ui.ReferralGroups.of(r)
+        if (g.urgent.isNotEmpty()) {
+            out += Block.Para(S.urgentGroup[l], bold = true, tone = Tone.URGENT)
+            g.urgent.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], Tone.URGENT) }
+        }
+        if (g.routine.isNotEmpty()) {
+            out += Block.Para(S.routineGroup[l], bold = true, tone = Tone.ROUTINE)
+            g.routine.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], Tone.ROUTINE) }
+        }
+    }
+
     /** Full staff summary in the shop's chosen language. */
     fun shopCopy(state: UiState, rules: RulesConfig, ctx: ChoiceContext, l: Lang): List<Block> {
         val r = state.result ?: return emptyList()
@@ -47,7 +60,8 @@ object PdfContent {
 
         out += Block.Heading(S.referral[l])
         out += Block.Para(S.referralLevel(a.referral.level)[l], bold = true, tone = referralTone(a.referral.level))
-        a.referral.reasons.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], referralTone(a.referral.level)) }
+        reasonGroups(a.referral, rules, l, out)
+        if (state.glassesOn) out += Block.Para(com.drishtisaathi.i18n.SFlow.glassesOnNote[l], bold = true, tone = Tone.ROUTINE)
 
         val adv = a.advice
         if (adv == null) {
@@ -76,6 +90,7 @@ object PdfContent {
                 if (adv.coatings.isEmpty()) S.noCoatings[l] else adv.coatings.joinToString(", ") { S.coating(it)[l] })
 
             out += Block.Heading(S.suggestedFrames[l])
+            out += Block.Para(S.demoCatalogue[l], bold = true, tone = Tone.ROUTINE)
             r.frames.forEachIndexed { i, rf ->
                 out += Block.Para("${i + 1}. ${rf.frame.name} (${rf.frame.id}) · ${Fmt.frameLine(rf, l)}", bold = true)
                 Fmt.label(rf, l)?.let { out += Block.Para(it, bold = true, tone = Tone.ACCENT) }
@@ -131,7 +146,7 @@ object PdfContent {
             ReferralLevel.ROUTINE -> { out += Block.Heading(S.routineTitle[l]); out += Block.Para(S.routineBody[l], tone = tone) }
             ReferralLevel.NONE -> { out += Block.Heading(S.referral[l]); out += Block.Para(S.referralLevel(a.referral.level)[l], tone = tone) }
         }
-        a.referral.reasons.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], tone) }
+        reasonGroups(a.referral, rules, l, out)
 
         a.advice?.let { adv ->
             out += Block.Heading(S.lensPackage[l])

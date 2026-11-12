@@ -67,7 +67,10 @@ fun ResultScreen(
             }
             SectionCard(S.referral[l], container = bg) {
                 Text(S.referralLevel(a.referral.level)[l], color = fg, style = MaterialTheme.typography.titleMedium)
-                a.referral.reasons.forEach { Text("• " + S.referralReason(it, rules)[l], color = fg) }
+            }
+            ReferralReasonGroups(a.referral, rules, l)
+            if (state.glassesOn) SectionCard(SFlow.glassesOnStaff[l], container = RoutineBg) {
+                Text(SFlow.glassesOnNote[l], color = RoutineAmber)
             }
 
             val adv = a.advice
@@ -115,6 +118,8 @@ fun ResultScreen(
 
                 // ---- Frames ----
                 SectionCard(S.suggestedFrames[l]) {
+                    if (state.staffMode) Text(S.demoCatalogue[l], style = MaterialTheme.typography.bodySmall, color = RoutineAmber,
+                        fontWeight = FontWeight.SemiBold)
                     if (onTryOn != null && r.frames.any { it.frame.overlay != null }) {
                         BigButton(SFlow.tryOnAll[l], { onTryOn(null) }, container = Teal)
                     }

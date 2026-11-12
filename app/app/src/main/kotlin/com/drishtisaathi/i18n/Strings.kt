@@ -158,6 +158,14 @@ object S {
     val leftEye = t("Left eye (L)", "बायीं आँख (L)")
     val sameAsRight = t("Copy right eye to left", "दायीं आँख वाले नंबर बायीं में भरें")
     val noNumbers = t("No numbers available", "नंबर नहीं हैं")
+    // Old-glasses numbers all left at 0 on save
+    val allZeroTitle = t("No numbers available?", "नंबर उपलब्ध नहीं हैं?")
+    val allZeroBody = t(
+        "All numbers are 0.00. If the customer does not know their old numbers, choose \"No numbers\". Save 0.00 only if the old glasses really are plain (no power).",
+        "सभी नंबर 0.00 हैं। अगर ग्राहक को पुराने नंबर नहीं पता, तो \"नंबर नहीं हैं\" चुनें। 0.00 तभी सेव करें जब पुराना चश्मा सच में सादा (बिना पावर) हो।",
+    )
+    val allZeroNoNumbers = t("No numbers", "नंबर नहीं हैं")
+    val allZeroSavePlano = t("Save as plain (0.00)", "सादा (0.00) सेव करें")
     val saveNumbers = t("Save numbers", "नंबर सेव करें")
     val oldNumbersLabel = t("Old glasses numbers", "पुराने चश्मे के नंबर")
 
@@ -272,6 +280,11 @@ object S {
         "दुकान आज चश्मे में मदद कर सकती है, पर कुछ जवाबों के लिए ऑप्टोमेट्रिस्ट या आँखों के डॉक्टर से पूरी जाँच ज़रूरी है।",
     )
     val reasons = t("Reasons", "कारण")
+    /** Staff view + shop PDF: the 30-frame catalogue sizes are estimated, not measured (see frames.json comments). */
+    val demoCatalogue = t("Demo catalogue: sizes are typical, not measured", "डेमो कैटलॉग: साइज़ आम (अनुमानित) हैं, नापे हुए नहीं")
+    /** Referral reasons grouped by urgency (red box / amber box). */
+    val urgentGroup = t("Urgent", "तुरंत")
+    val routineGroup = t("Routine", "सामान्य (रूटीन)")
     val continueToSummary = t("Continue to summary", "सारांश देखें")
 
     // ---- Customer copy ---------------------------------------------------------------------

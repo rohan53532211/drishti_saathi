@@ -77,6 +77,8 @@ data class UiState(
     val testsDone: Boolean = false,
     /** Staff demo mode: sample customer, labelled DEMO everywhere. */
     val demo: Boolean = false,
+    /** Staff override: camera steps and screen tests done with glasses on (noted on the summary and shop PDF). */
+    val glassesOn: Boolean = false,
 ) {
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
     val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
@@ -206,6 +208,9 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         return out.status
     }
 
+    /** Before the camera steps: true = staff chose to continue with the customer's glasses on. */
+    fun setGlassesOn(on: Boolean) = _state.update { it.copy(glassesOn = on, result = null) }
+
     fun skipCapture() = _state.update { it.copy(face = null, captureStatus = null, result = null) }
 
     fun setVisionTests(tests: VisionTests) = _state.update { it.copy(tests = tests, testsDone = true, result = null) }
@@ -275,7 +280,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 finalAdd = s.verification.finalAdd.ifBlank { null },
                 pdMeterMm = s.verification.pdMeterMm,
                 verifiedAt = s.verification.verifiedAt,
-                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo)),
+                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo, glassesOn = s.glassesOn)),
             )
             if (current == null) {
                 val id = dao.insert(entity)
@@ -348,6 +353,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 tests = m.tests ?: VisionTests(),
                 testsDone = m.tests != null,
                 demo = m.demo,
+                glassesOn = m.glassesOn,
                 verification = Verification(
                     e.finalTrialRight.orEmpty(), e.finalTrialLeft.orEmpty(), e.finalAdd.orEmpty(), e.pdMeterMm, e.verifiedAt,
                 ),

@@ -13,6 +13,7 @@ import androidx.room.Update
 import androidx.room.Upsert
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.SessionResult
 import com.drishtisaathi.engine.StaffMeasurements
@@ -56,6 +57,8 @@ data class Measurements(
     val tests: com.drishtisaathi.engine.VisionTests? = null,
     /** Staff demo mode: invented sample customer, labelled DEMO on every screen and PDF. */
     val demo: Boolean = false,
+    /** Staff override: camera steps and screen tests were done with the customer's glasses on. */
+    val glassesOn: Boolean = false,
 )
 
 /**
@@ -106,6 +109,7 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
+        const val DB_NAME = "drishti.db"
 
         /** v2 adds consentAt. Keeps sessions saved by earlier test builds. */
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -128,8 +132,10 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) = db.execSQL(CREATE_DEVICE_CORRECTIONS)
         }
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
-            instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "drishti.db")
+            instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, DB_NAME)
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                // Encrypted with SQLCipher; a plain database from an earlier build is encrypted first (DbEncryption).
+                .openHelperFactory(SupportOpenHelperFactory(DbEncryption.prepare(context.applicationContext, DB_NAME)))
                 .build().also { instance = it }
         }
     }
