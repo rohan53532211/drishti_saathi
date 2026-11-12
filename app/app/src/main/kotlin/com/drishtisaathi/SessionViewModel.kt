@@ -466,6 +466,10 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** Which quick tests run for the current answers (nothing after an urgent red flag). */
     fun quickPlan(): QuickPlan = quickEstimator.plan(_state.value.answers)
 
+    /** What the customer eye check runs (power and two-line per eye, grid when needed, reading check). */
+    fun eyeCheckPlan(): com.drishtisaathi.vision.EyeCheckPlan =
+        com.drishtisaathi.vision.EyeCheckPlan.from(_state.value.answers, quickPlan())
+
     /** YES path: offer the optional quick check next to the known power. */
     fun offerCompare(): Boolean = quickEstimator.offerCompare(_state.value.answers)
 

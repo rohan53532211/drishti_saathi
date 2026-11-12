@@ -176,6 +176,7 @@ object Questions {
         "firstTimeWearer" to YesNoB({ it.firstTimeWearer }, { a, v -> a.copy(firstTimeWearer = v) }),
         "headacheStrain" to YesNoB({ it.headacheStrain }, { a, v -> a.copy(headacheStrain = v) }),
         "diabetesOrBp" to YesNoB({ it.diabetesOrBp }, { a, v -> a.copy(diabetesOrBp = v) }),
+        "straightLinesBent" to YesNoB({ it.straightLinesBent }, { a, v -> a.copy(straightLinesBent = v) }),
         "redFlagFlashes" to YesNoB({ it.redFlagFlashes }, { a, v -> clearOnset(a.copy(redFlagFlashes = v)) }),
         "redFlagOther" to YesNoB({ it.redFlagOther }, { a, v -> clearOnset(a.copy(redFlagOther = v)) }),
         "redFlagOnset" to ChoiceB(RedFlagOnset.entries, { it.redFlagOnset }, { a, v -> a.copy(redFlagOnset = v) }),

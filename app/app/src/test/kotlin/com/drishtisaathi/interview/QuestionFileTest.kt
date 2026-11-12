@@ -33,7 +33,7 @@ class QuestionFileTest {
     }
 
     @Test fun `the file builds the question table and the voice keywords`() {
-        assertEquals(27, Questions.all.size)
+        assertEquals(28, Questions.all.size)
         VoiceLexicon.fromQuestionsFile(text)
         assertTrue(file.aiTopics.size >= 10)
         assertThrows(IllegalArgumentException::class.java) {

@@ -33,28 +33,41 @@ class EyeCheckTest {
     }
     private fun answers(p: VisionProblem, age: Int) =
         Questions.setVisionProblem(InterviewAnswers(age = age), p).copy(powerKnown = PowerKnown.NOT_SURE)
+    private fun plan(a: InterviewAnswers) = EyeCheckPlan.from(a, est.plan(a))
     private fun steps(p: VisionProblem, age: Int, primary: Boolean = true) =
-        eyeCheckSteps(est.plan(answers(p, age)), primary).map { it.toString() }
+        eyeCheckSteps(plan(answers(p, age)), primary).map { it.toString() }
     private fun r(mm: Double) = DistanceReading(mm, Confidence.HIGH)
 
-    @Test fun `far - per eye power, line and grid check, right eye first, no reading check under 38`() {
+    @Test fun `far - per eye power then two-line test, right eye first, no grid under 40`() {
         assertEquals(
-            listOf("Power(eye=RIGHT)", "Dial(eye=RIGHT)", "Grid(eye=RIGHT)", "Power(eye=LEFT)", "Dial(eye=LEFT)", "Grid(eye=LEFT)", "Done"),
+            listOf("Power(eye=RIGHT)", "Lines(eye=RIGHT)", "Power(eye=LEFT)", "Lines(eye=LEFT)", "Done"),
             steps(VisionProblem.DISTANCE, 30),
         )
     }
 
-    @Test fun `both and 38+ - the reading check runs after the far power check`() {
-        val s = steps(VisionProblem.BOTH, 45)
-        assertEquals("Near", s[s.size - 2])
-        assertTrue(s.indexOf("Near") > s.indexOf("Power(eye=LEFT)"))
-        assertFalse("Near" in steps(VisionProblem.BOTH, 30))
+    @Test fun `40+ adds the grid per eye, both adds the reading check last`() {
+        assertEquals(
+            listOf("Power(eye=RIGHT)", "Lines(eye=RIGHT)", "Grid(eye=RIGHT)", "Power(eye=LEFT)", "Lines(eye=LEFT)", "Grid(eye=LEFT)", "Near", "Done"),
+            steps(VisionProblem.BOTH, 45),
+        )
+        assertEquals("Near", steps(VisionProblem.BOTH, 30).let { it[it.size - 2] })
     }
 
-    @Test fun `near and 38+ - grid per eye then the reading check, under 38 nothing runs`() {
+    @Test fun `near only - reading check at any age, grid from 40`() {
         assertEquals(listOf("Grid(eye=RIGHT)", "Grid(eye=LEFT)", "Near", "Done"), steps(VisionProblem.NEAR, 50))
-        assertFalse(est.plan(answers(VisionProblem.NEAR, 30)).runsAnything)
-        assertTrue(est.plan(answers(VisionProblem.NEAR, 30)).possibleLongSight)
+        assertEquals(listOf("Near", "Done"), steps(VisionProblem.NEAR, 30))
+        assertTrue(plan(answers(VisionProblem.NEAR, 30)).runsAnything)
+    }
+
+    @Test fun `grid only when lines look bent, 40+, or diabetes`() {
+        val young = answers(VisionProblem.DISTANCE, 30)
+        assertFalse(EyeCheckPlan.gridNeeded(young))
+        assertTrue(EyeCheckPlan.gridNeeded(young.copy(straightLinesBent = true)))
+        assertTrue(EyeCheckPlan.gridNeeded(young.copy(diabetesOrBp = true)))
+        assertTrue(EyeCheckPlan.gridNeeded(answers(VisionProblem.DISTANCE, 40)))
+        assertFalse(EyeCheckPlan.gridNeeded(young.copy(straightLinesBent = false, diabetesOrBp = false)))
+        assertEquals(listOf("Grid(eye=RIGHT)", "Grid(eye=LEFT)", "Done"),
+            eyeCheckSteps(plan(young.copy(diabetesOrBp = true)), primary = false, gridOnly = true).map { it.toString() })
     }
 
     @Test fun `the comparison with a known power is the power check only`() {
@@ -78,16 +91,66 @@ class EyeCheckTest {
         assertTrue(clear.noMyopiaAtReach)
     }
 
-    @Test fun `line check flags astigmatism, the phone estimate stays the power source`() {
-        val dial = mapOf(TestEye.RIGHT to ClockDialAnalysis.analyse(TestEye.RIGHT, listOf(2), 30)!!)
-        val equal = mapOf(TestEye.LEFT to ClockDialAnalysis.analyse(TestEye.LEFT, listOf(null), 30)!!)
+    @Test fun `two-line test - a 0_75 D difference flags astigmatism with cyl and axis`() {
+        // horizontal blurs at 40 cm (-2.50), vertical at 80 cm (-1.25): 1.25 cyl, horizontal first -> axis 180
+        val a = TwoLineAstig.analyse(400.0, 800.0)
+        assertTrue(a.flagged); assertEquals(1.25, a.cylD, 1e-9); assertEquals(180, a.axisDeg)
+        // vertical blurs first -> axis 90
+        assertEquals(90, TwoLineAstig.analyse(800.0, 400.0).axisDeg)
+        // exactly 0.75 D apart (50 cm vs 80 cm = 2.00 vs 1.25) flags; rounding to 0.25
+        assertTrue(TwoLineAstig.analyse(500.0, 800.0).flagged)
+        assertEquals(1.0, TwoLineAstig.analyse(480.0, 1000.0).cylD, 1e-9) // 2.08 - 1.00 = 1.08 -> 1.00
+        assertEquals(1.25, TwoLineAstig.analyse(450.0, 1000.0).cylD, 1e-9) // 1.22 -> 1.25
+        // still sharp at arm's length counts as 0 D
+        val sharp = TwoLineAstig.analyse(null, 500.0)
+        assertTrue(sharp.flagged); assertEquals(2.0, sharp.cylD, 1e-9); assertEquals(90, sharp.axisDeg)
+    }
+
+    @Test fun `two-line test - lines blurring together give no flag`() {
+        val r = TwoLineAstig.analyse(400.0, 450.0)  // 2.50 vs 2.22
+        assertFalse(r.flagged); assertNull(r.axisDeg)
+        assertFalse(TwoLineAstig.analyse(null, null).flagged)
+    }
+
+    @Test fun `two-line flag reaches the engine, the phone estimate stays the power source`() {
+        val lines = mapOf(TestEye.RIGHT to TwoLineAstig.analyse(400.0, 800.0), TestEye.LEFT to TwoLineAstig.analyse(440.0, 460.0))
         val q = QuickEstimate(QuickEye(-2.5, 40.0, QuickTarget.WHITE), QuickEye(-2.25, 44.0, QuickTarget.WHITE), primary = true)
-        val t = eyeCheckTests(dial + equal, emptyMap(), q.right, q.left)
+        val t = eyeCheckTests(lines, emptyMap(), q.right, q.left)
         assertTrue(t.right!!.astigmatismFlag)
+        assertEquals(180, t.right!!.astigmatismAxisDeg)
         assertNull(t.left)
-        val result = engine.evaluate(answers(VisionProblem.DISTANCE, 30), tests = t, quick = q)
+        val withCyl = withCylinder(q.right, lines[TestEye.RIGHT])!!
+        assertEquals(-1.25, withCyl.cylD!!, 1e-9); assertEquals(180, withCyl.cylAxisDeg)
+        assertNull(withCylinder(q.left, lines[TestEye.LEFT])!!.cylD)
+        val result = engine.evaluate(answers(VisionProblem.DISTANCE, 30), tests = t, quick = q.copy(right = withCyl))
         assertEquals(Source.PHONE_ESTIMATE, result.assessment.advice!!.powerSource)
         assertTrue(ReferralReason.ASTIGMATISM_FLAG in result.assessment.referral.reasons)
+    }
+
+    @Test fun `reading check 38+ - add rounded to 0_25 and clamped to 0_75 to 3_00`() {
+        val a = answers(VisionProblem.NEAR, 50)
+        val r = NearCheck.analyse(500.0, 50, null, a, rules)
+        assertEquals(50.0, r.nearPointCm, 0.0)
+        val add = r.addD!!
+        assertTrue(add in 0.75..3.0)
+        assertEquals(0.0, (add / 0.25) - Math.round(add / 0.25), 1e-9)
+        assertNull(r.expectedNearPointCm); assertFalse(r.fartherThanExpected)
+        assertEquals(0.75, NearCheck.analyse(100.0, 50, null, a, rules).addD!!, 1e-9)   // very close: clamped low
+        assertTrue(NearCheck.analyse(5000.0, 70, null, a, rules).addD!! in 2.0..3.0)   // very far: high, never above +3.00
+        assertTrue(NearCheck.analyse(800.0, 50, null, a, rules).addD!! >= add)          // farther near point, more add
+    }
+
+    @Test fun `reading check under 38 - no plus number, near point against the age-expected one`() {
+        val a = answers(VisionProblem.NEAR, 20)
+        val vm = com.drishtisaathi.engine.vision.VisionMath(rules)
+        val far = NearCheck.analyse(500.0, 20, null, a, rules)          // amplitude 2 D at 20: far too little
+        assertNull(far.addD)
+        assertTrue(far.fartherThanExpected)
+        assertEquals(Math.round(100.0 / vm.hofstetterMean(20)).toDouble(), far.expectedNearPointCm!!, 1e-9)
+        val normal = NearCheck.analyse(70.0, 20, null, a, rules)        // 7 cm: about 14 D
+        assertNull(normal.addD)
+        assertFalse(normal.fartherThanExpected)
+        assertFalse(NearCheck.analyse(500.0, null, null, a, rules).fartherThanExpected)
     }
 
     @Test fun `wavy grid lines mean an urgent referral`() {

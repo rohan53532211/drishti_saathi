@@ -96,8 +96,8 @@ private object Routes {
     const val AI_INTERVIEW = "aiInterview"
     const val OLD_NUMBERS = "oldNumbers"
     const val COMPARE_OFFER = "compareOffer"
-    const val QUICK = "quick?primary={primary}"
-    fun quick(primary: Boolean) = "quick?primary=$primary"
+    const val QUICK = "quick?primary={primary}&gridOnly={gridOnly}"
+    fun quick(primary: Boolean, gridOnly: Boolean = false) = "quick?primary=$primary&gridOnly=$gridOnly"
     const val CARD = "card"
     const val CAPTURE = "capture"
     const val CAPTURE_OUTCOME = "captureOutcome"
@@ -176,24 +176,33 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     // ---- power path ----
     /** The power path was opened from the edit-answers screen: return there instead of going on. */
     var powerFromEdit by remember { mutableStateOf(false) }
+    /** The grid check already ran (or was offered) in this session's eye check. */
+    var gridAsked by remember { mutableStateOf(false) }
     fun finishPowerPath() {
-        if (powerFromEdit) { powerFromEdit = false; toEdit() } else afterEyeCheck()
+        when {
+            powerFromEdit -> { powerFromEdit = false; toEdit() }
+            // Grid needed (bent lines, 40+, diabetes) but no eye check with the grid ran: the grid check alone.
+            !gridAsked && vm.eyeCheckPlan().grid -> { gridAsked = true; nav.navigate(Routes.quick(primary = false, gridOnly = true)) }
+            else -> afterEyeCheck()
+        }
     }
     /**
      * Runs the eye check, or stores the no-test outcome and goes on. As the power source ([primary]) it opens straight
      * on the camera; [primary] false = the optional check to compare with a known power.
      */
     fun startQuick(primary: Boolean) {
-        val plan = vm.quickPlan()
-        if (!plan.runsAnything) {
+        val plan = vm.eyeCheckPlan()
+        if (!(if (primary) plan.runsAnything else plan.far)) {
             vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
             finishPowerPath()
         } else {
             vm.setGlassesOn(false)
+            if (primary) gridAsked = true
             nav.navigate(Routes.quick(primary))
         }
     }
     fun startPowerPath() {
+        if (!powerFromEdit) gridAsked = false
         vm.setQuick(null)
         vm.skipVisionTests()
         when (vm.state.value.answers.powerKnown) {
@@ -369,24 +378,32 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         composable(
             Routes.QUICK,
-            arguments = listOf(navArgument("primary") { type = NavType.BoolType; defaultValue = true }),
+            arguments = listOf(
+                navArgument("primary") { type = NavType.BoolType; defaultValue = true },
+                navArgument("gridOnly") { type = NavType.BoolType; defaultValue = false },
+            ),
         ) { entry ->
             val l = state.lang
             val primary = entry.arguments?.getBoolean("primary") ?: true
-            val plan = androidx.compose.runtime.remember { vm.quickPlan() }
+            val gridOnly = entry.arguments?.getBoolean("gridOnly") ?: false
+            val plan = androidx.compose.runtime.remember { vm.eyeCheckPlan() }
             StepFrame(l, vm::setLang, SShop.eyeCheckTitle[l], onBack = { nav.popBackStack() }) {
                 CameraQuickEstimateFlow(
                     l, vm.rules, vm.calibration, plan, state.answers, primary,
                     onDone = { q, tests ->
-                        vm.setQuick(q)
-                        // the line and grid checks of the customer's own eye check (not of the comparison)
-                        if (primary) vm.setVisionTests(tests)
+                        when {
+                            gridOnly -> vm.setVisionTests(tests)
+                            // the line and grid checks of the customer's own eye check (not of the comparison)
+                            primary -> { vm.setQuick(q); vm.setVisionTests(tests) }
+                            else -> vm.setQuick(q)
+                        }
                         finishPowerPath()
                     },
                     onSkip = {
-                        vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
+                        if (!gridOnly) vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
                         finishPowerPath()
                     },
+                    gridOnly = gridOnly,
                     modifier = Modifier.fillMaxSize(),
                     voice = voice,
                     onInstruction = { voice.instructionSpeaker.speak(it, l) },

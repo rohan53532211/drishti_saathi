@@ -42,7 +42,37 @@ object SShop {
     val leftEye = tx("Left eye", "बाईं आँख")
     val bothEyes = tx("Both eyes", "दोनों आँखें")
     val powerCheck = tx("Power check", "नंबर जाँच")
-    val lineCheck = tx("Line check", "लकीर जाँच")
+    val lineCheck = tx("Line blur check", "लकीर धुंधलापन जाँच")
+    val linesHorizontal = tx(
+        "Lying lines. Start close. Move the phone slowly away. Tap BLUR when the lines stop being sharp.",
+        "लेटी लकीरें। पास से शुरू करें। फ़ोन धीरे-धीरे दूर ले जाएँ। लकीरें साफ़ न रहें तो 'धुंधला' दबाएँ।",
+    )
+    val linesVertical = tx(
+        "Standing lines. Start close again. Move the phone slowly away. Tap BLUR when the lines stop being sharp.",
+        "खड़ी लकीरें। फिर से पास से शुरू करें। फ़ोन धीरे-धीरे दूर ले जाएँ। लकीरें साफ़ न रहें तो 'धुंधला' दबाएँ।",
+    )
+    val linesFlag = tx(
+        "Possible astigmatism: about %s cyl, axis about %d (approximate, confirm with trial lens)",
+        "एस्टिग्मैटिज़्म हो सकता है: लगभग %s सिलिंडर, एक्सिस लगभग %d (अनुमान, ट्रायल लेंस से पक्का करें)",
+    )
+    val linesTogether = tx("Lines blur together: no clear astigmatism", "दोनों लकीरें साथ धुंधली हुईं: साफ़ एस्टिग्मैटिज़्म नहीं")
+    val cylShort = tx("cyl about %s, axis about %d (approximate)", "सिलिंडर लगभग %s, एक्सिस लगभग %d (अनुमान)")
+    val readingInstruction = tx(
+        "Both eyes open. Hold the phone far. Move it slowly closer. Tap BLUR when the text stops being sharp.",
+        "दोनों आँखें खुली रखें। फ़ोन दूर पकड़ें। धीरे-धीरे पास लाएँ। अक्षर साफ़ न रहें तो 'धुंधला' दबाएँ।",
+    )
+    val readingSample = tx("I read the newspaper every morning with my tea.", "मैं रोज़ सुबह चाय के साथ अख़बार पढ़ता हूँ।")
+    val sharpUpClose = tx("Still sharp up close", "पास में भी साफ़")
+    val nearAdd = tx(
+        "Near point %d cm: about %s for reading (approximate, confirm with a ready-reader)",
+        "पास का बिंदु %d cm: पढ़ने के लिए लगभग %s (अनुमान, रेडी-रीडर से पक्का करें)",
+    )
+    val nearFarther = tx(
+        "Near point %d cm (expected about %d cm). Near point is farther than expected for your age: possible long-sightedness or focusing weakness. Check with plus trial lenses.",
+        "पास का बिंदु %d cm (उम्मीद लगभग %d cm)। उम्र के हिसाब से पास का बिंदु ज़्यादा दूर है: दूर-दृष्टि या फ़ोकस की कमज़ोरी हो सकती है। प्लस ट्रायल लेंस से जाँचें।",
+    )
+    val nearNormal = tx("Near point %d cm: as expected for your age (about %d cm).", "पास का बिंदु %d cm: उम्र के हिसाब से ठीक (लगभग %d cm)।")
+    val nearOnly = tx("Near point %d cm.", "पास का बिंदु %d cm।")
     val gridCheck = tx("Grid check", "जाली जाँच")
     val readingCheck = tx("Reading check", "पढ़ने की जाँच")
     /** "Right eye: Power check" */

@@ -71,6 +71,8 @@ data class InterviewAnswers(
     val occupation: Occupation? = null,
     val headacheStrain: Boolean? = null,
     val diabetesOrBp: Boolean? = null,
+    /** "Do straight lines like door frames or tiles look bent or wavy?" (decides the grid check). */
+    val straightLinesBent: Boolean? = null,
     val redFlagFlashes: Boolean? = null,
     val redFlagOther: Boolean? = null,
     val budget: Budget? = null,
@@ -124,6 +126,10 @@ data class QuickEye(
     val target: QuickTarget,
     /** Still clear at arm's length: no myopia found, check with the trial lens. */
     val noMyopiaAtReach: Boolean = false,
+    /** Two-line blur test: approximate minus cylinder (D) when the two line patterns blur ≥ 0.75 D apart. */
+    val cylD: Double? = null,
+    /** Two-line blur test: approximate axis, 180 or 90. */
+    val cylAxisDeg: Int? = null,
 )
 
 /**
@@ -140,6 +146,8 @@ data class QuickEstimate(
     /** Near-only problem under quickEstimate.nearAddFromAge: no plus power is estimated, hand test instead. */
     val possibleLongSight: Boolean = false,
     val primary: Boolean = true,
+    /** Under the add age: the near point expected for the age (Hofstetter mean), for the optometrist. */
+    val expectedNearPointCm: Double? = null,
 ) {
     val eyes: List<Pair<Eye, QuickEye>> get() = listOfNotNull(right?.let { Eye.RIGHT to it }, left?.let { Eye.LEFT to it })
 }

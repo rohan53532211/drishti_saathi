@@ -120,6 +120,20 @@
       "showIf": [{"answer": "wearsGlasses", "in": ["true"]}]
     },
     {
+      "id": "diabetesOrBp",
+      "stage": "CORE",
+      "text": {"en": "Do you have sugar (diabetes) or BP?", "hi": "क्या आपको शुगर या बीपी है?"},
+      "kind": "yesNo",
+      "showIf": []
+    },
+    {
+      "id": "straightLinesBent",
+      "stage": "CORE",
+      "text": {"en": "Do straight lines like door frames or tiles look bent or wavy?", "hi": "क्या दरवाज़े की चौखट या टाइल जैसी सीधी लकीरें टेढ़ी या लहरदार दिखती हैं?"},
+      "kind": "yesNo",
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
       "id": "powerKnown",
       "stage": "CORE",
       "text": {"en": "Do you remember your glasses power, or have the slip?", "hi": "क्या आपको अपने चश्मे का नंबर याद है, या पर्ची है?"},
@@ -168,13 +182,6 @@
       "id": "headacheStrain",
       "stage": "LATER",
       "text": {"en": "Do you get headaches or tired eyes?", "hi": "क्या सिरदर्द या आँखों में थकान होती है?"},
-      "kind": "yesNo",
-      "showIf": []
-    },
-    {
-      "id": "diabetesOrBp",
-      "stage": "LATER",
-      "text": {"en": "Do you have sugar (diabetes) or BP?", "hi": "क्या आपको शुगर या बीपी है?"},
       "kind": "yesNo",
       "showIf": []
     },

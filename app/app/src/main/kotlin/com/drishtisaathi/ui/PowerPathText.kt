@@ -42,8 +42,11 @@ object PowerPathText {
         val q = state.quick?.takeIf { it.primary } ?: return emptyList()
         return buildList {
             q.eyes.forEach { (eye, e) -> val t = quickEyeText(e); add(Txt(eyeName(eye) + ": " + t.en, eyeName(eye) + ": " + t.hi)) }
-            q.nearPointCm?.let { cm -> q.addD?.let { add(SAnamnesis.quickNearFrozen.format(cm.toInt(), fmtD(it))) } }
-            if (q.possibleLongSight) add(SAnamnesis.quickLongSight)
+            // The reading check: the add (38+), or the near point against the age-expected one (no plus number).
+            q.nearPointCm?.let { cm ->
+                add(com.drishtisaathi.vision.nearResultText(cm, q.addD, q.expectedNearPointCm, q.possibleLongSight))
+            }
+            if (q.possibleLongSight && q.expectedNearPointCm == null) add(SAnamnesis.quickLongSight)
         }
     }
 

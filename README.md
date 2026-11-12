@@ -1,5 +1,47 @@
 # Drishti Saathi
 
+**Drishti Saathi** is a phone-only helper for small optical shops in India. A voice-guided Hindi/English interview, a camera-measured eye check (power check with BLUR at the blur distance, a two-line blur test for astigmatism, a reading check, and the Amsler grid only when needed) and a face scan give the staff a starting trial lens, referral flags, a lens package and ranked frames with live try-on, in about 5 minutes on one phone. Results go into a shop PDF and a Hindi customer PDF, and, with consent, to a remote optometrist who can reply from a browser. No name or photo ever leaves the phone. It is a starting point for the shop's trial-lens test, not a replacement for it.
+
+### Download the APK
+
+Get **DrishtiSaathi-v1.0.apk** from [Releases](https://github.com/rohan53532211/drishti_saathi/releases) (tag `v1.0-hackathon`).
+
+### Install (Android 8+)
+
+1. Download the APK on the phone (or copy it over USB).
+2. Tap the file. When Android asks, allow **Install unknown apps** for your browser or file manager (Settings → Apps → Special app access → Install unknown apps).
+3. Tap **Install**, then open **Drishti Saathi**. Allow camera and microphone when asked.
+4. First launch opens **Phone setup** (bank-card screen size, quick camera test). You can skip it for now.
+
+### 5-step demo
+
+1. **Demo mode:** Home → **Shop tools** → **Demo mode: sample customers** → pick the Student, Shopkeeper or Driver. The full results open at once (every screen marked DEMO).
+2. **Real customer:** Home → **Start new customer** → consent → language → answer the questions by voice or tap.
+3. **Eye check:** glasses off, cover one eye, start close and move the phone away; tap **BLUR** (or say "dhundhla") when the letters, then the lines, stop being sharp. Near problems get the reading check; the grid shows only for bent lines, 40+ or diabetes.
+4. **Results:** power estimate with its source, approximate cylinder, reading add, referral flags, lens package, frames, try-on; share the shop and customer PDFs.
+5. **Optometrist bridge:** start the backend (below), set its URL in **Shop tools → Optometrist bridge settings**, tap **Send to optometrist** on the results, open the same URL in a browser as the optometrist, reply, and watch the reply appear on the phone with its case number.
+
+### Screenshots
+
+See [`screenshots/`](screenshots/) (placeholder, to be filled).
+
+### Run the backend (optometrist bridge, optional AI voice interview)
+
+```sh
+cd backend
+python -m venv .venv
+.venv\Scriptsctivate            # macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+set BRIDGE_TOKEN=pick-a-long-random-string     # macOS/Linux: export BRIDGE_TOKEN=...
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+The optometrist page is `http://<laptop IP>:8000/`. For the AI voice interview, put `SARVAM_API_KEY` in `backend/.env` (never in the APK). Details: [`backend/README.md`](backend/README.md).
+
+---
+
+## About
+
 An Android app for small optical shops. It does a voice-guided, bilingual (Hindi/English) pre-consultation on one phone before the shop's own trial-lens test.
 
 The app:
@@ -63,7 +105,7 @@ Home has two big buttons, **Start new customer** and **Past sessions**, and a sm
 1. Consent, then the language (Hindi or English).
 2. Questions: the AI voice interview when the backend answers, otherwise the scripted questions. Red flags come right after the main problem; the power question ends this part. No question numbers. Texts, follow-up rules and voice keywords are in `app/app/src/main/assets/anamnesis_questions.json`; the backend reads its interview topics from the same file.
 3. Power: known → enter it (optional "Quick check to compare" when the glasses are over 2 years old or still blurry). Not sure / No → the eye check, at once.
-4. Eye check, right eye then left: power check (BLUR at the distance where letters stop being sharp), line check (clock dial, one tap), grid check (wavy lines → urgent referral). Reading check for NEAR or BOTH at 38+. Each test has a header, Skip and a short result.
+4. Eye check, right eye then left: power check (BLUR at the distance where letters stop being sharp, power = −1/d), two-line blur test (horizontal, then vertical lines; ≥ 0.75 D apart flags possible astigmatism with an approximate cylinder and axis 180 or 90), grid check only when straight lines look bent, age 40+ or diabetes (wavy lines → urgent referral). Then, for NEAR or BOTH, the reading check with both eyes: 38+ gives an approximate reading add (1/WD − A/2, +0.75…+3.00); under 38 no plus number, the near point is compared with the age-expected one. Each test has a header, Skip and a short result. The clock dial is only in Shop tools → Device checks.
 5. Face measurement for frame fit (optional card on the forehead, can be skipped).
 6. The remaining lifestyle and frame questions (only unanswered ones).
 7. Results: vision profile, power and source, referral, lens package, frames, try-on and compare. Staff details are folded under **For the shop** (notes, measurements, transcript, verification, **Edit answers**).

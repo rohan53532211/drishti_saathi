@@ -59,6 +59,9 @@ import com.drishtisaathi.i18n.fmtD
 import com.drishtisaathi.ui.BigButton
 import com.drishtisaathi.voice.VoiceController
 import kotlin.math.roundToInt
+import kotlin.math.pow
+import kotlin.math.min
+import androidx.compose.foundation.layout.BoxScope
 import kotlin.random.Random
 
 /** Words that count as "Blur" when said during the quick estimate (Hindi, Hinglish, English). */
@@ -127,34 +130,54 @@ data class QuickFarProcedure(
 /** One screen of the guided eye check. */
 internal sealed interface QuickStep {
     data class Power(val eye: TestEye) : QuickStep
-    data class Dial(val eye: TestEye) : QuickStep
+    data class Lines(val eye: TestEye) : QuickStep
     data class Grid(val eye: TestEye) : QuickStep
     data object Near : QuickStep
     data object Done : QuickStep
 }
 
 /**
- * The guided eye check, right eye then left: power check (far point), then the line check (clock dial) and the
- * grid check (Amsler) for that eye; then the reading check (near point) when [plan] says so (NEAR or BOTH, 38+).
- * NEAR only: the grid check per eye, then the reading check. [primary] false (the optional check to compare with
- * a known power): the power check only, and the reading check if planned.
+ * The guided eye check, right eye then left: power check and the two-line blur test (DISTANCE or BOTH), and the
+ * grid check only when [EyeCheckPlan.grid]; then the reading check with both eyes (NEAR or BOTH). [primary] false
+ * (the optional check to compare with a known power): the power check only. [gridOnly]: the grid check alone (when
+ * no other eye check ran, e.g. a known power at 40+).
  */
-internal fun eyeCheckSteps(plan: QuickPlan, primary: Boolean): List<QuickStep> = buildList {
+internal fun eyeCheckSteps(plan: EyeCheckPlan, primary: Boolean, gridOnly: Boolean = false): List<QuickStep> = buildList {
     for (eye in listOf(TestEye.RIGHT, TestEye.LEFT)) {
-        if (plan.far) add(QuickStep.Power(eye))
-        if (primary && plan.far) add(QuickStep.Dial(eye))
-        if (primary && plan.runsAnything) add(QuickStep.Grid(eye))
+        if (!gridOnly && plan.far) add(QuickStep.Power(eye))
+        if (!gridOnly && primary && plan.far) add(QuickStep.Lines(eye))
+        if ((primary && plan.grid) || gridOnly) add(QuickStep.Grid(eye))
     }
-    if (plan.near) add(QuickStep.Near)
+    if (!gridOnly && primary && plan.near) add(QuickStep.Near)
     add(QuickStep.Done)
 }
 
 private enum class QPhase { RUN, RESULT }
 
-/** The frozen result line for one eye. */
-fun quickEyeText(e: QuickEye): Txt =
-    if (e.seD == null || e.noMyopiaAtReach) SAnamnesis.quickNoMyopia
-    else SAnamnesis.quickFrozen.format(e.blurAtCm?.roundToInt() ?: 0, fmtD(e.seD!!))
+/** The frozen result line for one eye (with the two-line test's cylinder when it found one). */
+fun quickEyeText(e: QuickEye): Txt {
+    val base = if (e.seD == null || e.noMyopiaAtReach) SAnamnesis.quickNoMyopia
+        else SAnamnesis.quickFrozen.format(e.blurAtCm?.roundToInt() ?: 0, fmtD(e.seD!!))
+    val cyl = e.cylD ?: return base
+    val c = SShop.cylShort.format(fmtD(cyl), e.cylAxisDeg ?: 0)
+    return Txt("${base.en}; ${c.en}", "${base.hi}; ${c.hi}")
+}
+
+/** Two-line blur test result. */
+fun linesText(r: TwoLineAstig.Result?): Txt = when {
+    r == null -> SShop.skipped
+    r.flagged -> SShop.linesFlag.format(fmtD(-r.cylD), r.axisDeg ?: 0)
+    else -> SShop.linesTogether
+}
+
+/** Reading check result: the add (38+), or the near point against the age-expected one (no plus number). */
+fun nearResultText(nearPointCm: Double?, addD: Double?, expectedCm: Double?, farther: Boolean): Txt = when {
+    nearPointCm == null -> SAnamnesis.quickNearNone
+    addD != null -> SShop.nearAdd.format(nearPointCm.roundToInt(), fmtD(addD))
+    expectedCm != null && farther -> SShop.nearFarther.format(nearPointCm.roundToInt(), expectedCm.roundToInt())
+    expectedCm != null -> SShop.nearNormal.format(nearPointCm.roundToInt(), expectedCm.roundToInt())
+    else -> SShop.nearOnly.format(nearPointCm.roundToInt())
+}
 
 private fun eyeName(eye: TestEye): Txt = when (eye) {
     TestEye.RIGHT -> SShop.rightEye
@@ -167,20 +190,10 @@ private fun header(eye: TestEye, test: Txt): Txt =
 
 private fun stepHeader(step: QuickStep): Txt = when (step) {
     is QuickStep.Power -> header(step.eye, SShop.powerCheck)
-    is QuickStep.Dial -> header(step.eye, SShop.lineCheck)
+    is QuickStep.Lines -> header(step.eye, SShop.lineCheck)
     is QuickStep.Grid -> header(step.eye, SShop.gridCheck)
     QuickStep.Near -> header(TestEye.BOTH, SShop.readingCheck)
     QuickStep.Done -> SShop.checkDone
-}
-
-private fun dialText(r: ClockDialEyeResult?): Txt = when {
-    r == null -> SShop.skipped
-    !r.astigmatismFlag -> SShop.dialEqualResult
-    else -> {
-        val i = r.answers.firstNotNullOf { it }
-        val (a, b) = ClockDialAnalysis.hoursOf(i)
-        SShop.dialLineResult.format(a, b)
-    }
 }
 
 private fun gridText(r: AmslerEyeResult?): Txt = when {
@@ -192,26 +205,30 @@ private fun gridText(r: AmslerEyeResult?): Txt = when {
 private fun eyeLine(eye: TestEye, t: Txt): Txt = Txt("${eyeName(eye).en}: ${t.en}", "${eyeName(eye).hi}: ${t.hi}")
 
 /**
- * The eye check's results for the engine: the line check flags astigmatism per eye (with the power check's
+ * The eye check's results for the engine: the two-line test flags astigmatism per eye (with the power check's
  * "no short-sight" carried over, so the phone estimate stays the power source), and the grid check flags
  * distortion (urgent referral). Nothing else is invented: a skipped check adds nothing.
  */
 internal fun eyeCheckTests(
-    dial: Map<TestEye, ClockDialEyeResult>, grid: Map<TestEye, AmslerEyeResult>, right: QuickEye?, left: QuickEye?,
+    lines: Map<TestEye, TwoLineAstig.Result>, grid: Map<TestEye, AmslerEyeResult>, right: QuickEye?, left: QuickEye?,
 ): VisionTests {
-    fun eye(e: TestEye, q: QuickEye?): MeasuredEye? = dial[e]?.takeIf { it.astigmatismFlag }?.let {
-        MeasuredEye(seD = null, confidence = it.confidence, noMyopiaAtArmsLength = q?.noMyopiaAtReach == true,
+    fun eye(e: TestEye, q: QuickEye?): MeasuredEye? = lines[e]?.takeIf { it.flagged }?.let {
+        MeasuredEye(seD = null, confidence = Confidence.LOW, noMyopiaAtArmsLength = q?.noMyopiaAtReach == true,
             astigmatismFlag = true, astigmatismAxisDeg = it.axisDeg)
     }
     return VisionTests(right = eye(TestEye.RIGHT, right), left = eye(TestEye.LEFT, left), amslerAbnormal = grid.values.any { it.abnormal })
 }
 
+/** Attaches a flagged two-line result to that eye's power reading (minus cylinder, axis). */
+internal fun withCylinder(q: QuickEye?, r: TwoLineAstig.Result?): QuickEye? =
+    if (q == null || r == null || !r.flagged) q else q.copy(cylD = -r.cylD, cylAxisDeg = r.axisDeg)
+
 /**
  * The guided eye check (under 3 minutes): per eye, glasses off and the other eye covered, the power check with
- * distance-locked letters (only the live distance shows; BLUR or "dhundhla" freezes "Blur at 28 cm, about
- * −3.50 D"), the line check and the grid check; then the reading check. Each test has a header, a Skip button
- * and a short result before the next one; nothing loops. Returns the [QuickEstimate] ([primary] = it is the power
- * source) and the line / grid results as [VisionTests].
+ * distance-locked letters (BLUR or "dhundhla" freezes "Blur at 28 cm, about −3.50 D"), the two-line blur test and,
+ * when needed, the grid check; then the reading check with both eyes. Each test has a header, a Skip button and a
+ * short result; nothing loops. Returns the [QuickEstimate] ([primary] = it is the power source) and the line / grid
+ * results as [VisionTests].
  */
 @Composable
 fun QuickEstimateFlow(
@@ -219,7 +236,7 @@ fun QuickEstimateFlow(
     rules: RulesConfig,
     distance: DistanceProvider,
     calibration: CalibrationRepository,
-    plan: QuickPlan,
+    plan: EyeCheckPlan,
     answers: InterviewAnswers,
     primary: Boolean,
     onDone: (QuickEstimate, VisionTests) -> Unit,
@@ -227,6 +244,7 @@ fun QuickEstimateFlow(
     modifier: Modifier = Modifier,
     voice: VoiceController? = null,
     onInstruction: (Txt) -> Unit = {},
+    gridOnly: Boolean = false,
 ) {
     DisposableEffect(distance) {
         distance.start()
@@ -240,21 +258,28 @@ fun QuickEstimateFlow(
     val env = remember(lang, rules, scale, onInstruction) { TestEnv(lang, rules, scale, onInstruction).singleRun() }
     val est = remember(rules) { QuickEstimator(rules) }
     val target = rules.quickEstimate.target
+    val simulated = distance is FakeDistanceProvider
 
-    val steps = remember(plan, primary) { eyeCheckSteps(plan, primary) }
+    val steps = remember(plan, primary, gridOnly) { eyeCheckSteps(plan, primary, gridOnly) }
     var index by remember { mutableIntStateOf(0) }
     var phase by remember { mutableStateOf(QPhase.RUN) }
     var right by remember { mutableStateOf<QuickEye?>(null) }
     var left by remember { mutableStateOf<QuickEye?>(null) }
-    var dial by remember { mutableStateOf(mapOf<TestEye, ClockDialEyeResult>()) }
+    var lines by remember { mutableStateOf(mapOf<TestEye, TwoLineAstig.Result>()) }
+    var linesSkipped by remember { mutableStateOf(setOf<TestEye>()) }
     var grid by remember { mutableStateOf(mapOf<TestEye, AmslerEyeResult>()) }
-    var nearCm by remember { mutableStateOf<Double?>(null) }
-    var addD by remember { mutableStateOf<Double?>(null) }
+    var near by remember { mutableStateOf<NearCheck.Result?>(null) }
     var nearDone by remember { mutableStateOf(false) }
     val step = steps[index.coerceAtMost(steps.lastIndex)]
 
     fun next() { index = (index + 1).coerceAtMost(steps.lastIndex); phase = QPhase.RUN }
-    fun result() = QuickEstimate(right, left, addD, nearCm, possibleLongSight = plan.possibleLongSight, primary = primary)
+    fun result() = QuickEstimate(
+        withCylinder(right, lines[TestEye.RIGHT]), withCylinder(left, lines[TestEye.LEFT]),
+        near?.addD, near?.nearPointCm,
+        possibleLongSight = near?.fartherThanExpected ?: (plan.possibleLongSight && primary),
+        primary = primary, expectedNearPointCm = near?.expectedNearPointCm,
+    )
+    fun nearLine() = nearResultText(near?.nearPointCm, near?.addD, near?.expectedNearPointCm, near?.fartherThanExpected == true)
 
     Column(modifier.fillMaxSize()) {
         if (voice != null) MuteRow(voice, lang)
@@ -263,23 +288,23 @@ fun QuickEstimateFlow(
                 step == QuickStep.Done -> QuickInfo(
                     lang, SShop.checkDone,
                     buildList {
-                        right?.let { add(eyeLine(TestEye.RIGHT, quickEyeText(it))) }
-                        left?.let { add(eyeLine(TestEye.LEFT, quickEyeText(it))) }
-                        dial.forEach { (e, r) -> add(eyeLine(e, dialText(r))) }
+                        withCylinder(right, lines[TestEye.RIGHT])?.let { add(eyeLine(TestEye.RIGHT, quickEyeText(it))) }
+                        withCylinder(left, lines[TestEye.LEFT])?.let { add(eyeLine(TestEye.LEFT, quickEyeText(it))) }
+                        lines.forEach { (e, r) -> if (!r.flagged) add(eyeLine(e, linesText(r))) }
                         grid.forEach { (e, r) -> add(eyeLine(e, gridText(r))) }
-                        if (nearDone) add(nearText(nearCm, addD))
-                        if (plan.possibleLongSight) add(SAnamnesis.quickLongSight)
+                        if (nearDone) add(nearLine())
+                        if (plan.possibleLongSight && primary && !nearDone && !gridOnly) add(SAnamnesis.quickLongSight)
                     },
-                    primary = SShop.next to { onDone(result(), eyeCheckTests(dial, grid, right, left)) },
+                    primary = SShop.next to { onDone(result(), eyeCheckTests(lines, grid, right, left)) },
                 )
                 phase == QPhase.RESULT -> QuickInfo(
                     lang, stepHeader(step),
                     listOfNotNull(
                         when (step) {
                             is QuickStep.Power -> (if (step.eye == TestEye.RIGHT) right else left)?.let(::quickEyeText) ?: SShop.skipped
-                            is QuickStep.Dial -> dialText(dial[step.eye])
+                            is QuickStep.Lines -> linesText(lines[step.eye])
                             is QuickStep.Grid -> gridText(grid[step.eye])
-                            QuickStep.Near -> nearText(nearCm, addD)
+                            QuickStep.Near -> nearLine()
                             else -> null
                         },
                     ),
@@ -287,22 +312,18 @@ fun QuickEstimateFlow(
                     speak = env.onInstruction,
                 )
                 step is QuickStep.Power -> key(step) {
-                    QuickPowerScreen(env, step.eye, reading, est, target, voice, stepHeader(step), distance is FakeDistanceProvider,
+                    QuickPowerScreen(env, step.eye, reading, est, target, voice, stepHeader(step), simulated,
                         onSkip = { next() }) { eye ->
                         if (step.eye == TestEye.RIGHT) right = eye else left = eye
                         phase = QPhase.RESULT
                     }
                 }
-                step is QuickStep.Dial -> key(step) {
-                    val q = if (step.eye == TestEye.RIGHT) right else left
-                    val fpMm = q?.takeIf { !it.noMyopiaAtReach }?.blurAtCm?.let { it * 10.0 }
-                    val targetMm = fpMm?.let { minOf(it + env.cfg.clockDialBeyondFarPointMm, env.cfg.clockDialNoFarPointMm) }
-                        ?: env.cfg.clockDialNoFarPointMm
-                    ClockDialTestScreen(env, step.eye, targetMm, reading, onSkip = { next() }, header = stepHeader(step), quiet = true,
-                        onComplete = { p ->
-                            ClockDialAnalysis.analyse(step.eye, p.answers, env.cfg.clockDialAxisToleranceDeg)?.let { dial = dial + (step.eye to it) }
-                            phase = QPhase.RESULT
-                        })
+                step is QuickStep.Lines -> key(step) {
+                    TwoLineScreen(env, step.eye, reading, voice, stepHeader(step), simulated,
+                        onSkip = { linesSkipped = linesSkipped + step.eye; next() }) { r ->
+                        lines = lines + (step.eye to r)
+                        phase = QPhase.RESULT
+                    }
                 }
                 step is QuickStep.Grid -> key(step) {
                     AmslerTestScreen(env, step.eye, reading, onSkip = { next() }, header = stepHeader(step), quiet = true, yesNoOnly = true,
@@ -313,10 +334,9 @@ fun QuickEstimateFlow(
                 }
                 step == QuickStep.Near -> {
                     val farSe = listOfNotNull(right?.seD, left?.seD).takeIf { it.isNotEmpty() }?.average()
-                    QuickNearScreen(env, reading, farSe, voice, stepHeader(step), onSkip = { next() }) { mm ->
+                    ReadingCheckScreen(env, reading, voice, stepHeader(step), simulated, onSkip = { next() }) { mm ->
                         nearDone = true
-                        nearCm = mm?.let { (it / 10.0).roundToInt().toDouble() }
-                        addD = mm?.let { est.nearAdd(it / 1000.0, farSe, answers) }
+                        near = NearCheck.analyse(mm, answers.age, farSe, answers, rules)
                         phase = QPhase.RESULT
                     }
                 }
@@ -336,9 +356,6 @@ private fun MuteRow(voice: VoiceController, lang: Lang) {
         }
     }
 }
-
-private fun nearText(nearCm: Double?, add: Double?): Txt =
-    if (nearCm != null && add != null) SAnamnesis.quickNearFrozen.format(nearCm.roundToInt(), fmtD(add)) else SAnamnesis.quickNearNone
 
 @Composable
 private fun QuickInfo(
@@ -397,70 +414,41 @@ class DistanceBuffer(private val keepMs: Long = 1_500, private val useMs: Long =
 }
 
 /**
- * Power check for one eye: white background, distance-locked letters, only the live distance on screen. Start close,
- * move away, BLUR (or "dhundhla") freezes the reading. BLUR is always enabled: the distance is the median of the
- * readings of the last second; with none in 1.5 s it asks to tap again, and staff can type the distance from a tape.
- * One automatic repeat when the reading looks invalid, then the median.
+ * The shared blur screen of the eye check (power, two-line, reading): BLUR always enabled (and "dhundhla"), the
+ * distance from the median of the last second's readings; with none in 1.5 s "Distance not caught…"; a green / grey
+ * dot for live measuring; staff can type the distance from a tape. [second]: an extra button and its action (null =
+ * disabled). [onBlur] gets the distance in mm, the time, and whether it was typed.
  */
 @Composable
-private fun QuickPowerScreen(
-    env: TestEnv, eye: TestEye, reading: DistanceReading?, est: QuickEstimator, target: QuickTarget,
-    voice: VoiceController?, header: Txt, simulated: Boolean, onSkip: () -> Unit, onFrozen: (QuickEye) -> Unit,
+private fun BlurScreen(
+    env: TestEnv, eye: TestEye, reading: DistanceReading?, voice: VoiceController?, header: Txt, instruction: Txt,
+    simulated: Boolean, onSkip: () -> Unit, background: Color = Color.White,
+    second: Pair<Txt, (() -> Unit)?>? = null,
+    onBlur: (mm: Double, atMs: Long, typed: Boolean) -> Unit,
+    target: @Composable BoxScope.() -> Unit,
 ) {
-    val rules = env.rules
-    val cfg = env.cfg
     val l = env.lang
-    var proc by remember { mutableStateOf(QuickFarProcedure()) }
     val buffer = remember { DistanceBuffer() }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(reading) {
-        buffer.add(reading)
-        proc = proc.onReading(reading, rules, System.currentTimeMillis())
-    }
+    LaunchedEffect(reading) { buffer.add(reading) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); kotlinx.coroutines.delay(250) } }
     val live = if (simulated) reading?.faceVisible == true else buffer.live(now)
     val status = DistanceGate.check(reading, null, null)
-    val bg = rgbColor(if (target == QuickTarget.WHITE) cfg.farPointWhiteRgb else cfg.farPointBlueRgb)
-    val rnd = remember { Random(System.nanoTime()) }
-    val dirs = remember { List(cfg.farPointLetterCount) { EDirection.random(rnd) } }
     var notCaught by remember { mutableStateOf(false) }
     var typing by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
 
-    fun freeze(mm: Double, t: Long) {
-        notCaught = false
-        val e = proc.blur(DistanceReading(mm, Confidence.MEDIUM, timestampMs = t), est, target)
-        val first = proc.first
-        when {
-            first != null -> onFrozen(QuickFarProcedure.median(first, e, est, target))
-            proc.looksInvalid(mm, t) -> proc = proc.repeatWith(e)
-            else -> onFrozen(e)
-        }
-    }
     val blurNow: () -> Unit = {
         val t = System.currentTimeMillis()
         val mm = if (simulated) reading?.takeIf { it.faceVisible }?.distanceMm else buffer.atTap(t)
-        if (mm == null) notCaught = true else freeze(mm, t)
+        if (mm == null) notCaught = true else { notCaught = false; onBlur(mm, t, false) }
     }
     BlurKeyword(voice, blurNow)
 
-    // Spoken once per attempt: glasses off, which eye to cover, and how to move the phone.
-    val other = if (eye == TestEye.RIGHT) SShop.leftWord else SShop.rightWord
-    val setup = Txt(SShop.glassesOffCover.en.format(other.en), SShop.glassesOffCover.hi.format(other.hi))
-    val instruction = if (proc.first != null) SShop.repeatOnce
-        else Txt("${setup.en} ${SShop.powerInstruction.en}", "${setup.hi} ${SShop.powerInstruction.hi}")
     TestLayout(
         env, SAnamnesis.quickTitle, eye, instruction,
-        reading, status, 0, 1, onSkip, background = bg, bigDistance = true, header = header, quiet = true,
-        target = {
-            Canvas(Modifier.fillMaxSize()) {
-                val d = reading?.distanceMm ?: return@Canvas
-                val h = Sizing.letterHeightPx(env.vm, d, env.scale, rules.quickEstimate.letterLogMar).toFloat()
-                    .coerceAtMost(size.width / (2f * dirs.size)).coerceAtLeast(1f)
-                val total = dirs.size * h + (dirs.size - 1) * h
-                dirs.forEachIndexed { i, dir -> drawTumblingE(Offset(center.x - total / 2f + h / 2f + i * 2f * h, center.y), h, dir) }
-            }
-        },
+        reading, status, 0, 1, onSkip, background = background, bigDistance = true, header = header, quiet = true,
+        target = target,
         controls = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.size(14.dp).background(if (live) Color(0xFF2E7D32) else Color(0xFF9E9E9E), CircleShape))
@@ -469,8 +457,7 @@ private fun QuickPowerScreen(
             if (notCaught) Text(SShop.notCaught[l], color = Color(0xFFB26A00), style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold)
             BigButton(SAnamnesis.quickBlur[l], selected = true, onClick = blurNow)
-            BigButton(SShop.stillSharp[l], enabled = reading?.let { it.faceVisible && it.distanceMm >= rules.farPoint.selfHeldReachM * 1000.0 } == true,
-                onClick = { onFrozen(proc.stillClear(target)) })
+            second?.let { (label, action) -> BigButton(label[l], enabled = action != null, onClick = { action?.invoke() }) }
             if (!typing) {
                 TextButton(onClick = { typing = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SShop.typeDistance[l]) }
             } else {
@@ -480,56 +467,134 @@ private fun QuickPowerScreen(
                         label = { Text(SShop.distanceCmLabel[l]) },
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                     )
-                    val cm = typed.toIntOrNull()?.takeIf { it in 10..100 }
-                    // Typed from a tape: used as it is (no automatic repeat).
+                    val cm = typed.toIntOrNull()?.takeIf { it in 5..100 }
                     BigButton(SShop.useDistance[l], enabled = cm != null, modifier = Modifier.weight(1f),
-                        onClick = { cm?.let { onFrozen(proc.blur(DistanceReading(it * 10.0, Confidence.MEDIUM), est, target)) } })
+                        onClick = { cm?.let { onBlur(it * 10.0, System.currentTimeMillis(), true) } })
                 }
             }
         },
     )
 }
 
+private fun atReach(r: DistanceReading?, rules: RulesConfig) =
+    r != null && r.faceVisible && r.distanceMm >= rules.farPoint.selfHeldReachM * 1000.0
+
+/**
+ * Power check for one eye: white background, distance-locked letters, only the live distance on screen. Start close,
+ * move away, BLUR freezes the reading; one automatic repeat when it looks invalid, then the median. A distance typed
+ * from a tape is used as it is.
+ */
 @Composable
-private fun QuickNearScreen(
-    env: TestEnv, reading: DistanceReading?, farSeD: Double?, voice: VoiceController?, header: Txt,
-    onSkip: () -> Unit, onFrozen: (Double?) -> Unit,
+private fun QuickPowerScreen(
+    env: TestEnv, eye: TestEye, reading: DistanceReading?, est: QuickEstimator, target: QuickTarget,
+    voice: VoiceController?, header: Txt, simulated: Boolean, onSkip: () -> Unit, onFrozen: (QuickEye) -> Unit,
 ) {
+    val rules = env.rules
     val cfg = env.cfg
-    var proc by remember { mutableStateOf(NearPointProcedure.start(cfg, farSeD).copy(repeats = 1)) }
-    LaunchedEffect(reading) { proc = proc.onReading(reading, cfg) }
-    val status = DistanceGate.check(reading, null, null)
-    val ok = status == DistanceStatus.OK
+    var proc by remember { mutableStateOf(QuickFarProcedure()) }
+    LaunchedEffect(reading) { proc = proc.onReading(reading, rules, System.currentTimeMillis()) }
+    val bg = rgbColor(if (target == QuickTarget.WHITE) cfg.farPointWhiteRgb else cfg.farPointBlueRgb)
     val rnd = remember { Random(System.nanoTime()) }
-    val dirs = remember { List(10) { EDirection.random(rnd) } }
+    val dirs = remember { List(cfg.farPointLetterCount) { EDirection.random(rnd) } }
 
-    val blurNow: () -> Unit = {
-        val r = reading
-        if (ok && r != null && proc.canMarkBlur(r, cfg)) onFrozen(proc.markBlur(r, cfg).marksMm.last())
-    }
-    BlurKeyword(voice, blurNow)
-
-    TestLayout(
-        env, SAnamnesis.quickNearTitle, TestEye.BOTH, if (proc.seenFar) SAnamnesis.quickMoveIn else SAnamnesis.quickStartFar,
-        reading, status, 0, 1, onSkip,
-        holdAtMm = if (proc.seenFar) null else proc.startMinMm, bigDistance = true, header = header, quiet = true,
-        target = {
-            Canvas(Modifier.fillMaxSize()) {
-                val h = Sizing.mmToPx(cfg.nearPointLetterHeightMm, env.scale).toFloat().coerceAtLeast(3f)
-                val perRow = 5
-                val total = perRow * h + (perRow - 1) * h
-                dirs.forEachIndexed { i, dir ->
-                    val row = i / perRow; val col = i % perRow
-                    drawTumblingE(Offset(center.x - total / 2f + h / 2f + col * 2f * h, center.y + (row - 0.5f) * 3f * h), h, dir)
-                }
+    // Spoken once per attempt: glasses off, which eye to cover, and how to move the phone.
+    val other = if (eye == TestEye.RIGHT) SShop.leftWord else SShop.rightWord
+    val setup = Txt(SShop.glassesOffCover.en.format(other.en), SShop.glassesOffCover.hi.format(other.hi))
+    val instruction = if (proc.first != null) SShop.repeatOnce
+        else Txt("${setup.en} ${SShop.powerInstruction.en}", "${setup.hi} ${SShop.powerInstruction.hi}")
+    BlurScreen(
+        env, eye, reading, voice, header, instruction, simulated, onSkip, background = bg,
+        second = SShop.stillSharp to (if (atReach(reading, rules)) ({ onFrozen(proc.stillClear(target)) }) else null),
+        onBlur = { mm, t, typed ->
+            val e = proc.blur(DistanceReading(mm, Confidence.MEDIUM, timestampMs = t), est, target)
+            val first = proc.first
+            when {
+                typed -> onFrozen(e)
+                first != null -> onFrozen(QuickFarProcedure.median(first, e, est, target))
+                proc.looksInvalid(mm, t) -> proc = proc.repeatWith(e)
+                else -> onFrozen(e)
             }
         },
-        controls = {
-            BigButton(SAnamnesis.quickBlur[env.lang], enabled = ok && proc.canMarkBlur(reading, cfg), selected = true, onClick = blurNow)
-            BigButton(SVision.nearOutOfReach[env.lang], enabled = ok && proc.canMarkOutOfReach(reading, cfg),
-                onClick = { onFrozen(null) })
-        },
-    )
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val d = reading?.distanceMm ?: return@Canvas
+            val h = Sizing.letterHeightPx(env.vm, d, env.scale, rules.quickEstimate.letterLogMar).toFloat()
+                .coerceAtMost(size.width / (2f * dirs.size)).coerceAtLeast(1f)
+            val total = dirs.size * h + (dirs.size - 1) * h
+            dirs.forEachIndexed { i, dir -> drawTumblingE(Offset(center.x - total / 2f + h / 2f + i * 2f * h, center.y), h, dir) }
+        }
+    }
+}
+
+/**
+ * Two-line blur test for one eye: pass A horizontal lines, pass B vertical lines, both distance-locked on white,
+ * each "start close, move away, BLUR". "Still sharp at arm's length" counts as 0 D for that pattern.
+ */
+@Composable
+private fun TwoLineScreen(
+    env: TestEnv, eye: TestEye, reading: DistanceReading?, voice: VoiceController?, header: Txt, simulated: Boolean,
+    onSkip: () -> Unit, onDone: (TwoLineAstig.Result) -> Unit,
+) {
+    val rules = env.rules
+    var pass by remember { mutableIntStateOf(0) }
+    var horizontalMm by remember { mutableStateOf<Double?>(null) }
+    fun record(mm: Double?) {
+        if (pass == 0) { horizontalMm = mm; pass = 1 } else onDone(TwoLineAstig.analyse(horizontalMm, mm))
+    }
+    val vertical = pass == 1
+    val passHeader = Txt("${header.en} (${pass + 1}/2)", "${header.hi} (${pass + 1}/2)")
+    key(pass) {
+        BlurScreen(
+            env, eye, reading, voice, passHeader, if (vertical) SShop.linesVertical else SShop.linesHorizontal, simulated, onSkip,
+            second = SShop.stillSharp to (if (atReach(reading, rules)) ({ record(null) }) else null),
+            onBlur = { mm, _, _ -> record(mm) },
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                val d = reading?.distanceMm ?: return@Canvas
+                // Line width = the stroke of the power check's letters (distance-locked).
+                val w = Sizing.arcminPx(d, 10.0.pow(rules.quickEstimate.letterLogMar), env.scale).toFloat().coerceAtLeast(1f)
+                val n = 7
+                val span = (2 * n - 1) * w
+                val len = (span * 2.5f).coerceAtMost(min(size.width, size.height) * 0.8f)
+                for (i in 0 until n) {
+                    val off = -span / 2f + w / 2f + i * 2f * w
+                    if (vertical) drawLine(Color.Black, Offset(center.x + off, center.y - len / 2f), Offset(center.x + off, center.y + len / 2f), w)
+                    else drawLine(Color.Black, Offset(center.x - len / 2f, center.y + off), Offset(center.x + len / 2f, center.y + off), w)
+                }
+            }
+        }
+    }
+}
+
+/** Reading text letter size (logMAR), kept the same angular size at every distance. */
+const val READING_TEXT_LOGMAR = 0.3
+
+/**
+ * Reading check, both eyes: distance-locked small reading text (Hindi and English). Hold far, move closer, BLUR
+ * when the text stops being sharp. "Still sharp up close" (within 15 cm) uses that distance as the near point.
+ */
+@Composable
+private fun ReadingCheckScreen(
+    env: TestEnv, reading: DistanceReading?, voice: VoiceController?, header: Txt, simulated: Boolean,
+    onSkip: () -> Unit, onFrozen: (Double) -> Unit,
+) {
+    val close = reading != null && reading.faceVisible && reading.distanceMm <= env.cfg.farPointStartMaxMm
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    BlurScreen(
+        env, TestEye.BOTH, reading, voice, header, SShop.readingInstruction, simulated, onSkip,
+        second = SShop.sharpUpClose to (if (close) ({ onFrozen(reading!!.distanceMm) }) else null),
+        onBlur = { mm, _, _ -> onFrozen(mm) },
+    ) {
+        val d = reading?.distanceMm
+        if (d != null) {
+            val letterPx = Sizing.letterHeightPx(env.vm, d, env.scale, READING_TEXT_LOGMAR).toFloat().coerceAtLeast(4f)
+            val fontSize = with(density) { (letterPx / 0.7f).toSp() }
+            Column(Modifier.align(Alignment.Center).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(SShop.readingSample.hi, fontSize = fontSize, color = Color.Black)
+                Text(SShop.readingSample.en, fontSize = fontSize, color = Color.Black)
+            }
+        }
+    }
 }
 
 /** [QuickEstimateFlow] with the real camera (asked for at once); without permission: [onSkip], or (demo) the distance slider. */
@@ -538,7 +603,7 @@ fun CameraQuickEstimateFlow(
     lang: Lang,
     rules: RulesConfig,
     calibration: CalibrationRepository,
-    plan: QuickPlan,
+    plan: EyeCheckPlan,
     answers: InterviewAnswers,
     primary: Boolean,
     onDone: (QuickEstimate, VisionTests) -> Unit,
@@ -547,18 +612,19 @@ fun CameraQuickEstimateFlow(
     voice: VoiceController? = null,
     onInstruction: (Txt) -> Unit = {},
     allowDemoWithoutCamera: Boolean = false,
+    gridOnly: Boolean = false,
 ) {
     var demo by remember { mutableStateOf(false) }
     if (demo) {
         val fake = remember { FakeDistanceProvider() }
-        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction)
+        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction, gridOnly)
         return
     }
     CameraPermissionGate(lang, onSkip = { if (allowDemoWithoutCamera) demo = true else onSkip() }, autoRequest = true) {
         val relaxed = remember(rules) { powerCheckCamera(rules.camera) }
         val tracker = rememberFaceTracker(relaxed)
         val provider = remember(tracker) { CameraDistanceProvider(tracker, calibration, relaxed, controlsTracker = false) }
-        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction)
+        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction, gridOnly)
     }
 }
 
