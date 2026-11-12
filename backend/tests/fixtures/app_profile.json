@@ -1,0 +1,171 @@
+{
+    "consent": {
+        "consentAt": 1762934400000,
+        "spoken": true,
+        "tapped": true,
+        "textVersion": "bridge-1"
+    },
+    "app": {
+        "version": "t",
+        "lang": "HI"
+    },
+    "demo": true,
+    "answers": {
+        "age": 21,
+        "wearsGlasses": false,
+        "distanceBlur": true,
+        "nearBlur": false,
+        "screenHours": "H4_PLUS",
+        "nightDriving": false,
+        "outdoorWork": false,
+        "occupation": "STUDENT",
+        "headacheStrain": true,
+        "diabetesOrBp": false,
+        "redFlagFlashes": false,
+        "redFlagOther": false,
+        "budget": "LOW",
+        "style": "MODERN",
+        "colourPreference": "DARK",
+        "lightweightPreference": true,
+        "lookPreference": "CASUAL",
+        "firstTimeWearer": true,
+        "readingFrequency": "SOMETIMES",
+        "visionProblem": "DISTANCE",
+        "distanceSituation": "CLASSROOM_BOARD",
+        "distanceSince": "MONTHS_6_TO_24",
+        "powerKnown": "NOT_SURE"
+    },
+    "functionalProfile": {
+        "nearHours": 4.5,
+        "intermediateHours": 3.0,
+        "distanceHours": 6.0,
+        "dominant": "MIXED",
+        "impliedLens": "SINGLE_VISION"
+    },
+    "powerSource": "PHONE_ESTIMATE",
+    "power": {
+        "eyes": [
+            {
+                "eye": "RIGHT",
+                "band": {
+                    "value": {
+                        "lowD": -3.25,
+                        "highD": -1.75
+                    },
+                    "confidence": "LOW",
+                    "source": "PHONE_ESTIMATE"
+                },
+                "startingTrialLens": {
+                    "value": {
+                        "sph": -2.5,
+                        "cyl": 0.0
+                    },
+                    "confidence": "LOW",
+                    "source": "PHONE_ESTIMATE"
+                },
+                "thicknessPowerD": -2.5,
+                "bandUncertain": false,
+                "phoneNoMyopiaAtReach": false
+            },
+            {
+                "eye": "LEFT",
+                "band": {
+                    "value": {
+                        "lowD": -3.0,
+                        "highD": -1.5
+                    },
+                    "confidence": "LOW",
+                    "source": "PHONE_ESTIMATE"
+                },
+                "startingTrialLens": {
+                    "value": {
+                        "sph": -2.25,
+                        "cyl": 0.0
+                    },
+                    "confidence": "LOW",
+                    "source": "PHONE_ESTIMATE"
+                },
+                "thicknessPowerD": -2.25,
+                "bandUncertain": false,
+                "phoneNoMyopiaAtReach": false
+            }
+        ],
+        "addD": null,
+        "knownPower": null,
+        "phoneEstimate": {
+            "right": {
+                "seD": -2.5,
+                "blurAtCm": 40.0,
+                "target": "WHITE",
+                "noMyopiaAtReach": false
+            },
+            "left": {
+                "seD": -2.25,
+                "blurAtCm": 44.0,
+                "target": "WHITE",
+                "noMyopiaAtReach": false
+            },
+            "possibleLongSight": false,
+            "primary": true
+        }
+    },
+    "measurements": {
+        "pdMm": {
+            "value": 61.5,
+            "confidence": "HIGH",
+            "source": "MEASURED"
+        },
+        "faceWidthMm": {
+            "value": 134.0,
+            "confidence": "HIGH",
+            "source": "MEASURED"
+        },
+        "face": {
+            "pdMm": {
+                "value": 61.5,
+                "confidence": "HIGH",
+                "source": "MEASURED"
+            },
+            "faceWidthMm": {
+                "value": 134.0,
+                "confidence": "HIGH",
+                "source": "MEASURED"
+            },
+            "bridgeWidthMm": {
+                "value": 17.0,
+                "confidence": "MEDIUM",
+                "source": "MEASURED"
+            },
+            "faceShape": {
+                "value": "OVAL",
+                "confidence": "MEDIUM",
+                "source": "MEASURED"
+            },
+            "suggestedFrameShapes": [
+                "RECTANGLE",
+                "WAYFARER",
+                "SQUARE"
+            ],
+            "framesUsed": 30,
+            "lowPlausibility": false,
+            "scaleSource": "CARD"
+        },
+        "screenTests": null,
+        "glassesOn": false
+    },
+    "estimates": {
+        "referralLevel": "NONE",
+        "referralReasons": [],
+        "adviceWithheld": false,
+        "lensType": "SINGLE_VISION",
+        "material": "CR39",
+        "coatings": [
+            "ANTI_REFLECTIVE",
+            "BLUE_FILTER_OPTIONAL"
+        ],
+        "notes": [
+            "PHONE_ESTIMATE_APPROXIMATE",
+            "FIRST_TIME_WEARER"
+        ]
+    }
+}

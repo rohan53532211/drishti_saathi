@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optometrist Bridge</title>
+<style>
+  :root { --bg:#f6f7f8; --card:#fff; --fg:#1b1f23; --muted:#5f6b76; --line:#dde2e6; --teal:#00796b; --red:#b3261e; --amber:#9a6200; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121417; --card:#1c2024; --fg:#e8eaed; --muted:#9aa4ad; --line:#2e343a; --teal:#4db6ac; --red:#f2b8b5; --amber:#ffcc80; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; }
+  header { padding:14px 16px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; flex:1; }
+  main { display:grid; grid-template-columns:minmax(260px, 360px) 1fr; gap:16px; padding:16px; max-width:1200px; margin:0 auto; }
+  @media (max-width: 760px) { main { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .list button { display:block; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--line); padding:10px 4px; color:inherit; font:inherit; cursor:pointer; }
+  .list button:hover, .list button.sel { background:color-mix(in srgb, var(--teal) 10%, transparent); }
+  .tag { display:inline-block; font-size:12px; padding:1px 8px; border-radius:99px; border:1px solid currentColor; margin-left:6px; }
+  .waiting { color:var(--amber); } .reviewed { color:var(--teal); } .urgent { color:var(--red); } .demo { color:var(--red); }
+  .muted { color:var(--muted); font-size:13px; }
+  h2 { font-size:16px; margin:14px 0 6px; }
+  table { border-collapse:collapse; width:100%; } td { border-top:1px solid var(--line); padding:4px 6px; vertical-align:top; }
+  td:first-child { color:var(--muted); width:42%; word-break:break-word; }
+  textarea { width:100%; min-height:140px; font:inherit; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:inherit; }
+  input[type=password] { font:inherit; padding:6px 8px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:inherit; }
+  .btn { background:var(--teal); color:#fff; border:0; border-radius:8px; padding:9px 16px; font:inherit; cursor:pointer; }
+  .btn.secondary { background:none; color:var(--teal); border:1px solid var(--teal); }
+  .note { border-left:3px solid var(--amber); padding:6px 10px; margin:8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Drishti Saathi · Optometrist Bridge</h1>
+  <label class="muted">Token <input type="password" id="token" placeholder="if the server needs one"></label>
+  <button class="btn secondary" id="refresh">Refresh</button>
+</header>
+<main>
+  <section class="card">
+    <div class="muted" id="count">Loading…</div>
+    <div class="list" id="list"></div>
+  </section>
+  <section class="card" id="detail"><p class="muted">Open a profile on the left.</p></section>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let selected = null;
+
+function storedToken() { try { return localStorage.getItem("bridgeToken") || ""; } catch (e) { return ""; } }
+$("token").value = storedToken();
+$("token").addEventListener("change", () => { try { localStorage.setItem("bridgeToken", $("token").value); } catch (e) {} load(); });
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+  const t = $("token").value.trim();
+  if (t) headers["X-Bridge-Token"] = t;
+  const r = await fetch(path, Object.assign({}, opts, { headers }));
+  if (!r.ok) throw new Error(r.status + " " + (await r.text()));
+  return r.status === 204 ? null : r.json();
+}
+
+function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+function when(ms) { return ms ? new Date(ms).toLocaleString() : ""; }
+
+async function load() {
+  try {
+    const rows = await api("/profiles");
+    $("count").textContent = rows.length + " profile(s) · " + rows.filter(r => r.status === "WAITING").length + " waiting";
+    const list = $("list"); list.replaceChildren();
+    rows.forEach(r => {
+      const b = el("button"); if (r.id === selected) b.className = "sel";
+      b.append(el("strong", "Age " + (r.age ?? "?") + " · " + (r.visionProblem ?? "—")));
+      b.append(el("span", r.status === "WAITING" ? "Waiting" : "Reviewed", "tag " + (r.status === "WAITING" ? "waiting" : "reviewed")));
+      if (r.referralLevel === "URGENT") b.append(el("span", "Urgent referral", "tag urgent"));
+      if (r.demo) b.append(el("span", "DEMO", "tag demo"));
+      b.append(el("div", when(r.receivedAt) + " · power: " + (r.powerSource ?? "none"), "muted"));
+      b.onclick = () => open(r.id);
+      list.append(b);
+    });
+  } catch (e) { $("count").textContent = "Could not load: " + e.message; }
+}
+
+function table(obj) {
+  const t = el("table");
+  Object.entries(obj || {}).forEach(([k, v]) => {
+    if (v === null || v === undefined) return;
+    const tr = el("tr"); tr.append(el("td", k));
+    tr.append(el("td", typeof v === "object" ? JSON.stringify(v) : String(v)));
+    t.append(tr);
+  });
+  return t;
+}
+
+async function open(id) {
+  selected = id;
+  const d = $("detail"); d.replaceChildren(el("p", "Loading…", "muted"));
+  try {
+    const { profile: p, review, receivedAt } = await api("/profiles/" + id);
+    d.replaceChildren();
+    d.append(el("h2", "Profile received " + when(receivedAt)));
+    if (p.demo) d.append(el("div", "DEMO session: sample customer, not a real person.", "note"));
+    d.append(el("div", "No name or photo is ever sent. Phone values are estimates, to be confirmed with the trial lens.", "muted"));
+    d.append(el("h2", "Power source: " + (p.powerSource ?? "none")));
+    d.append(table(p.power));
+    d.append(el("h2", "Estimates (lens, referral, notes)")); d.append(table(p.estimates));
+    d.append(el("h2", "Functional vision profile")); d.append(table(p.functionalProfile));
+    d.append(el("h2", "Measurements")); d.append(table(p.measurements));
+    d.append(el("h2", "Interview answers")); d.append(table(p.answers));
+    d.append(el("h2", "Consent")); d.append(table(p.consent));
+
+    d.append(el("h2", "Your advice to the shop"));
+    if (review.status === "REVIEWED") d.append(el("div", "Reviewed " + when(review.reviewedAt) + ". Submitting again replaces it.", "muted"));
+    const ta = el("textarea"); ta.maxLength = 4000; ta.value = review.advice || ""; d.append(ta);
+    const lab = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!review.needsInPersonExam;
+    lab.append(cb, document.createTextNode(" Needs an in-person eye exam"));
+    const flagRow = el("div"); flagRow.append(lab); d.append(flagRow);
+    const btn = el("button", "Submit advice", "btn"); const msg = el("span", "", "muted");
+    btn.onclick = async () => {
+      if (!ta.value.trim()) { msg.textContent = " Write some advice first."; return; }
+      btn.disabled = true;
+      try {
+        await api("/profiles/" + id + "/review", { method: "POST", body: JSON.stringify({ advice: ta.value, needsInPersonExam: cb.checked }) });
+        msg.textContent = " Sent. The shop sees it when they refresh."; load();
+      } catch (e) { msg.textContent = " Failed: " + e.message; }
+      btn.disabled = false;
+    };
+    const row = el("div"); row.style.marginTop = "10px"; row.append(btn, msg); d.append(row);
+  } catch (e) { d.replaceChildren(el("p", "Could not open: " + e.message, "muted")); }
+  load();
+}
+
+$("refresh").onclick = load;
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>

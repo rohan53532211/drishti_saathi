@@ -1,0 +1,236 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "bdb9bd07b9463bdfdcf7b151d385ec9c",
+    "entities": [
+      {
+        "tableName": "sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `createdAt` INTEGER NOT NULL, `lang` TEXT NOT NULL, `phoneModel` TEXT NOT NULL, `answersJson` TEXT NOT NULL, `staffJson` TEXT NOT NULL, `resultJson` TEXT NOT NULL, `referralLevel` TEXT NOT NULL, `consentAt` INTEGER, `finalTrialRight` TEXT, `finalTrialLeft` TEXT, `finalAdd` TEXT, `pdMeterMm` REAL, `verifiedAt` INTEGER, `measurementsJson` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lang",
+            "columnName": "lang",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "phoneModel",
+            "columnName": "phoneModel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "answersJson",
+            "columnName": "answersJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staffJson",
+            "columnName": "staffJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resultJson",
+            "columnName": "resultJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "referralLevel",
+            "columnName": "referralLevel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "consentAt",
+            "columnName": "consentAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "finalTrialRight",
+            "columnName": "finalTrialRight",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "finalTrialLeft",
+            "columnName": "finalTrialLeft",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "finalAdd",
+            "columnName": "finalAdd",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pdMeterMm",
+            "columnName": "pdMeterMm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "verifiedAt",
+            "columnName": "verifiedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "measurementsJson",
+            "columnName": "measurementsJson",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "device_corrections",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`phoneModel` TEXT NOT NULL, `intercept` REAL NOT NULL, `slope` REAL NOT NULL, `sessions` INTEGER NOT NULL, `eyes` INTEGER NOT NULL, `residualSdD` REAL NOT NULL, `maxCorrectionD` REAL NOT NULL, `fittedAt` INTEGER NOT NULL, PRIMARY KEY(`phoneModel`))",
+        "fields": [
+          {
+            "fieldPath": "phoneModel",
+            "columnName": "phoneModel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intercept",
+            "columnName": "intercept",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slope",
+            "columnName": "slope",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessions",
+            "columnName": "sessions",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eyes",
+            "columnName": "eyes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "residualSdD",
+            "columnName": "residualSdD",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxCorrectionD",
+            "columnName": "maxCorrectionD",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fittedAt",
+            "columnName": "fittedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "phoneModel"
+          ]
+        }
+      },
+      {
+        "tableName": "remote_reviews",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sessionId` INTEGER NOT NULL, `remoteId` TEXT NOT NULL, `backendUrl` TEXT NOT NULL, `sentAt` INTEGER NOT NULL, `consentAt` INTEGER NOT NULL, `status` TEXT NOT NULL, `advice` TEXT, `needsInPersonExam` INTEGER, `reviewedAt` INTEGER, `checkedAt` INTEGER, PRIMARY KEY(`sessionId`))",
+        "fields": [
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteId",
+            "columnName": "remoteId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backendUrl",
+            "columnName": "backendUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sentAt",
+            "columnName": "sentAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "consentAt",
+            "columnName": "consentAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "advice",
+            "columnName": "advice",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "needsInPersonExam",
+            "columnName": "needsInPersonExam",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "reviewedAt",
+            "columnName": "reviewedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "checkedAt",
+            "columnName": "checkedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sessionId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bdb9bd07b9463bdfdcf7b151d385ec9c')"
+    ]
+  }
+}

@@ -6,6 +6,8 @@
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
     <!-- Track D: Hindi speech recognition for the voice interview (typed/buttons always available). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Remote Optometrist Bridge: only after the customer's spoken and tapped consent; never a name or photo. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Android 11+ package visibility for speech services. -->
     <queries>

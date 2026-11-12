@@ -162,6 +162,25 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
   - thresholds in `rules.json` → `functionalProfile`
 - Voice: keywords for all new choice questions. NOT SURE outranks NO, so "पता नहीं" is not read as "नहीं". The blur keyword listener runs without a read-back (the tap does the same) and is not used with the system voice dialog, because it covers the screen.
 
+**Remote Optometrist Bridge (12 Nov):**
+- `backend/`: FastAPI + SQLite and a plain web page for the optometrist (list, open, write advice, "needs in-person exam", submit).
+  - API: `POST/GET /profiles`, `GET /profiles/{id}`, `POST/GET /profiles/{id}/review`, `DELETE /profiles/{id}`, `/health`.
+  - An optional shared token (`BRIDGE_TOKEN`, header `X-Bridge-Token`).
+  - The server rejects a profile without spoken and tapped consent, any name / photo / image / phone / email / address key at any depth, strings over 2,000 characters and bodies over 256 KB.
+- App:
+  - "Send to optometrist" on the summary opens a consent screen. The text is read aloud; staff tick "the customer said yes" (spoken), then the customer taps "I agree, send" (tapped).
+  - The summary card shows Waiting / Reviewed and the reply, and is red when an in-person exam is needed. It refreshes once when the summary opens and on "Check for reply".
+  - Server address and token are in staff mode → Optometrist bridge settings, with "Test connection".
+- The profile contains:
+  - answers and the functional profile
+  - the power source and values (bands, starting trial lens, add, the known power or the phone estimate)
+  - measurements: PD, face width, face numbers, screen tests
+  - estimates: referral, lens type, material, coatings, notes
+  - never the frame list
+- Room v5 table `remote_reviews` (one row per sent session). Deleting the session deletes the row and, best effort, the server copy.
+- Plain `http://` is allowed in the debug build only (`src/debug/AndroidManifest.xml`).
+- Contract: `backend/tests/fixtures/app_profile.json` is produced by the app's `BridgeProfileTest` and must be accepted by the server.
+
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:
@@ -184,6 +203,12 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
     - Check the quick far point against the full test on a few myopes.
     - Check that "dhundhla" is recognised while the phone moves, and that the TTS instruction does not trigger it.
     - The `functionalProfile` hours are starting guesses.
+
+13. Remote Optometrist Bridge is a demo setup:
+    - one shared token, no per-optometrist login, no audit log
+    - the token is in plain app preferences (backups are off)
+    - before real use: proper authentication, hosting with encryption at rest, a retention rule, a DPDP Act review
+    - the optometrist's reply is shown as written (not translated)
 
 ## Next steps
 1. Phone: install via adb, voice check, then the checklist above; feed measured values back into `rules.json`.

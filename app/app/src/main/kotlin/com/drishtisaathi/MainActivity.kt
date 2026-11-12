@@ -53,6 +53,9 @@ import com.drishtisaathi.demo.DemoCustomers
 import com.drishtisaathi.vision.CameraVisionTestFlow
 import com.drishtisaathi.vision.CameraQuickEstimateFlow
 import com.drishtisaathi.ui.CompareOfferScreen
+import com.drishtisaathi.ui.BridgeConsentScreen
+import com.drishtisaathi.ui.BridgeSettingsScreen
+import com.drishtisaathi.ui.RemoteReviewCard
 import com.drishtisaathi.engine.PowerKnown
 import com.drishtisaathi.engine.QuickEstimate
 import androidx.compose.runtime.mutableStateOf
@@ -94,6 +97,9 @@ private object Routes {
     const val CAMERA_DEBUG = "cameraDebug"
     const val SCREEN_CAL = "screenCalibration"
     const val DEMO = "demo"
+    // Remote Optometrist Bridge
+    const val BRIDGE_CONSENT = "bridgeConsent"
+    const val BRIDGE_SETTINGS = "bridgeSettings"
 
     fun tryOn(frameId: String?) = "tryOn" + (frameId?.let { "?frame=$it" } ?: "")
 }
@@ -148,6 +154,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     BigButton(SFlow.cameraCheck[l], { nav.navigate(Routes.CAMERA_DEBUG) })
                     BigButton(SFlow.screenCalibration[l], { nav.navigate(Routes.SCREEN_CAL) })
                     BigButton(SFlow.demoMode[l], { nav.navigate(Routes.DEMO) })
+                    BigButton(com.drishtisaathi.i18n.SBridge.settingsTitle[l], { nav.navigate(Routes.BRIDGE_SETTINGS) })
                 },
             )
         }
@@ -345,6 +352,30 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onToggleCompare = vm::toggleCompare,
                 onCompare = { nav.navigate(Routes.COMPARE) },
                 onTryOn = { id -> nav.navigate(Routes.tryOn(id)) },
+                remoteCard = {
+                    val bridge by vm.bridgeSettings.config.collectAsStateWithLifecycle()
+                    RemoteReviewCard(
+                        state, configured = bridge.isValid,
+                        onSend = { vm.clearBridgeError(); nav.navigate(Routes.BRIDGE_CONSENT) },
+                        onCheck = { vm.checkReview() },
+                    )
+                },
+            )
+        }
+        composable(Routes.BRIDGE_CONSENT) {
+            BridgeConsentScreen(
+                state.lang, vm::setLang, voice.instructionSpeaker, state.bridgeBusy, state.bridgeError,
+                onSend = { consent -> vm.sendToOptometrist(consent) { nav.popBackStack() } },
+                onCancel = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.BRIDGE_SETTINGS) {
+            val bridge by vm.bridgeSettings.config.collectAsStateWithLifecycle()
+            BridgeSettingsScreen(
+                state.lang, vm::setLang, bridge,
+                onSave = vm.bridgeSettings::save,
+                onTest = vm::testBridge,
+                onBack = { nav.popBackStack() },
             )
         }
         // ---- M5 live try-on (addition 8) ----

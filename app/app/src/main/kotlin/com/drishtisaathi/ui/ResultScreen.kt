@@ -48,6 +48,8 @@ fun ResultScreen(
     onCompare: () -> Unit = {},
     /** Live try-on (addition 8); the argument is the frame to start with, null = first. */
     onTryOn: ((String?) -> Unit)? = null,
+    /** Remote Optometrist Bridge card (send / waiting / reviewed). */
+    remoteCard: @Composable () -> Unit = {},
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -163,6 +165,8 @@ fun ResultScreen(
                     }
                 }
             }
+
+            remoteCard()
 
             // ---- Notes + measurements ----
             if (a.notes.isNotEmpty()) {

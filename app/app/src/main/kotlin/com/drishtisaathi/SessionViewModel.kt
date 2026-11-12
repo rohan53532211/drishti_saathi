@@ -23,6 +23,16 @@ import com.drishtisaathi.engine.vision.DeviceFit
 import com.drishtisaathi.engine.DrishtiEngine
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.KnownRx
+import com.drishtisaathi.bridge.BridgeClient
+import com.drishtisaathi.bridge.BridgeConfig
+import com.drishtisaathi.bridge.BridgeConsent
+import com.drishtisaathi.bridge.BridgeException
+import com.drishtisaathi.bridge.BridgeHealth
+import com.drishtisaathi.bridge.BridgeProfile
+import com.drishtisaathi.bridge.BridgeSettings
+import com.drishtisaathi.data.RemoteReviewEntity
+import com.drishtisaathi.i18n.SBridge
+import com.drishtisaathi.i18n.Txt
 import com.drishtisaathi.engine.PowerKnown
 import com.drishtisaathi.engine.QuickEstimate
 import com.drishtisaathi.engine.anamnesis.QuickEstimator
@@ -87,6 +97,10 @@ data class UiState(
     val quick: QuickEstimate? = null,
     /** Staff: also run the full far-point test (and clock dial) in the screen tests. */
     val fullFarTest: Boolean = false,
+    /** Remote Optometrist Bridge: what was sent for this session and the reply; null = not sent. */
+    val remote: RemoteReviewEntity? = null,
+    val bridgeBusy: Boolean = false,
+    val bridgeError: Txt? = null,
 ) {
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
     val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
@@ -146,6 +160,79 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
             else db.deviceCorrections().upsert(DeviceCorrectionEntity.from(phoneModel, fit, System.currentTimeMillis()))
             _deviceFit.value = fit
         }
+    }
+
+    // ---- Remote Optometrist Bridge ------------------------------------------------------------
+
+    val bridgeSettings = BridgeSettings(app)
+    private val remoteDao = db.remoteReviews()
+    private val appVersion: String = runCatching {
+        app.packageManager.getPackageInfo(app.packageName, 0).versionName
+    }.getOrNull() ?: "?"
+
+    private fun errorText(e: BridgeException): Txt = when (e.kind) {
+        BridgeException.Kind.NOT_CONFIGURED -> SBridge.notConfigured
+        BridgeException.Kind.NETWORK -> SBridge.errNetwork
+        BridgeException.Kind.UNAUTHORIZED -> SBridge.errToken
+        BridgeException.Kind.REJECTED -> SBridge.errRejected.format(e.detail)
+        BridgeException.Kind.NOT_FOUND -> SBridge.errGone
+        BridgeException.Kind.SERVER -> SBridge.errServer.format(e.detail)
+    }
+
+    /** Settings screen "Test connection": null on success, else the error to show. */
+    suspend fun testBridge(c: BridgeConfig): Pair<BridgeHealth?, Txt?> = withContext(Dispatchers.IO) {
+        try {
+            val h = BridgeClient(c).health()
+            if (!h.tokenOk) null to SBridge.errToken else h to null
+        } catch (e: BridgeException) { null to errorText(e) }
+    }
+
+    /** Sends the profile (only with spoken and tapped consent), stores the server id; [onSent] runs on success. */
+    fun sendToOptometrist(consent: BridgeConsent, onSent: () -> Unit) = viewModelScope.launch {
+        if (!consent.complete || _state.value.bridgeBusy) return@launch
+        saveJob?.join() // the session row must exist first
+        val s = _state.value
+        val id = s.sessionId ?: run { _state.update { it.copy(bridgeError = SBridge.errNoSession) }; return@launch }
+        val cfg = bridgeSettings.config.value
+        _state.update { it.copy(bridgeBusy = true, bridgeError = null) }
+        try {
+            val profile = BridgeProfile.build(s, rules, consent, appVersion)
+            val created = withContext(Dispatchers.IO) { BridgeClient(cfg).send(profile) }
+            val e = RemoteReviewEntity(id, created.id, cfg.baseUrl, System.currentTimeMillis(), consent.consentAt, created.status)
+            remoteDao.upsert(e)
+            _state.update { it.copy(remote = e, bridgeBusy = false) }
+            onSent()
+        } catch (e: BridgeException) {
+            _state.update { it.copy(bridgeBusy = false, bridgeError = errorText(e)) }
+        }
+    }
+
+    fun clearBridgeError() = _state.update { it.copy(bridgeError = null) }
+
+    /** "Check for reply": asks the server the profile was sent to. */
+    fun checkReview() = viewModelScope.launch {
+        val r = _state.value.remote ?: return@launch
+        if (_state.value.bridgeBusy) return@launch
+        _state.update { it.copy(bridgeBusy = true, bridgeError = null) }
+        try {
+            val cfg = bridgeSettings.config.value.copy(url = r.backendUrl)
+            val rv = withContext(Dispatchers.IO) { BridgeClient(cfg).review(r.remoteId) }
+            val e = r.copy(status = rv.status, advice = rv.advice, needsInPersonExam = rv.needsInPersonExam,
+                reviewedAt = rv.reviewedAt, checkedAt = System.currentTimeMillis())
+            remoteDao.upsert(e)
+            _state.update { if (it.remote?.sessionId == e.sessionId) it.copy(remote = e, bridgeBusy = false) else it.copy(bridgeBusy = false) }
+        } catch (e: BridgeException) {
+            _state.update { it.copy(bridgeBusy = false, bridgeError = errorText(e)) }
+        }
+    }
+
+    /** Session deleted: remove the server copy too (best effort; offline the local row still goes). */
+    private suspend fun removeRemote(sessionId: Long) {
+        val r = remoteDao.get(sessionId) ?: return
+        withContext(Dispatchers.IO) {
+            runCatching { BridgeClient(bridgeSettings.config.value.copy(url = r.backendUrl), timeoutMs = 5_000).delete(r.remoteId) }
+        }
+        remoteDao.delete(sessionId)
     }
 
     /** The pending save; delete waits for it so a fast "Delete" never leaves a row behind. */
@@ -354,6 +441,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Deletes the stored row and any PDFs exported for it. */
     private suspend fun removeSession(id: Long) {
+        removeRemote(id)
         dao.delete(id)
         withContext(Dispatchers.IO) { PdfExporter.deleteFor(getApplication(), id) }
         refitDeviceCorrection()
@@ -367,6 +455,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** Opens a stored session (history) with its saved result, without re-running the engine. */
     fun openSession(id: Long, onLoaded: () -> Unit) = viewModelScope.launch {
         val e = dao.get(id) ?: return@launch
+        val remote = remoteDao.get(id)
         val answers = SessionCodec.answers(e)
         val m = SessionCodec.measurements(e)
         _state.update {
@@ -387,6 +476,8 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 demo = m.demo,
                 glassesOn = m.glassesOn,
                 quick = m.quick,
+                remote = remote,
+                bridgeError = null,
                 verification = Verification(
                     e.finalTrialRight.orEmpty(), e.finalTrialLeft.orEmpty(), e.finalAdd.orEmpty(), e.pdMeterMm, e.verifiedAt,
                 ),
