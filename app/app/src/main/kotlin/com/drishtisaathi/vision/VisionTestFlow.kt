@@ -74,6 +74,8 @@ fun VisionTestFlow(
     workingDistanceM: Double? = null,
     onInstruction: (Txt) -> Unit = {},
     debugDistance: FakeDistanceProvider? = distance as? FakeDistanceProvider,
+    farPoint: Boolean = true,
+    nearPoint: Boolean = true,
 ) {
     val cfg = rules.visionTests
     val simulated = distance is FakeDistanceProvider
@@ -92,7 +94,7 @@ fun VisionTestFlow(
     val env = remember(lang, rules, scale, onInstruction) { TestEnv(lang, rules, scale, onInstruction) }
     val wd = workingDistanceM ?: env.vm.workingDistanceM(occupation)
 
-    val steps = remember(age, rules) { VisionFlowPlan.steps(age, rules) }
+    val steps = remember(age, rules, farPoint, nearPoint) { VisionFlowPlan.steps(age, rules, farPoint, nearPoint) }
     var index by remember { mutableIntStateOf(0) }
     var phase by remember { mutableStateOf(Phase.INTRO) }
     var run by remember { mutableIntStateOf(0) }
@@ -274,16 +276,20 @@ fun CameraVisionTestFlow(
     workingDistanceM: Double? = null,
     onInstruction: (Txt) -> Unit = {},
     allowDemoWithoutCamera: Boolean = false,
+    farPoint: Boolean = true,
+    nearPoint: Boolean = true,
 ) {
     var demo by remember { mutableStateOf(false) }
     if (demo) {
         val fake = remember { FakeDistanceProvider() }
-        VisionTestFlow(lang, rules, fake, calibration, age, occupation, onDone, onCancel, modifier, workingDistanceM, onInstruction)
+        VisionTestFlow(lang, rules, fake, calibration, age, occupation, onDone, onCancel, modifier, workingDistanceM, onInstruction,
+            farPoint = farPoint, nearPoint = nearPoint)
         return
     }
     CameraPermissionGate(lang, onSkip = { if (allowDemoWithoutCamera) demo = true else onCancel() }) {
         val tracker = rememberFaceTracker(rules.camera)
         val provider = remember(tracker) { CameraDistanceProvider(tracker, calibration, rules.camera, controlsTracker = false) }
-        VisionTestFlow(lang, rules, provider, calibration, age, occupation, onDone, onCancel, modifier, workingDistanceM, onInstruction)
+        VisionTestFlow(lang, rules, provider, calibration, age, occupation, onDone, onCancel, modifier, workingDistanceM, onInstruction,
+            farPoint = farPoint, nearPoint = nearPoint)
     }
 }

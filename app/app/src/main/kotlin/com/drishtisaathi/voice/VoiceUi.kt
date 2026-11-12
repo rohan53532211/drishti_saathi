@@ -43,7 +43,7 @@ import com.drishtisaathi.ui.TealLight
 /** Builds the app's single voice controller (Android TTS + SpeechRecognizer + lexicon from assets). */
 fun createVoiceController(context: Context, readAloudByDefault: Boolean = true): VoiceController {
     val app = context.applicationContext
-    val lexicon = VoiceLexicon.parse(app.assets.open(VoiceLexicon.ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() })
+    val lexicon = VoiceLexicon.fromQuestionsFile(com.drishtisaathi.interview.QuestionBank.text)
     return VoiceController(AndroidTtsSpeaker(app), AndroidSpeechInput(app), VoiceParser(lexicon), readAloudByDefault)
 }
 

@@ -6,6 +6,18 @@ import com.drishtisaathi.engine.face.FaceShape
 /** User-facing text for the integrated flow (capture → tests → results). Create every string with tx(en, hi). */
 object SFlow {
     // ---- flow steps ----
+    // ---- glasses off before the camera steps and screen tests ----
+    val glassesOffTitle = tx("Please take off your glasses", "कृपया अपना चश्मा उतार दें")
+    val glassesOffBody = tx(
+        "If you are wearing glasses or sunglasses, please take them off now and keep them off for the face measurement and the eye checks. Contact lenses: please tell the staff.",
+        "अगर आपने चश्मा या धूप का चश्मा पहना है, तो कृपया अभी उतार दें और चेहरे के माप और आँखों की जाँच पूरी होने तक उतारे रखें। कॉन्टैक्ट लेंस हों तो स्टाफ़ को बताएँ।",
+    )
+    val glassesOffDone = tx("Glasses are off: continue", "चश्मा उतार दिया: आगे बढ़ें")
+    val glassesOnStaff = tx("Staff: continue with glasses on", "स्टाफ़: चश्मा पहने हुए आगे बढ़ें")
+    val glassesOnNote = tx(
+        "Staff override: face measurement and eye checks were done with glasses ON. Screen-test results are on top of the current glasses, not the bare eyes.",
+        "स्टाफ़ ने बदला: चेहरे का माप और आँखों की जाँच चश्मा पहने हुए की गई। स्क्रीन-टेस्ट के नतीजे मौजूदा चश्मे के ऊपर के हैं, खाली आँखों के नहीं।",
+    )
     val stepCard = tx("Step 1 of 3: card size check (optional)", "चरण 1/3: कार्ड से साइज़ जाँच (वैकल्पिक)")
     val stepCapture = tx("Step 2 of 3: face measurement", "चरण 2/3: चेहरे का माप")
     val stepTests = tx("Step 3 of 3: eye checks on the screen", "चरण 3/3: स्क्रीन पर आँखों की जाँच")

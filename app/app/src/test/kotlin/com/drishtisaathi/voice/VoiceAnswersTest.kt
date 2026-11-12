@@ -38,6 +38,6 @@ class VoiceAnswersTest {
         assertEquals(S.dontKnow, VoiceAnswers.label(q("glassesAgeYears"), VoiceAnswer.Number(null), ctx))
         assertEquals(S.years.format(4), VoiceAnswers.label(q("glassesAgeYears"), VoiceAnswer.Number(4), ctx))
         assertEquals(S.budget(Budget.LOW, 2000, 5000), VoiceAnswers.label(q("budget"), VoiceAnswer.Choice(Budget.LOW), ctx))
-        assertEquals("आपने कहा: हाँ. सही है?", VoiceAnswers.readBack(q("nearBlur"), VoiceAnswer.YesNo(true), ctx).hi)
+        assertEquals("आपने कहा: हाँ. सही है?", VoiceAnswers.readBack(q("nightDriving"), VoiceAnswer.YesNo(true), ctx).hi)
     }
 }

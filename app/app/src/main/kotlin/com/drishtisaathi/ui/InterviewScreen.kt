@@ -53,10 +53,11 @@ fun InterviewScreen(
     onOldNumbersYes: () -> Unit,
     onBack: () -> Unit,
     voice: VoiceController? = null,
+    /** Shown under the first question before anything is answered (the AI voice interview option). */
+    startExtra: (@Composable () -> Unit)? = null,
 ) {
     val l = state.lang
     val q = state.currentQuestion ?: return
-    val total = state.visibleQuestions.size
     val idx = state.questionIndex
 
     if (voice != null) VoiceEffects(voice, q, l, choiceContext, onAnswer, onOldNumbersYes)
@@ -66,10 +67,11 @@ fun InterviewScreen(
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(S.questionOf.format(idx + 1, total)[l], style = MaterialTheme.typography.bodyMedium)
-            LinearProgressIndicator(progress = { (idx + 1f) / total }, modifier = Modifier.fillMaxWidth())
+            // No numbering: follow-ups depend on the answers, so a count would only jump around.
+            Text((if (state.stage == com.drishtisaathi.interview.Stage.LATER) com.drishtisaathi.i18n.SShop.fewMoreQuestions
+                else com.drishtisaathi.i18n.SShop.aboutYourEyes)[l], style = MaterialTheme.typography.titleMedium, color = Teal)
             Text(q.text[l], style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 12.dp))
-            if (voice != null) VoicePanel(voice, l, showDiagnostics = state.staffMode)
+            if (voice != null) VoicePanel(voice, l, showDiagnostics = false)
 
             when (q) {
                 is Question.YesNo -> {
@@ -85,6 +87,7 @@ fun InterviewScreen(
                     BigButton(S.no[l], { onAnswer(q.id) { a -> a.copy(knownRx = null) } }, selected = answeredNo)
                 }
             }
+            if (startExtra != null && idx == 0 && state.answered.isEmpty()) startExtra()
         }
     }
 }

@@ -39,7 +39,7 @@ import com.drishtisaathi.ui.BigButton
  * "open settings" when Android will no longer show the dialog.
  */
 @Composable
-fun CameraPermissionGate(lang: Lang, onSkip: () -> Unit, content: @Composable () -> Unit) {
+fun CameraPermissionGate(lang: Lang, onSkip: () -> Unit, autoRequest: Boolean = false, content: @Composable () -> Unit) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(hasCameraPermission(context)) }
     var askedOnce by rememberSaveable { mutableStateOf(false) }
@@ -55,6 +55,10 @@ fun CameraPermissionGate(lang: Lang, onSkip: () -> Unit, content: @Composable ()
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
 
+    // Power path: show the system dialog straight away instead of waiting for "Allow camera".
+    androidx.compose.runtime.LaunchedEffect(autoRequest) {
+        if (autoRequest && !granted && !askedOnce) launcher.launch(Manifest.permission.CAMERA)
+    }
     if (granted) {
         content()
         return

@@ -88,7 +88,6 @@ fun CompareScreen(state: UiState, engine: DrishtiEngine, rules: RulesConfig, onL
             Section(S.rowWhy[l]) {
                 Pair({ Column { ReasonBullets(a, l) } }, { Column { ReasonBullets(b, l) } })
             }
-            if (state.staffMode) Section(S.rowScores[l]) { TextPair(scores(a), scores(b), better = compareBy(-a.score, -b.score)) }
             Disclaimer()
         }
     }

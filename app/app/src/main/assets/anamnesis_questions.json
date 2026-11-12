@@ -1,0 +1,702 @@
+{
+  "schemaVersion": 1,
+  "notes": "Scripted anamnesis: question texts (Hindi and English), answer options, the stage (CORE = before the eye check, LATER = after it), follow-up rules (showIf: every condition must hold; 'answer' compares the saved answer, 'flag' is urgent / notUrgent / powerPath), the voice keywords, and the topics the backend's AI interview covers. The app and the backend both read this file.",
+  "questions": [
+    {
+      "id": "age",
+      "stage": "CORE",
+      "askWhenUrgent": true,
+      "text": {"en": "How old are you?", "hi": "आपकी उम्र क्या है?"},
+      "kind": "number",
+      "hint": {"en": "Age in years", "hi": "उम्र (साल में)"},
+      "range": [3, 110],
+      "allowUnknown": false,
+      "showIf": []
+    },
+    {
+      "id": "visionProblem",
+      "stage": "CORE",
+      "askWhenUrgent": true,
+      "text": {"en": "Do you have trouble seeing far, near, or both?", "hi": "क्या आपको दूर का, पास का, या दोनों देखने में दिक्कत है?"},
+      "kind": "choice",
+      "options": {
+        "DISTANCE": {"en": "Far", "hi": "दूर का"},
+        "NEAR": {"en": "Near", "hi": "पास का"},
+        "BOTH": {"en": "Both", "hi": "दोनों"},
+        "NONE": {"en": "No trouble", "hi": "कोई दिक्कत नहीं"}
+      },
+      "showIf": []
+    },
+    {
+      "id": "redFlagFlashes",
+      "stage": "CORE",
+      "askWhenUrgent": true,
+      "text": {"en": "Have you suddenly seen flashes of light, floating spots, or a curtain in front of the eye?", "hi": "क्या अचानक रोशनी की चमक, तैरते धब्बे या आँख के आगे पर्दा जैसा दिखा है?"},
+      "kind": "yesNo",
+      "showIf": []
+    },
+    {
+      "id": "redFlagOther",
+      "stage": "CORE",
+      "askWhenUrgent": true,
+      "text": {"en": "Has your vision suddenly dropped, or do you have eye pain or redness, rings around lights with pain, or double vision?", "hi": "क्या अचानक नज़र कम हुई, आँख में दर्द-लाली, दर्द के साथ रोशनी के चारों ओर घेरे, या दो-दो दिखता है?"},
+      "kind": "yesNo",
+      "showIf": []
+    },
+    {
+      "id": "redFlagOnset",
+      "stage": "CORE",
+      "askWhenUrgent": true,
+      "text": {"en": "When did this start?", "hi": "यह कब शुरू हुआ?"},
+      "kind": "choice",
+      "options": {
+        "TODAY": {"en": "Today", "hi": "आज"},
+        "THIS_WEEK": {"en": "This week", "hi": "इस हफ़्ते"},
+        "LONGER": {"en": "Longer ago", "hi": "उससे पहले"}
+      },
+      "showIf": [{"flag": "urgent"}]
+    },
+    {
+      "id": "redFlagEye",
+      "stage": "CORE",
+      "askWhenUrgent": true,
+      "text": {"en": "Which eye?", "hi": "कौन सी आँख में?"},
+      "kind": "choice",
+      "options": {
+        "RIGHT": {"en": "Right eye", "hi": "दायीं आँख"},
+        "LEFT": {"en": "Left eye", "hi": "बायीं आँख"},
+        "BOTH": {"en": "Both eyes", "hi": "दोनों आँखें"}
+      },
+      "showIf": [{"flag": "urgent"}]
+    },
+    {
+      "id": "nearTask",
+      "stage": "CORE",
+      "text": {"en": "Which close work is hardest?", "hi": "पास का कौन सा काम सबसे मुश्किल लगता है?"},
+      "kind": "choice",
+      "options": {
+        "PHONE": {"en": "Mobile phone", "hi": "मोबाइल"},
+        "NEWSPAPER": {"en": "Newspaper / books", "hi": "अख़बार / किताब"},
+        "SEWING": {"en": "Sewing / fine work", "hi": "सिलाई / बारीक काम"},
+        "ACCOUNTS": {"en": "Accounts / bills", "hi": "हिसाब-किताब / बिल"},
+        "OTHER": {"en": "Something else", "hi": "कुछ और"}
+      },
+      "showIf": [{"answer": "visionProblem", "in": ["NEAR", "BOTH"]}]
+    },
+    {
+      "id": "nearDistance",
+      "stage": "CORE",
+      "text": {"en": "How far do you usually hold your phone or paper?", "hi": "आप मोबाइल या कागज़ आमतौर पर कितनी दूर रखते हैं?"},
+      "kind": "choice",
+      "options": {
+        "VERY_CLOSE": {"en": "Very close (about 25 cm)", "hi": "बहुत पास (लगभग 25 cm)"},
+        "NORMAL": {"en": "Normal (about 35 cm)", "hi": "सामान्य (लगभग 35 cm)"},
+        "ARM_LENGTH": {"en": "Far, almost at arm's length", "hi": "दूर, लगभग हाथ भर"}
+      },
+      "showIf": [{"answer": "visionProblem", "in": ["NEAR", "BOTH"]}]
+    },
+    {
+      "id": "wearsGlasses",
+      "stage": "CORE",
+      "text": {"en": "Do you wear glasses now?", "hi": "क्या आप अभी चश्मा पहनते हैं?"},
+      "kind": "yesNo",
+      "showIf": []
+    },
+    {
+      "id": "glassesAgeYears",
+      "stage": "CORE",
+      "text": {"en": "How many years old are your glasses?", "hi": "चश्मा कितने साल पुराना है?"},
+      "kind": "number",
+      "hint": {"en": "Years", "hi": "साल"},
+      "range": [0, 60],
+      "allowUnknown": true,
+      "showIf": [{"answer": "wearsGlasses", "in": ["true"]}]
+    },
+    {
+      "id": "happyWithGlasses",
+      "stage": "CORE",
+      "text": {"en": "Are you happy with your current glasses?", "hi": "क्या आप अपने मौजूदा चश्मे से संतुष्ट हैं?"},
+      "kind": "yesNo",
+      "showIf": [{"answer": "wearsGlasses", "in": ["true"]}]
+    },
+    {
+      "id": "diabetesOrBp",
+      "stage": "CORE",
+      "text": {"en": "Do you have sugar (diabetes) or BP?", "hi": "क्या आपको शुगर या बीपी है?"},
+      "kind": "yesNo",
+      "showIf": []
+    },
+    {
+      "id": "straightLinesBent",
+      "stage": "CORE",
+      "text": {"en": "Do straight lines like door frames or tiles look bent or wavy?", "hi": "क्या दरवाज़े की चौखट या टाइल जैसी सीधी लकीरें टेढ़ी या लहरदार दिखती हैं?"},
+      "kind": "yesNo",
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "powerKnown",
+      "stage": "CORE",
+      "text": {"en": "Do you remember your glasses power, or have the slip?", "hi": "क्या आपको अपने चश्मे का नंबर याद है, या पर्ची है?"},
+      "kind": "choice",
+      "options": {
+        "YES": {"en": "Yes, I know it / have the slip", "hi": "हाँ, याद है / पर्ची है"},
+        "NOT_SURE": {"en": "Not sure", "hi": "पक्का नहीं पता"},
+        "NO": {"en": "No", "hi": "नहीं"}
+      },
+      "showIf": [{"flag": "powerPath"}]
+    },
+    {
+      "id": "distanceSituation",
+      "stage": "LATER",
+      "text": {"en": "Where do you notice it most?", "hi": "यह दिक्कत सबसे ज़्यादा कहाँ होती है?"},
+      "kind": "choice",
+      "options": {
+        "DRIVING": {"en": "Driving", "hi": "गाड़ी चलाते समय"},
+        "TV": {"en": "Watching TV", "hi": "टीवी देखते समय"},
+        "SIGNBOARDS": {"en": "Reading signboards / bus numbers", "hi": "बोर्ड / बस के नंबर पढ़ते समय"},
+        "CLASSROOM_BOARD": {"en": "Classroom board", "hi": "क्लास का बोर्ड"},
+        "OTHER": {"en": "Something else", "hi": "कुछ और"}
+      },
+      "showIf": [{"answer": "visionProblem", "in": ["DISTANCE", "BOTH"]}]
+    },
+    {
+      "id": "distanceSince",
+      "stage": "LATER",
+      "text": {"en": "Since when has far-away been blurry?", "hi": "दूर का धुंधला कब से दिख रहा है?"},
+      "kind": "choice",
+      "options": {
+        "UNDER_6_MONTHS": {"en": "Less than 6 months", "hi": "6 महीने से कम"},
+        "MONTHS_6_TO_24": {"en": "6 months to 2 years", "hi": "6 महीने से 2 साल"},
+        "OVER_2_YEARS": {"en": "More than 2 years", "hi": "2 साल से ज़्यादा"}
+      },
+      "showIf": [{"answer": "visionProblem", "in": ["DISTANCE", "BOTH"]}]
+    },
+    {
+      "id": "firstTimeWearer",
+      "stage": "LATER",
+      "text": {"en": "Will these be your first glasses?", "hi": "क्या यह आपका पहला चश्मा होगा?"},
+      "kind": "yesNo",
+      "showIf": [{"answer": "wearsGlasses", "in": ["false"]}]
+    },
+    {
+      "id": "headacheStrain",
+      "stage": "LATER",
+      "text": {"en": "Do you get headaches or tired eyes?", "hi": "क्या सिरदर्द या आँखों में थकान होती है?"},
+      "kind": "yesNo",
+      "showIf": []
+    },
+    {
+      "id": "readingFrequency",
+      "stage": "LATER",
+      "text": {"en": "How much do you read or do close work?", "hi": "आप कितना पढ़ते हैं या पास का काम करते हैं?"},
+      "kind": "choice",
+      "options": {
+        "RARELY": {"en": "Rarely", "hi": "कभी-कभार"},
+        "SOMETIMES": {"en": "Sometimes, for short periods", "hi": "कभी-कभी, थोड़ी देर"},
+        "DAILY_LONG": {"en": "Every day, for long periods", "hi": "रोज़, लंबे समय तक"}
+      },
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "screenHours",
+      "stage": "LATER",
+      "text": {"en": "How many hours a day do you look at a mobile or computer?", "hi": "आप रोज़ कितने घंटे मोबाइल या कंप्यूटर देखते हैं?"},
+      "kind": "choice",
+      "options": {
+        "H0_2": {"en": "0–2 hours", "hi": "0–2 घंटे"},
+        "H2_4": {"en": "2–4 hours", "hi": "2–4 घंटे"},
+        "H4_PLUS": {"en": "More than 4 hours", "hi": "4 घंटे से ज़्यादा"}
+      },
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "nightDriving",
+      "stage": "LATER",
+      "text": {"en": "Do you drive at night?", "hi": "क्या आप रात में गाड़ी चलाते हैं?"},
+      "kind": "yesNo",
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "outdoorWork",
+      "stage": "LATER",
+      "text": {"en": "Do you mostly work outside in the sun?", "hi": "क्या आप ज़्यादातर बाहर धूप में काम करते हैं?"},
+      "kind": "yesNo",
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "occupation",
+      "stage": "LATER",
+      "text": {"en": "What is your work?", "hi": "आपका काम क्या है?"},
+      "kind": "choice",
+      "options": {
+        "OFFICE_COMPUTER": {"en": "Office / computer", "hi": "दफ़्तर / कंप्यूटर"},
+        "SHOP_BUSINESS": {"en": "Shop / business", "hi": "दुकान / व्यापार"},
+        "FINE_HANDWORK": {"en": "Fine handwork (tailoring, jewellery, repair)", "hi": "बारीक हाथ का काम (सिलाई, ज़ेवर, मरम्मत)"},
+        "DRIVER": {"en": "Driver", "hi": "ड्राइवर"},
+        "FIELD_OUTDOOR": {"en": "Farm / field / outdoor work", "hi": "खेती / मज़दूरी / बाहर का काम"},
+        "HOMEMAKER": {"en": "Homemaker", "hi": "गृहिणी / घर का काम"},
+        "STUDENT": {"en": "Student", "hi": "विद्यार्थी"},
+        "SPORT_ACTIVE": {"en": "Sports / very active work", "hi": "खेल / भाग-दौड़ वाला काम"},
+        "OTHER": {"en": "Other", "hi": "अन्य"}
+      },
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "budget",
+      "stage": "LATER",
+      "text": {"en": "What is your budget for glasses?", "hi": "चश्मे के लिए आपका बजट कितना है?"},
+      "kind": "choice",
+      "options": {
+        "LOW": {"en": "Low (up to ₹{low})", "hi": "कम (₹{low} तक)"},
+        "MID": {"en": "Medium (₹{low} – ₹{mid})", "hi": "मध्यम (₹{low} – ₹{mid})"},
+        "HIGH": {"en": "Premium (above ₹{mid})", "hi": "प्रीमियम (₹{mid} से ज़्यादा)"}
+      },
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "style",
+      "stage": "LATER",
+      "text": {"en": "What style do you like?", "hi": "आपको कौन सा स्टाइल पसंद है?"},
+      "kind": "choice",
+      "options": {
+        "CLASSIC": {"en": "Classic", "hi": "क्लासिक"},
+        "MODERN": {"en": "Modern", "hi": "मॉडर्न"},
+        "BOLD": {"en": "Bold / thick frame", "hi": "बोल्ड / मोटा फ़्रेम"},
+        "MINIMAL": {"en": "Light / simple", "hi": "हल्का / सादा"},
+        "ANY": {"en": "Anything, show me", "hi": "कोई भी, दिखाइए"}
+      },
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "colourPreference",
+      "stage": "LATER",
+      "text": {"en": "What frame colour do you like?", "hi": "फ़्रेम का कौन सा रंग पसंद है?"},
+      "kind": "choice",
+      "options": {
+        "DARK": {"en": "Black / dark", "hi": "काला / गहरा"},
+        "BROWN_TORTOISE": {"en": "Brown / tortoise", "hi": "भूरा / कछुआ डिज़ाइन"},
+        "METALLIC": {"en": "Gold / silver metal", "hi": "सुनहरा / चाँदी जैसा मेटल"},
+        "COLOURFUL": {"en": "Colourful", "hi": "रंग-बिरंगा"},
+        "ANY": {"en": "Any colour", "hi": "कोई भी रंग"}
+      },
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "lookPreference",
+      "stage": "LATER",
+      "text": {"en": "Is this mainly for work / formal use, or casual everyday use?", "hi": "चश्मा ज़्यादातर काम / औपचारिक मौक़ों के लिए है या रोज़ आम पहनने के लिए?"},
+      "kind": "choice",
+      "options": {
+        "PROFESSIONAL": {"en": "Work / formal", "hi": "काम / औपचारिक"},
+        "CASUAL": {"en": "Casual / everyday", "hi": "आम / रोज़ का"},
+        "BOTH": {"en": "Both", "hi": "दोनों"}
+      },
+      "showIf": [{"flag": "notUrgent"}]
+    },
+    {
+      "id": "lightweightPreference",
+      "stage": "LATER",
+      "text": {"en": "Do you want a very light frame?", "hi": "क्या आपको बहुत हल्का फ़्रेम चाहिए?"},
+      "kind": "yesNo",
+      "showIf": [{"flag": "notUrgent"}]
+    }
+  ],
+  "voiceKeywords": {
+    "version": 1,
+    "notes": "Track D voice lexicon. 'hi' = Devanagari (incl. Devanagari spellings of English words), 'en' = Latin script (English and romanised Hindi). Text is normalised before matching: lower case, nukta removed, chandrabindu = anusvara, Devanagari digits to ASCII, punctuation and hyphens become spaces. Longer phrases win over shorter ones. Add words here; no code change needed.",
+    "yes": {
+      "hi": ["हाँ", "हां", "हा", "हाँ जी", "जी हाँ", "जी", "हांजी", "जी हां", "बिल्कुल", "सही", "सही है", "ठीक है", "ठीक", "यस", "ओके", "हाँ है", "हाँ सही है", "हाँ होती है", "हाँ होता है", "ज़रूर", "पक्का"],
+      "en": ["yes", "yeah", "yep", "yup", "haan", "han", "haa", "ha", "haanji", "ji", "ji haan", "sure", "right", "correct", "ok", "okay", "of course", "theek hai", "sahi", "sahi hai", "bilkul"]
+    },
+    "no": {
+      "hi": ["नहीं", "नही", "ना", "नहीं जी", "जी नहीं", "जी नही", "बिल्कुल नहीं", "कभी नहीं", "गलत", "गलत है", "नो", "नहीं है", "नहीं होती", "नहीं होता", "नहीं होती है", "नहीं होता है", "सही नहीं", "मत"],
+      "en": ["no", "nahi", "nahin", "nai", "na", "nope", "not", "never", "wrong", "galat", "ji nahi", "no no", "incorrect"]
+    },
+    "weakYes": {
+      "hi": ["है", "हैं", "हूँ", "होती है", "होता है", "होती", "होता", "करता हूँ", "करती हूँ", "चलाता हूँ", "चलाती हूँ", "पहनता हूँ", "पहनती हूँ", "दिखती हैं", "दिखता है", "थोड़ा", "थोड़ी", "कभी कभी"],
+      "en": ["i do", "i have", "do", "have", "a little", "little bit", "sometimes", "kabhi kabhi", "thoda"]
+    },
+    "dontKnow": {
+      "hi": ["पता नहीं", "पता नही", "मालूम नहीं", "मालूम नही", "याद नहीं", "याद नही", "नहीं पता", "नहीं मालूम", "नहीं याद"],
+      "en": ["dont know", "don't know", "do not know", "not sure", "pata nahi", "pata nahin", "maloom nahi", "yaad nahi", "no idea", "cant remember", "can't remember"]
+    },
+    "tagWords": {
+      "hi": ["ना"],
+      "en": ["na"]
+    },
+    "negators": {
+      "hi": ["नहीं", "नही", "ना", "मत"],
+      "en": ["nahi", "nahin", "nai", "na"]
+    },
+    "preNegators": {
+      "hi": ["बिना"],
+      "en": ["not", "dont", "don't", "never", "without"]
+    },
+    "numbers": {
+      "words": {
+        "शून्य": 0, "जीरो": 0, "एक": 1, "दो": 2, "तीन": 3, "चार": 4, "पांच": 5, "छह": 6, "छः": 6, "छे": 6, "सात": 7, "आठ": 8, "नौ": 9, "दस": 10,
+        "ग्यारह": 11, "बारह": 12, "तेरह": 13, "चौदह": 14, "पंद्रह": 15, "पन्द्रह": 15, "सोलह": 16, "सत्रह": 17, "अठारह": 18, "उन्नीस": 19, "बीस": 20,
+        "इक्कीस": 21, "बाईस": 22, "तेईस": 23, "चौबीस": 24, "पच्चीस": 25, "छब्बीस": 26, "सत्ताईस": 27, "अट्ठाईस": 28, "अठ्ठाईस": 28, "अठाईस": 28, "उनतीस": 29, "तीस": 30,
+        "इकतीस": 31, "बत्तीस": 32, "तैंतीस": 33, "चौंतीस": 34, "पैंतीस": 35, "छत्तीस": 36, "सैंतीस": 37, "अड़तीस": 38, "उनतालीस": 39, "उन्तालीस": 39, "चालीस": 40,
+        "इकतालीस": 41, "बयालीस": 42, "तैंतालीस": 43, "चवालीस": 44, "चौवालीस": 44, "पैंतालीस": 45, "छियालीस": 46, "सैंतालीस": 47, "अड़तालीस": 48, "उनचास": 49, "पचास": 50,
+        "इक्यावन": 51, "बावन": 52, "तिरेपन": 53, "तिरपन": 53, "चौवन": 54, "पचपन": 55, "छप्पन": 56, "सत्तावन": 57, "अट्ठावन": 58, "उनसठ": 59, "साठ": 60,
+        "इकसठ": 61, "बासठ": 62, "तिरसठ": 63, "चौंसठ": 64, "पैंसठ": 65, "छियासठ": 66, "सड़सठ": 67, "अड़सठ": 68, "उनहत्तर": 69, "सत्तर": 70,
+        "इकहत्तर": 71, "बहत्तर": 72, "तिहत्तर": 73, "चौहत्तर": 74, "पचहत्तर": 75, "छिहत्तर": 76, "सतहत्तर": 77, "अठहत्तर": 78, "उन्यासी": 79, "उनासी": 79, "अस्सी": 80,
+        "इक्यासी": 81, "बयासी": 82, "तिरासी": 83, "चौरासी": 84, "पचासी": 85, "छियासी": 86, "सत्तासी": 87, "अट्ठासी": 88, "नवासी": 89, "नब्बे": 90,
+        "इक्यानवे": 91, "बानवे": 92, "तिरानवे": 93, "चौरानवे": 94, "पचानवे": 95, "छियानवे": 96, "सत्तानवे": 97, "अट्ठानवे": 98, "निन्यानवे": 99,
+        "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+        "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+        "twenty": 20, "thirty": 30, "forty": 40, "fourty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+        "ek": 1, "teen": 3, "char": 4, "chaar": 4, "paanch": 5, "panch": 5, "chhe": 6, "aath": 8, "nau": 9, "das": 10,
+        "gyarah": 11, "barah": 12, "pandrah": 15, "bees": 20, "pachchis": 25, "pachees": 25, "tees": 30, "paintis": 35, "paintees": 35,
+        "chalis": 40, "chaalis": 40, "pachas": 50, "pachaas": 50, "pachpan": 55, "sattar": 70, "assi": 80, "nabbe": 90
+      },
+      "hundred": ["सौ", "sau", "hundred"],
+      "thousand": ["हजार", "hazar", "hazaar", "thousand"]
+    },
+    "choices": {
+      "readingFrequency": {
+        "numberMode": "none",
+        "options": {
+          "RARELY": {
+            "hi": ["कभी कभार", "बहुत कम", "कम", "ना के बराबर", "न के बराबर", "शायद ही", "नहीं पढ़ता", "नहीं पढ़ती"],
+            "en": ["rarely", "rare", "hardly", "seldom", "very little", "not much", "kabhi kabhar", "bahut kam", "kam"]
+          },
+          "SOMETIMES": {
+            "hi": ["कभी कभी", "थोड़ी देर", "थोड़ा", "कुछ देर", "कभी", "बीच बीच में"],
+            "en": ["sometimes", "occasionally", "a little", "short", "short time", "kabhi kabhi", "thoda", "thodi der"]
+          },
+          "DAILY_LONG": {
+            "hi": ["रोज", "रोजाना", "हर दिन", "लंबे समय", "बहुत", "बहुत ज्यादा", "ज्यादा", "घंटों", "दिन भर", "पूरा दिन"],
+            "en": ["daily", "every day", "everyday", "a lot", "lot", "long", "long time", "for hours", "hours", "roz", "rozana", "bahut", "zyada", "jyada"]
+          }
+        }
+      },
+      "screenHours": {
+        "numberMode": "range",
+        "options": {
+          "H0_2": {
+            "hi": ["कम", "बहुत कम", "थोड़ा", "थोड़ी देर", "ज्यादा नहीं", "ज्यादा नही", "घंटा भर", "एक दो घंटे"],
+            "en": ["less", "little", "very little", "not much", "hardly", "kam", "thoda"],
+            "range": [0, 2]
+          },
+          "H2_4": {
+            "hi": ["मध्यम", "बीच में", "ठीक ठाक", "आधा दिन"],
+            "en": ["medium", "moderate", "average", "some", "beech mein", "half day"],
+            "range": [3, 4]
+          },
+          "H4_PLUS": {
+            "hi": ["ज्यादा", "बहुत", "बहुत ज्यादा", "दिन भर", "पूरा दिन", "सारा दिन", "चार से ज्यादा"],
+            "en": ["a lot", "lot", "many", "whole day", "all day", "full day", "more than four", "zyada", "jyada", "bahut"],
+            "range": [5, 24]
+          }
+        }
+      },
+      "occupation": {
+        "numberMode": "none",
+        "options": {
+          "OFFICE_COMPUTER": {
+            "hi": ["दफ्तर", "ऑफिस", "आफिस", "कंप्यूटर", "कम्प्यूटर", "बैंक", "क्लर्क", "लैपटॉप", "सॉफ्टवेयर"],
+            "en": ["office", "computer", "desk", "bank", "clerk", "software", "laptop", "daftar"]
+          },
+          "SHOP_BUSINESS": {
+            "hi": ["दुकान", "दुकानदार", "व्यापार", "बिजनेस", "धंधा", "व्यवसाय", "सेल्स"],
+            "en": ["shop", "shopkeeper", "business", "trade", "sales", "store", "dukaan", "dukan", "vyapar", "dhanda"]
+          },
+          "FINE_HANDWORK": {
+            "hi": ["सिलाई", "दर्जी", "कढ़ाई", "जेवर", "सुनार", "मरम्मत", "रिपेयर", "कारीगर", "बारीक", "घड़ी"],
+            "en": ["tailor", "tailoring", "stitching", "embroidery", "jewellery", "jewelry", "goldsmith", "repair", "handwork", "craft", "silai", "darzi"]
+          },
+          "DRIVER": {
+            "hi": ["ड्राइवर", "ड्राइविंग", "चालक", "टैक्सी", "ट्रक", "ऑटो", "गाड़ी", "बस"],
+            "en": ["driver", "driving", "drive", "taxi", "truck", "auto", "cab", "bus", "gaadi", "gadi"]
+          },
+          "FIELD_OUTDOOR": {
+            "hi": ["खेती", "किसान", "खेत", "मजदूरी", "मजदूर", "बाहर", "निर्माण", "बागवानी"],
+            "en": ["farm", "farmer", "farming", "field", "outdoor", "outside", "labour", "labor", "construction", "kheti", "kisan", "mazdoor"]
+          },
+          "HOMEMAKER": {
+            "hi": ["गृहिणी", "घर", "घरेलू", "घर का काम", "हाउसवाइफ"],
+            "en": ["homemaker", "housewife", "home", "house", "household", "ghar"]
+          },
+          "STUDENT": {
+            "hi": ["विद्यार्थी", "छात्र", "छात्रा", "स्टूडेंट", "पढ़ाई", "स्कूल", "कॉलेज"],
+            "en": ["student", "study", "studying", "school", "college", "padhai"]
+          },
+          "SPORT_ACTIVE": {
+            "hi": ["खेल", "खिलाड़ी", "स्पोर्ट्स", "भाग दौड़", "दौड़", "जिम", "पुलिस", "फौज", "सेना"],
+            "en": ["sports", "sport", "player", "athlete", "gym", "running", "active", "police", "army"]
+          },
+          "OTHER": {
+            "hi": ["अन्य", "दूसरा", "कुछ और", "और कुछ"],
+            "en": ["other", "something else", "anya", "kuch aur"]
+          }
+        }
+      },
+      "budget": {
+        "numberMode": "budgetCaps",
+        "options": {
+          "LOW": {
+            "hi": ["कम", "सस्ता", "किफायती", "कम बजट", "ज्यादा नहीं", "ज्यादा नही"],
+            "en": ["low", "cheap", "less", "economy", "basic", "kam", "sasta", "not much"]
+          },
+          "MID": {
+            "hi": ["मध्यम", "बीच का", "ठीक ठाक", "नॉर्मल", "मीडियम"],
+            "en": ["medium", "mid", "middle", "normal", "average", "moderate", "theek thaak"]
+          },
+          "HIGH": {
+            "hi": ["प्रीमियम", "महंगा", "ज्यादा", "अच्छा वाला", "बढ़िया", "ब्रांडेड"],
+            "en": ["premium", "high", "expensive", "costly", "best", "branded", "mehenga", "zyada"]
+          }
+        }
+      },
+      "style": {
+        "numberMode": "none",
+        "options": {
+          "CLASSIC": {
+            "hi": ["क्लासिक", "पारंपरिक", "पुराना", "पुराने स्टाइल"],
+            "en": ["classic", "traditional", "old style", "purana"]
+          },
+          "MODERN": {
+            "hi": ["मॉडर्न", "नया", "नए", "आधुनिक", "फैशन", "ट्रेंडी", "स्टाइलिश"],
+            "en": ["modern", "new", "trendy", "fashion", "fashionable", "stylish", "latest"]
+          },
+          "BOLD": {
+            "hi": ["बोल्ड", "मोटा", "मोटे", "भारी", "चौड़ा"],
+            "en": ["bold", "thick", "heavy", "big", "mota"]
+          },
+          "MINIMAL": {
+            "hi": ["हल्का", "सादा", "सिंपल", "पतला", "साधारण"],
+            "en": ["simple", "light", "minimal", "thin", "plain", "halka", "sada"]
+          },
+          "ANY": {
+            "hi": ["कोई भी", "कुछ भी", "कैसा भी", "दिखाइए", "पता नहीं"],
+            "en": ["any", "anything", "whatever", "show me", "koi bhi", "kuch bhi"],
+            "priority": 1
+          }
+        }
+      },
+      "colourPreference": {
+        "numberMode": "none",
+        "options": {
+          "DARK": {
+            "hi": ["काला", "काले", "गहरा", "डार्क", "ब्लैक"],
+            "en": ["black", "dark", "kala"]
+          },
+          "BROWN_TORTOISE": {
+            "hi": ["भूरा", "भूरे", "ब्राउन", "कछुआ"],
+            "en": ["brown", "tortoise", "tortoiseshell", "bhura"]
+          },
+          "METALLIC": {
+            "hi": ["सुनहरा", "गोल्ड", "गोल्डन", "चांदी", "सिल्वर", "मेटल", "धातु", "स्टील"],
+            "en": ["gold", "golden", "silver", "metal", "metallic", "steel", "chandi"]
+          },
+          "COLOURFUL": {
+            "hi": ["रंग बिरंगा", "रंगीन", "लाल", "नीला", "हरा", "गुलाबी", "पीला", "कलरफुल"],
+            "en": ["colourful", "colorful", "red", "blue", "green", "pink", "purple", "rangeen"]
+          },
+          "ANY": {
+            "hi": ["कोई भी", "कुछ भी", "कोई भी रंग", "पता नहीं", "फर्क नहीं"],
+            "en": ["any", "anything", "any colour", "any color", "whatever", "koi bhi"],
+            "priority": 1
+          }
+        }
+      },
+      "lookPreference": {
+        "numberMode": "none",
+        "options": {
+          "PROFESSIONAL": {
+            "hi": ["काम", "ऑफिस", "दफ्तर", "औपचारिक", "फॉर्मल", "प्रोफेशनल"],
+            "en": ["work", "formal", "office", "professional", "kaam"]
+          },
+          "CASUAL": {
+            "hi": ["आम", "रोज", "रोजाना", "कैजुअल", "घूमने", "रोज का"],
+            "en": ["casual", "everyday", "daily", "roz", "aam"]
+          },
+          "BOTH": {
+            "hi": ["दोनों", "दोनो", "दोनों के लिए"],
+            "en": ["both", "dono"],
+            "priority": 1
+          }
+        }
+      },
+      "visionProblem": {
+        "numberMode": "none",
+        "options": {
+          "DISTANCE": {
+            "hi": ["दूर", "दूर का", "दूर की", "दूर वाला"],
+            "en": ["far", "distance", "far away", "door", "door ka"]
+          },
+          "NEAR": {
+            "hi": ["पास", "पास का", "पास की", "पढ़ने में", "पढने में", "नजदीक"],
+            "en": ["near", "close", "reading", "paas", "paas ka"]
+          },
+          "BOTH": {
+            "hi": ["दोनों", "दोनो", "दूर और पास", "दोनों में"],
+            "en": ["both", "far and near", "near and far", "dono"],
+            "priority": 1
+          },
+          "NONE": {
+            "hi": ["कोई दिक्कत नहीं", "कोई परेशानी नहीं", "कुछ नहीं", "ठीक है", "सब ठीक", "दिक्कत नहीं"],
+            "en": ["none", "no trouble", "no problem", "nothing", "fine", "all fine", "koi dikkat nahi"],
+            "priority": 2
+          }
+        }
+      },
+      "distanceSituation": {
+        "numberMode": "none",
+        "options": {
+          "DRIVING": {
+            "hi": ["गाड़ी", "गाडी", "गाड़ी चलाते", "ड्राइविंग", "बाइक", "स्कूटर"],
+            "en": ["driving", "drive", "car", "bike", "gaadi"]
+          },
+          "TV": {
+            "hi": ["टीवी", "टी वी", "टेलीविजन"],
+            "en": ["tv", "television", "t v"]
+          },
+          "SIGNBOARDS": {
+            "hi": ["बोर्ड", "साइन बोर्ड", "बस का नंबर", "बस नंबर", "दुकान का नाम"],
+            "en": ["signboard", "signboards", "sign", "bus number", "board"]
+          },
+          "CLASSROOM_BOARD": {
+            "hi": ["क्लास", "ब्लैकबोर्ड", "क्लास का बोर्ड", "स्कूल", "कॉलेज"],
+            "en": ["classroom", "class", "blackboard", "school", "college"],
+            "priority": 1
+          },
+          "OTHER": {
+            "hi": ["कुछ और", "दूसरा", "और कहीं"],
+            "en": ["other", "something else", "kuch aur"]
+          }
+        }
+      },
+      "distanceSince": {
+        "numberMode": "none",
+        "options": {
+          "UNDER_6_MONTHS": {
+            "hi": ["6 महीने से कम", "छह महीने से कम", "कुछ महीने", "हाल ही में", "अभी अभी", "थोड़े दिन"],
+            "en": ["less than 6 months", "few months", "recently", "recent", "new"]
+          },
+          "MONTHS_6_TO_24": {
+            "hi": ["एक साल", "1 साल", "डेढ़ साल", "6 महीने से 2 साल", "साल भर"],
+            "en": ["one year", "a year", "1 year", "6 months to 2 years"]
+          },
+          "OVER_2_YEARS": {
+            "hi": ["2 साल से ज्यादा", "दो साल से ज्यादा", "कई साल", "बहुत साल", "बहुत पहले", "बचपन"],
+            "en": ["more than 2 years", "many years", "long ago", "years", "childhood"],
+            "priority": 1
+          }
+        }
+      },
+      "nearTask": {
+        "numberMode": "none",
+        "options": {
+          "PHONE": {
+            "hi": ["मोबाइल", "फोन", "फ़ोन", "व्हाट्सएप"],
+            "en": ["phone", "mobile", "whatsapp"]
+          },
+          "NEWSPAPER": {
+            "hi": ["अखबार", "अख़बार", "किताब", "पढ़ना", "पढना"],
+            "en": ["newspaper", "paper", "book", "books", "akhbar"]
+          },
+          "SEWING": {
+            "hi": ["सिलाई", "सुई", "बारीक काम", "कढ़ाई"],
+            "en": ["sewing", "needle", "stitching", "fine work", "silai"]
+          },
+          "ACCOUNTS": {
+            "hi": ["हिसाब", "हिसाब किताब", "बिल", "खाता", "बही"],
+            "en": ["accounts", "bills", "bill", "hisab"]
+          },
+          "OTHER": {
+            "hi": ["कुछ और", "दूसरा"],
+            "en": ["other", "something else", "kuch aur"]
+          }
+        }
+      },
+      "nearDistance": {
+        "numberMode": "none",
+        "options": {
+          "VERY_CLOSE": {
+            "hi": ["बहुत पास", "आँख के पास", "एकदम पास", "बिल्कुल पास"],
+            "en": ["very close", "very near", "bahut paas"],
+            "priority": 1
+          },
+          "NORMAL": {
+            "hi": ["सामान्य", "नॉर्मल", "ठीक दूरी", "आम"],
+            "en": ["normal", "usual", "regular"]
+          },
+          "ARM_LENGTH": {
+            "hi": ["दूर", "हाथ भर", "हाथ की दूरी", "हाथ लंबा करके"],
+            "en": ["far", "arm", "arm length", "arms length", "haath bhar"]
+          }
+        }
+      },
+      "redFlagOnset": {
+        "numberMode": "none",
+        "options": {
+          "TODAY": {
+            "hi": ["आज", "आज ही", "अभी"],
+            "en": ["today", "aaj", "just now"]
+          },
+          "THIS_WEEK": {
+            "hi": ["इस हफ्ते", "इस हफ़्ते", "कल", "परसों", "कुछ दिन"],
+            "en": ["this week", "yesterday", "few days", "kal"]
+          },
+          "LONGER": {
+            "hi": ["पहले", "बहुत पहले", "महीना", "महीने", "उससे पहले"],
+            "en": ["longer", "long ago", "earlier", "month", "months"],
+            "priority": 1
+          }
+        }
+      },
+      "redFlagEye": {
+        "numberMode": "none",
+        "options": {
+          "RIGHT": {
+            "hi": ["दायीं", "दाईं", "दाहिनी", "दायां", "सीधी"],
+            "en": ["right", "daayi", "seedhi"]
+          },
+          "LEFT": {
+            "hi": ["बायीं", "बाईं", "बायां", "उल्टी"],
+            "en": ["left", "baayi", "ulti"]
+          },
+          "BOTH": {
+            "hi": ["दोनों", "दोनो"],
+            "en": ["both", "dono"],
+            "priority": 1
+          }
+        }
+      },
+      "powerKnown": {
+        "numberMode": "none",
+        "options": {
+          "YES": {
+            "hi": ["हाँ", "हां", "याद है", "पर्ची है", "पर्ची", "पता है", "मालूम है"],
+            "en": ["yes", "haan", "han", "slip", "i know", "i remember", "yaad hai"]
+          },
+          "NOT_SURE": {
+            "hi": ["पक्का नहीं", "पक्का नही", "पता नहीं", "पता नही", "नहीं पता", "शायद", "ठीक से याद नहीं", "मालूम नहीं"],
+            "en": ["not sure", "maybe", "dont know", "don't know", "pata nahi", "pakka nahi", "shayad"],
+            "priority": 2
+          },
+          "NO": {
+            "hi": ["नहीं", "नही", "याद नहीं", "याद नही", "नहीं है", "कोई पर्ची नहीं"],
+            "en": ["no", "nahi", "nahin", "no slip", "dont remember", "don't remember", "yaad nahi"]
+          }
+        }
+      }
+    }
+  },
+  "aiTopics": [
+    {"id": "age_group", "fields": ["age"], "about": "the customer's age in years", "scripted": {"en-IN": "How old are you?", "hi-IN": "आपकी उम्र क्या है?"}},
+    {"id": "main_difficulty", "fields": ["visionProblem"], "about": "whether seeing far, near (reading, phone) or both is difficult, or neither", "scripted": {"en-IN": "Do you have trouble seeing far, near, or both?", "hi-IN": "क्या आपको दूर का, पास का, या दोनों देखने में दिक्कत है?"}},
+    {"id": "red_flags", "fields": ["redFlagFlashes", "redFlagOther", "redFlagAny"], "about": "sudden flashes, floaters, a curtain, sudden vision loss, eye pain or redness, double vision", "scripted": {"en-IN": "Have you suddenly seen flashes of light, floating spots or a curtain, or had a sudden drop in vision, eye pain or redness, or double vision?", "hi-IN": "क्या अचानक रोशनी की चमक, तैरते धब्बे या आँख के आगे पर्दा दिखा, या अचानक नज़र कम हुई, आँख में दर्द-लाली हुई, या दो-दो दिखता है?"}},
+    {"id": "existing_glasses", "fields": ["wearsGlasses", "powerKnown"], "about": "whether they wear glasses now and, if yes, whether they remember the glasses number or have the slip", "scripted": {"en-IN": "Do you wear glasses now? If yes, do you remember their number or have the slip?", "hi-IN": "क्या आप अभी चश्मा पहनते हैं? अगर हाँ, तो क्या चश्मे का नंबर याद है या पर्ची है?"}},
+    {"id": "screen_use", "fields": ["screenHours"], "about": "how many hours a day they look at a mobile or computer", "scripted": {"en-IN": "How many hours a day do you look at a mobile or computer?", "hi-IN": "आप रोज़ कितने घंटे मोबाइल या कंप्यूटर देखते हैं?"}},
+    {"id": "reading", "fields": ["readingFrequency", "nearTask"], "about": "how much they read or do close work, and which close work", "scripted": {"en-IN": "How much do you read or do close work, like the newspaper, phone or sewing?", "hi-IN": "आप कितना पढ़ते हैं या पास का काम करते हैं, जैसे अखबार, फ़ोन या सिलाई?"}},
+    {"id": "distance_tasks", "fields": ["distanceSituation"], "about": "distance tasks: driving, TV, reading signboards", "scripted": {"en-IN": "Is it hard to see when driving, watching TV or reading signboards?", "hi-IN": "क्या गाड़ी चलाते, टीवी देखते या बोर्ड पढ़ते समय देखने में दिक्कत होती है?"}},
+    {"id": "headache", "fields": ["headacheStrain"], "about": "headaches during reading, screen or other visual work", "scripted": {"en-IN": "Do you get headaches when you read or look at a screen?", "hi-IN": "क्या पढ़ते या स्क्रीन देखते समय सिरदर्द होता है?"}},
+    {"id": "eye_strain", "fields": ["eyeStrain"], "about": "tired, strained or watery eyes", "scripted": {"en-IN": "Do your eyes feel tired or strained?", "hi-IN": "क्या आपकी आँखें थकी हुई या भारी लगती हैं?"}},
+    {"id": "night_vision", "fields": ["nightDriving", "nightVisionDifficulty"], "about": "seeing at night and driving at night", "scripted": {"en-IN": "Is it hard to see at night? Do you drive at night?", "hi-IN": "क्या रात में देखने में दिक्कत होती है? क्या आप रात में गाड़ी चलाते हैं?"}},
+    {"id": "outdoor_indoor", "fields": ["outdoorWork"], "about": "whether they mostly work outdoors in the sun or indoors", "scripted": {"en-IN": "Do you mostly work outside in the sun, or indoors?", "hi-IN": "क्या आप ज़्यादातर बाहर धूप में काम करते हैं, या अंदर?"}}
+  ]
+}

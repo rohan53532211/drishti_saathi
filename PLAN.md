@@ -117,6 +117,93 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 - Old-glasses numbers and demo customers are never corrected. Demo sessions never count towards the fit.
 - The fit always uses the raw measured SE, so it cannot feed on itself. It is refitted at app start, after a verification is saved and after a session is deleted, and stored in Room table `device_corrections` (database v4).
 
+**Fixes from phone testing (12 Nov):**
+1. Old-glasses steppers: the value sits in a fixed-width, single-line slot, with the buttons on their own row, so "−1.75" no longer wraps.
+2. AXIS stepper (0–180, steps of 5) per eye, shown only when CYL is not 0.
+3. Saving with every value at 0 asks "No numbers available?": either "No numbers" or "Save as plain (0.00)".
+4. Referral screen, summary and both PDFs: urgent reasons go in a red "Urgent" group and routine reasons in a separate amber "Routine" group.
+5. A "Please take off your glasses" step (also read aloud) comes before the card check, face capture and screen tests. Staff mode can choose "continue with glasses on". That choice is stored with the session and shown as a note on the summary and the shop PDF. The engine does not adjust for it.
+6. Bundled font: Noto Sans + Noto Sans Devanagari merged into one file per weight (`tools/build_fonts.py`, SIL OFL), used by every text style, the canvas labels and the PDFs. A unit test checks that every character in the sources and assets has a glyph.
+7. Room database encrypted with SQLCipher 4.6.1:
+   - The passphrase is 32 random bytes, wrapped by an AES-GCM key in the Android Keystore.
+   - An existing plain database is encrypted in place with `sqlcipher_export`. The copy is checked (row counts and schema version) before it replaces the plain file.
+   - On failure the plain database is opened unchanged and encryption is retried at the next start.
+   - If the key can no longer be read, an encrypted database is moved aside, not deleted.
+8. "Demo catalogue: sizes are typical, not measured" on the frame list (staff mode), the comparison screen (staff mode) and the shop PDF.
+
+**Adaptive anamnesis and power path (12 Nov):**
+- Interview order:
+  - Age.
+  - "Trouble seeing far, near, or both?" (DISTANCE / NEAR / BOTH / NONE). It also fills the old `distanceBlur` and `nearBlur` fields, so every existing rule still works. The two old yes/no questions are gone.
+  - Far: where it shows (driving, TV, signboards, classroom board) and since when.
+  - Near: which task (phone, newspaper, sewing, accounts) and the usual distance (25 / 35 / 45 cm). The distance sets the working distance for the add.
+  - Glasses: wearers get glasses age and "happy with them?"; non-wearers get "first pair?".
+  - Headache, diabetes/BP, then the red flags.
+  - An urgent flag asks onset (today / this week / longer) and which eye. Nothing after that is asked: no power path, lifestyle or frames.
+- Power path: "Do you remember your glasses power, or have the slip?" (YES / NOT SURE / NO). It is skipped after an urgent flag, and when there is no trouble and no glasses.
+  - YES: the old-glasses screen opens. Those numbers become the power source (`Source.KNOWN_POWER`, "customer's known power").
+    - If the glasses are older than 2 years, or blur or unhappiness is still reported, an optional quick check is offered.
+    - Its values are shown to staff next to the known power (summary and shop PDF) and never used for the suggestions.
+    - "No numbers available" continues as NO.
+  - NOT SURE / NO: glasses off, then the quick estimate runs right away. The result is the power source (`Source.PHONE_ESTIMATE`, "phone estimate, approximate", LOW confidence, band ±0.75 D).
+    - Far point, DISTANCE/BOTH, each eye: distance-locked 20/20 letters (`quickEstimate.letterLogMar`).
+      - The live line "If blur starts here: about −X.XX D" appears once the phone has been close. White: −1/d. Blue: −1/d + 0.67. Rounded to 0.25 D.
+      - "Blur", or saying "dhundhla" / "धुंधला" / "blur", freezes it.
+      - "Still clear at arm's length" (from 0.60 m) gives "No myopia found at arm's length, check with trial lens".
+    - Near, age 38 and over: one near-point reading gives the reading add, with "Confirm with a ready-reader at the counter".
+    - Near under 38: no plus estimate, "Possible long-sightedness, check with trial lens" plus the hand test.
+- Screen tests after the power path leave out the full far point and clock dial; staff can tick "also run the full far-point test" on the confirmation screen. The near point is left out when the quick estimate already took it.
+- The quick estimate is stored in the session's measurements JSON (`quick`). No schema change.
+- The summary and shop PDF state the power source.
+- The functional vision profile card (summary + shop PDF) shows:
+  - daily hours at near (<40 cm), intermediate (40–100 cm) and distance
+  - the main zone (share ≥ 0.45, else mixed)
+  - the lens it points to
+  - thresholds in `rules.json` → `functionalProfile`
+- Voice: keywords for all new choice questions. NOT SURE outranks NO, so "पता नहीं" is not read as "नहीं". The blur keyword listener runs without a read-back (the tap does the same) and is not used with the system voice dialog, because it covers the screen.
+
+**Remote Optometrist Bridge (12 Nov):**
+- `backend/`: FastAPI + SQLite and a plain web page for the optometrist (list, open, write advice, "needs in-person exam", submit).
+  - API: `POST/GET /profiles`, `GET /profiles/{id}`, `POST/GET /profiles/{id}/review`, `DELETE /profiles/{id}`, `/health`.
+  - An optional shared token (`BRIDGE_TOKEN`, header `X-Bridge-Token`).
+  - The server rejects a profile without spoken and tapped consent, any name / photo / image / phone / email / address key at any depth, strings over 2,000 characters and bodies over 256 KB.
+- App:
+  - "Send to optometrist" on the summary opens a consent screen. The text is read aloud; staff tick "the customer said yes" (spoken), then the customer taps "I agree, send" (tapped).
+  - The summary card shows Waiting / Reviewed and the reply, and is red when an in-person exam is needed. It refreshes once when the summary opens and on "Check for reply".
+  - Server address and token are in staff mode → Optometrist bridge settings, with "Test connection".
+- The profile contains:
+  - answers and the functional profile
+  - the power source and values (bands, starting trial lens, add, the known power or the phone estimate)
+  - measurements: PD, face width, face numbers, screen tests
+  - estimates: referral, lens type, material, coatings, notes
+  - never the frame list
+- Room v5 table `remote_reviews` (one row per sent session). Deleting the session deletes the row and, best effort, the server copy.
+- Plain `http://` is allowed in the debug build only (`src/debug/AndroidManifest.xml`).
+- Contract: `backend/tests/fixtures/app_profile.json` is produced by the app's `BridgeProfileTest` and must be accepted by the server.
+
+**Sarvam AI voice interview (12 Nov, branch `feature/sarvam-voice-anamnesis`):**
+- Optional "Voice interview (AI)" under the first interview question, shown when a backend address is set. The standard interview stays the default and the fallback.
+- Backend `app/anamnesis.py` + `app/sarvam.py`:
+  - `/anamnesis/start|turn|finish`; per turn Sarvam speech-to-text (saaras:v4), then chat (sarvam-105b, JSON mode), then text-to-speech (bulbul:v3).
+  - The key is only in `backend/.env`.
+  - Sessions are in memory, 30 min.
+- A coverage tracker in code chooses the topic and stops at 8 questions (or when everything is covered).
+  - Red flags are always question 3, with fixed wording; a "yes" ends the interview as urgent.
+  - The model's question is checked for diagnosis / power / lens words.
+  - Bad JSON or a failed call gives the scripted question.
+  - A red-flag keyword the model missed makes the red flag "unclear".
+- App (`aivoice/`):
+  - consent ("Your voice will be sent to a secure server for transcription. No name or photo is sent.") with Hindi / English
+  - 16 kHz WAV recording, auto-stop at 15 s
+  - the backend's audio plays (or the phone's own voice reads it if TTS failed)
+  - "You said: …", "Thinking…", "Question n of ~8", End, Retry
+- `AiProfileMapper` writes the answers into the existing `InterviewAnswers` through the interview's own setters. The existing functional profile, power path, tests and rules engine then run unchanged.
+  - The power question is pre-selected but asked again, so the power path still opens.
+  - An unclear or unasked red flag is left for the phone to ask.
+  - A red-flag "yes" is urgent in the rules engine exactly as before.
+- Two backend failures in a row, or a permanent one (no key, wrong token, no server), switch to the standard interview with the answers so far.
+- The transcript (text only) is stored in the session's measurements JSON (`aiInterview`). It appears only in staff mode on the summary and on the shop PDF. It is never on the customer copy and never in the optometrist profile, and it is deleted with the session.
+
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:
@@ -129,15 +216,33 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 3. Tune on-device guesses in `rules.json` from real readings: sharpness/brightness gates, face-shape thresholds, bridge landmarks, landmark pose ratios.
 4. Under-30 Bayesian prior row is a draft; myopia magnitude prior is an assumption: replace with pilot data.
 5. Hindi proofread by a native speaker (all S*, SFlow, SVision, SVoice, SCamera, STryOn strings and the voice lexicon).
-6. Room encryption for stored sessions.
-7. APK size (~54 MB, mostly OpenCV + MediaPipe): consider dropping armeabi-v7a (~15 MB).
+6. ~~Room encryption for stored sessions~~ **Done (12 Nov):** SQLCipher with a Keystore-wrapped key. The plain-to-encrypted migration still has to be checked on the phone with existing sessions (open History after installing).
+7. APK size (~59 MB since SQLCipher and the fonts, mostly OpenCV + MediaPipe): consider dropping armeabi-v7a (~15 MB).
 8. Frame images (Kaggle Glasses dataset) have an unknown licence: demo use only.
 9. Every clinical number in `rules.json` still needs optometrist review before field use.
 10. Addition 7 (temple length from a ~45° side capture) is not implemented.
 11. `deviceCorrection` thresholds (5 sessions, 0.5 D spread, slope 0.7–1.3, 3 D entry-error cut-off, ±1 D cap) are starting values: review with pilot data. The Room DAO and migration are checked against the exported schema in unit tests, not on a device.
+12. Power path on the phone:
+    - Check the quick far point against the full test on a few myopes.
+    - Check that "dhundhla" is recognised while the phone moves, and that the TTS instruction does not trigger it.
+    - The `functionalProfile` hours are starting guesses.
+    - Fixed after the 12 Nov phone test: "Not sure" / "No" now opens the camera measurement straight away (no glasses-off screen, no intro or Start button; the camera permission dialog appears by itself the first time). Glasses off and which eye to cover are spoken on the measuring screen. The distance is shown large, and the live line shows from the first reading (Blur still waits until the phone has been close). The staff Camera check also shows the live line.
+
+13. Remote Optometrist Bridge is a demo setup:
+    - one shared token, no per-optometrist login, no audit log
+    - the token is in plain app preferences (backups are off)
+    - before real use: proper authentication, hosting with encryption at rest, a retention rule, a DPDP Act review
+    - the optometrist's reply is shown as written (not translated)
+
+14. Sarvam AI voice interview:
+    - Not yet tried with a real Sarvam key on the phone. Check the speech-to-text quality for older voices and shop noise, the latency per turn (3 calls), and the cost per interview.
+    - The customer's voice goes to Sarvam (a third party): the consent says so, but a data-processing agreement and a DPDP review are needed before real use.
+    - Free speech may include a name. The transcript stays in the shop (staff view and shop PDF), but it is not filtered.
+    - The red-flag keyword list and the banned-word list need clinical review and a native-speaker check.
+    - If the customer answers many topics at once, it can end before 5 questions (nothing left to ask).
 
 ## Next steps
 1. Phone: install via adb, voice check, then the checklist above; feed measured values back into `rules.json`.
 2. 9 Nov: record the mid-sprint update with demo mode (try-on uses the live camera).
 3. Fix whatever the phone test finds; re-tune thresholds; native-speaker Hindi pass.
-4. Then: Room encryption, APK size, pilot data for the priors.
+4. Then: APK size, pilot data for the priors.

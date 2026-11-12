@@ -37,6 +37,9 @@ data class RulesConfig(
     val readingAdd: com.drishtisaathi.engine.config.ReadingAddConfig = com.drishtisaathi.engine.config.ReadingAddConfig(),
     // ---- Learning loop: per-phone-model correction from verified shop records ----
     val deviceCorrection: com.drishtisaathi.engine.config.DeviceCorrectionConfig = com.drishtisaathi.engine.config.DeviceCorrectionConfig(),
+    // ---- Adaptive anamnesis: power path quick estimate and functional vision profile ----
+    val quickEstimate: com.drishtisaathi.engine.config.QuickEstimateConfig = com.drishtisaathi.engine.config.QuickEstimateConfig(),
+    val functionalProfile: com.drishtisaathi.engine.config.FunctionalProfileConfig = com.drishtisaathi.engine.config.FunctionalProfileConfig(),
 ) {
     fun material(id: String): MaterialSpec =
         materials.firstOrNull { it.id == id } ?: error("Material '$id' is not defined in rules.json")

@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Keyword lexicon (`assets/voice_lexicon.json`). Strict schema: unknown keys are rejected, and [validate]
+ * Keyword lexicon ("voiceKeywords" in `assets/anamnesis_questions.json`). Strict schema: unknown keys are rejected, and [validate]
  * enforces the rules the parser relies on. `hi` lists are Devanagari, `en` lists are Latin script
  * (English and romanised Hindi).
  */
@@ -127,7 +127,8 @@ data class VoiceLexicon(
     }
 
     companion object {
-        const val ASSET = "voice_lexicon.json"
+        /** The lexicon lives in the question file, under "voiceKeywords". */
+        const val ASSET = com.drishtisaathi.interview.QuestionBank.ASSET
         private val json = Json { ignoreUnknownKeys = false }
 
         /** Parses and validates; throws [IllegalArgumentException] listing every problem. */
@@ -136,6 +137,13 @@ data class VoiceLexicon(
             val errs = lex.validate()
             require(errs.isEmpty()) { "voice_lexicon.json invalid:\n" + errs.joinToString("\n") }
             return lex
+        }
+
+        /** The "voiceKeywords" object of the question file, parsed and validated like [parse]. */
+        fun fromQuestionsFile(text: String): VoiceLexicon {
+            val root = Json.parseToJsonElement(text) as? kotlinx.serialization.json.JsonObject
+            val kw = requireNotNull(root?.get("voiceKeywords")) { "question file has no voiceKeywords" }
+            return parse(kw.toString())
         }
     }
 }

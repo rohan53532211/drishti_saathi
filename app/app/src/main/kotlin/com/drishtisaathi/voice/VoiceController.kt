@@ -133,9 +133,20 @@ class VoiceController(
      * open a second engine. `shutdown()` on it is a no-op: the controller owns the engine ([release]).
      */
     val instructionSpeaker: InstructionSpeaker = object : InstructionSpeaker {
-        override fun speak(text: Txt, lang: Lang) = speaker.speak(text, lang) {}
+        override fun speak(text: Txt, lang: Lang) {
+            if (!_instructionsMuted.value && pacer.allow(text[lang])) speaker.speak(text, lang) {}
+        }
         override fun stop() = speaker.stop()
         override fun shutdown() {}
+    }
+
+    private val pacer = com.drishtisaathi.camera.InstructionPacer()
+    private val _instructionsMuted = MutableStateFlow(false)
+    /** The mute button on the eye check: no spoken instructions while true. */
+    val instructionsMuted: StateFlow<Boolean> = _instructionsMuted.asStateFlow()
+    fun setInstructionsMuted(muted: Boolean) {
+        _instructionsMuted.value = muted
+        if (muted) speaker.stop()
     }
 
     private class Session(val q: Question, val lang: Lang, val ctx: ChoiceContext, val onAction: (VoiceAnswers.Action) -> Unit)
@@ -185,6 +196,7 @@ class VoiceController(
     fun detach() = post {
         stopDialogue()
         session = null
+        if (keyword != null) { keyword = null; generation++; input.stop() }
     }
 
     fun setReadAloud(on: Boolean) = post {
@@ -232,6 +244,62 @@ class VoiceController(
 
     /** ✓ / ✗ on the read-back. */
     fun confirm(correct: Boolean) = post { dispatch(DialogueEvent.Tapped(correct)) }
+
+    // ---- keyword listening (quick estimate: "dhundhla" = blur) -----------------------------------
+
+    private var keyword: KeywordSession? = null
+    private class KeywordSession(val words: List<List<String>>, val onHeard: () -> Unit)
+
+    /** True when [listenForKeyword] would use the mic (mic on, allowed, and not the system dialog, which covers the screen). */
+    val canListenForKeyword: Boolean
+        get() {
+            val st = _state.value.copy(recognition = input.mode.value)
+            return st.canListen && st.recognition != RecognitionMode.SYSTEM_DIALOG
+        }
+
+    /**
+     * Listens continuously for one of [keywords] (any language; matched on normalised tokens, partial results
+     * included) and calls [onHeard] each time. No read-back: the tap button does the same thing. Stops the
+     * interview dialogue first. [stopKeyword] (or [detach]) ends it.
+     */
+    fun listenForKeyword(keywords: List<String>, onHeard: () -> Unit) = post {
+        stopDialogue()
+        session = null
+        if (!canListenForKeyword) return@post
+        keyword = KeywordSession(keywords.map(TextNormalizer::tokens).filter { it.isNotEmpty() }, onHeard)
+        startKeyword()
+    }
+
+    fun stopKeyword() = post {
+        if (keyword == null) return@post
+        keyword = null
+        generation++
+        input.stop()
+    }
+
+    private fun startKeyword() {
+        val k = keyword ?: return
+        val gen = ++generation
+        input.start(_state.value.networkConsent, object : SpeechInput.Listener {
+            private var fired = false
+            private fun check(text: String) {
+                if (!fired && keywordHeard(text, k.words)) { fired = true; k.onHeard() }
+            }
+            override fun onPartial(text: String) = post { if (gen == generation) check(text) }
+            override fun onResults(hypotheses: List<String>, confidences: List<Float>?) = post {
+                if (gen != generation) return@post
+                hypotheses.forEach(::check)
+                if (keyword === k) startKeyword()
+            }
+            override fun onError(kind: RecognitionErrorKind) = post {
+                if (gen != generation) return@post
+                when (kind) {
+                    RecognitionErrorKind.PERMISSION, RecognitionErrorKind.UNAVAILABLE -> keyword = null
+                    else -> if (keyword === k) startKeyword()
+                }
+            }
+        })
+    }
 
     /** Frees the TTS engine and recogniser. Call once, when the app's owner goes away. */
     fun release() = post {
@@ -328,4 +396,10 @@ class VoiceController(
             FallbackReason.NOT_UNDERSTOOD -> {}
         }
     }
+}
+
+/** Pure: does [text] contain one of [words] (each a normalised token sequence, see [TextNormalizer.tokens])? */
+fun keywordHeard(text: String, words: List<List<String>>): Boolean {
+    val t = TextNormalizer.tokens(text)
+    return words.any { w -> w.isNotEmpty() && (0..t.size - w.size).any { i -> t.subList(i, i + w.size) == w } }
 }

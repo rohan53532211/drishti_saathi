@@ -38,6 +38,8 @@ fun HistoryScreen(
     lang: Lang,
     sessions: List<SessionEntity>,
     onLang: (Lang) -> Unit,
+    /** Sent to the optometrist: sessionId to status (Waiting / Reviewed). */
+    remote: Map<Long, com.drishtisaathi.data.RemoteReviewEntity> = emptyMap(),
     onOpen: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onBack: () -> Unit,
@@ -75,6 +77,16 @@ fun HistoryScreen(
                                 Text(fmt.format(Date(s.createdAt)), style = MaterialTheme.typography.bodyMedium)
                                 Text(S.referralLevel(level)[l], style = MaterialTheme.typography.bodySmall, color = color)
                                 if (s.verifiedAt != null) Text("✓ " + S.verified[l], style = MaterialTheme.typography.bodySmall, color = OkGreen)
+                                remote[s.id]?.let { r ->
+                                    val b = com.drishtisaathi.i18n.SBridge
+                                    Text(
+                                        (if (r.reviewed) b.historyReviewed else b.historyWaiting).format(r.caseId)[l],
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                        color = if (r.reviewed) OkGreen else RoutineAmber,
+                                    )
+                                    if (r.needsInPersonExam == true) Text("! " + b.historyInPerson[l], style = MaterialTheme.typography.bodySmall, color = UrgentRed)
+                                }
                             }
                             TextButton(onClick = { pendingDelete = s.id }) { Text(S.delete[l], color = UrgentRed) }
                         }

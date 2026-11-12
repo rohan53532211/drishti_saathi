@@ -19,7 +19,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.drishtisaathi.calibration.ForeheadCardCalibrationScreen
-import com.drishtisaathi.calibration.ScreenCardCalibrationScreen
 import com.drishtisaathi.camera.CameraDebugScreen
 import com.drishtisaathi.camera.CameraPermissionGate
 import com.drishtisaathi.camera.CameraPreview
@@ -30,6 +29,14 @@ import com.drishtisaathi.engine.ReferralLevel
 import com.drishtisaathi.i18n.S
 import com.drishtisaathi.i18n.SFlow
 import com.drishtisaathi.interview.Questions
+import com.drishtisaathi.interview.Stage
+import com.drishtisaathi.i18n.SShop
+import com.drishtisaathi.ui.ShopToolsScreen
+import com.drishtisaathi.ui.DiagnosticsScreen
+import com.drishtisaathi.ui.LanguageScreen
+import com.drishtisaathi.ui.PhoneSetupScreen
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.fillMaxWidth
 import com.drishtisaathi.pdf.PdfExporter
 import com.drishtisaathi.tryon.TryOnMapping
 import com.drishtisaathi.tryon.TryOnScreen
@@ -50,6 +57,18 @@ import com.drishtisaathi.ui.DemoScreen
 import com.drishtisaathi.ui.DemoBadge
 import com.drishtisaathi.demo.DemoCustomers
 import com.drishtisaathi.vision.CameraVisionTestFlow
+import com.drishtisaathi.vision.CameraQuickEstimateFlow
+import com.drishtisaathi.ui.CompareOfferScreen
+import com.drishtisaathi.ui.BridgeConsentScreen
+import com.drishtisaathi.ui.BridgeSettingsScreen
+import com.drishtisaathi.ui.RemoteReviewCard
+import com.drishtisaathi.ui.AiConsentScreen
+import com.drishtisaathi.ui.AiInterviewScreen
+import com.drishtisaathi.engine.PowerKnown
+import com.drishtisaathi.engine.QuickEstimate
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.drishtisaathi.voice.rememberVoiceController
 
 class MainActivity : ComponentActivity() {
@@ -61,24 +80,37 @@ class MainActivity : ComponentActivity() {
 
 private object Routes {
     const val HOME = "home"
+    // Shop tools (no staff switch on the customer path)
+    const val SHOP_TOOLS = "shopTools"
+    const val PHONE_SETUP = "phoneSetup"
+    const val DIAGNOSTICS = "diagnostics"
+    const val PRECISION = "precision"
+    const val CAMERA_DEBUG = "cameraDebug"
+    const val DEMO = "demo"
+    // Customer flow: consent → language → questions (AI voice or scripted) → power / eye check → face → more
+    // questions → results
     const val CONSENT = "consent"
+    const val LANGUAGE = "language"
     const val INTERVIEW = "interview"
+    const val AI_CONSENT = "aiConsent"
+    const val AI_INTERVIEW = "aiInterview"
     const val OLD_NUMBERS = "oldNumbers"
-    const val CONFIRM = "confirm"
-    // Integrated flow: card check (optional) → face capture → outcome → screen tests → results
+    const val COMPARE_OFFER = "compareOffer"
+    const val QUICK = "quick?primary={primary}&gridOnly={gridOnly}"
+    fun quick(primary: Boolean, gridOnly: Boolean = false) = "quick?primary=$primary&gridOnly=$gridOnly"
     const val CARD = "card"
     const val CAPTURE = "capture"
     const val CAPTURE_OUTCOME = "captureOutcome"
-    const val TESTS = "tests"
     const val REFERRAL = "referral"
     const val RESULT = "result"
+    /** "For the shop" → Edit answers (the old confirmation screen). */
+    const val EDIT = "editAnswers"
     const val TRY_ON = "tryOn?frame={frame}"
     const val HISTORY = "history"
     const val COMPARE = "compare"
-    // Staff tools
-    const val CAMERA_DEBUG = "cameraDebug"
-    const val SCREEN_CAL = "screenCalibration"
-    const val DEMO = "demo"
+    // Remote Optometrist Bridge
+    const val BRIDGE_CONSENT = "bridgeConsent"
+    const val BRIDGE_SETTINGS = "bridgeSettings"
 
     fun tryOn(frameId: String?) = "tryOn" + (frameId?.let { "?frame=$it" } ?: "")
 }
@@ -96,83 +128,300 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     val voice = rememberVoiceController()
 
     fun goHome() = nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
-    fun toConfirm() = nav.navigate(Routes.CONFIRM) { popUpTo(Routes.HOME) }
+
+    // Tapped a "Reply received" notification: open that session's summary.
+    val activity = LocalContext.current as? android.app.Activity
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val id = activity?.intent?.getLongExtra(com.drishtisaathi.bridge.ReplyNotifier.EXTRA_SESSION, -1L) ?: -1L
+        if (id > 0) {
+            activity?.intent?.removeExtra(com.drishtisaathi.bridge.ReplyNotifier.EXTRA_SESSION)
+            vm.openSession(id) { nav.navigate(Routes.RESULT) }
+        }
+    }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val setupDone by vm.phoneSetup.done.collectAsStateWithLifecycle()
+
+    // First launch: the one-time phone setup opens by itself ("Skip for now" leaves a reminder on home).
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (!vm.phoneSetup.done.value && !vm.phoneSetup.offered) {
+            vm.phoneSetup.markOffered()
+            nav.navigate(Routes.PHONE_SETUP)
+        }
+    }
 
     /** Runs the engine with everything gathered so far; any referral is shown before the summary. */
     fun computeAndShow() {
         val r = vm.computeResult()
         val target = if (r.assessment.referral.level == ReferralLevel.NONE) Routes.RESULT else Routes.REFERRAL
-        nav.navigate(target) { popUpTo(Routes.CONFIRM) }
+        nav.navigate(target) { popUpTo(Routes.HOME) }
+    }
+
+    /** Back to the edit-answers screen ("For the shop"). */
+    fun toEdit() { if (!nav.popBackStack(Routes.EDIT, inclusive = false)) nav.navigate(Routes.EDIT) }
+
+    /** LATER questions (only the unanswered ones), then the results. */
+    fun toLater() {
+        if (vm.startStage(Stage.LATER)) nav.navigate(Routes.INTERVIEW) { popUpTo(Routes.CARD) { inclusive = true } }
+        else computeAndShow()
+    }
+
+    /** Face measurement for frame fit (card on the forehead first, optional). */
+    fun toFace() = nav.navigate(Routes.CARD) { popUpTo(Routes.LANGUAGE) }
+
+    /** After the power answer or the eye check: urgent → referral at once; else the face measurement. */
+    fun afterEyeCheck() {
+        if (vm.needsUrgentReferral()) { vm.skipCapture(); computeAndShow() } else toFace()
+    }
+
+    // ---- power path ----
+    /** The power path was opened from the edit-answers screen: return there instead of going on. */
+    var powerFromEdit by remember { mutableStateOf(false) }
+    /** The grid check already ran (or was offered) in this session's eye check. */
+    var gridAsked by remember { mutableStateOf(false) }
+    fun finishPowerPath() {
+        when {
+            powerFromEdit -> { powerFromEdit = false; toEdit() }
+            // Grid needed (bent lines, 40+, diabetes) but no eye check with the grid ran: the grid check alone.
+            !gridAsked && vm.eyeCheckPlan().grid -> { gridAsked = true; nav.navigate(Routes.quick(primary = false, gridOnly = true)) }
+            else -> afterEyeCheck()
+        }
+    }
+    /**
+     * Runs the eye check, or stores the no-test outcome and goes on. As the power source ([primary]) it opens straight
+     * on the camera; [primary] false = the optional check to compare with a known power.
+     */
+    fun startQuick(primary: Boolean) {
+        val plan = vm.eyeCheckPlan()
+        if (!(if (primary) plan.runsAnything else plan.far)) {
+            vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
+            finishPowerPath()
+        } else {
+            vm.setGlassesOn(false)
+            if (primary) gridAsked = true
+            nav.navigate(Routes.quick(primary))
+        }
+    }
+    fun startPowerPath() {
+        if (!powerFromEdit) gridAsked = false
+        vm.setQuick(null)
+        vm.skipVisionTests()
+        when (vm.state.value.answers.powerKnown) {
+            PowerKnown.YES -> nav.navigate(Routes.OLD_NUMBERS)
+            PowerKnown.NOT_SURE, PowerKnown.NO -> startQuick(primary = true)
+            null -> finishPowerPath()
+        }
+    }
+
+    /** CORE questions done: urgent → referral; else the power question's path (known power or eye check). */
+    fun afterCore() {
+        if (vm.state.value.answers.urgentRedFlag) {
+            vm.skipCapture(); vm.skipVisionTests(); vm.setQuick(null); computeAndShow()
+        } else startPowerPath()
     }
 
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     NavHost(nav, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
             HomeScreen(
-                state, vm::setLang, vm::setStaffMode,
+                state, vm::setLang,
                 onStart = { vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onHistory = { nav.navigate(Routes.HISTORY) },
-                staffTools = {
-                    val l = state.lang
-                    BigButton(SFlow.cameraCheck[l], { nav.navigate(Routes.CAMERA_DEBUG) })
-                    BigButton(SFlow.screenCalibration[l], { nav.navigate(Routes.SCREEN_CAL) })
-                    BigButton(SFlow.demoMode[l], { nav.navigate(Routes.DEMO) })
-                },
+                onShopTools = { nav.navigate(Routes.SHOP_TOOLS) },
+                setupDone = setupDone,
+                onSetup = { nav.navigate(Routes.PHONE_SETUP) },
             )
+        }
+        composable(Routes.SHOP_TOOLS) {
+            ShopToolsScreen(
+                state.lang, vm::setLang, setupDone,
+                onSetup = { nav.navigate(Routes.PHONE_SETUP) },
+                onDemo = { nav.navigate(Routes.DEMO) },
+                onBridge = { nav.navigate(Routes.BRIDGE_SETTINGS) },
+                onDiagnostics = { nav.navigate(Routes.DIAGNOSTICS) },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.PHONE_SETUP) {
+            val context = LocalContext.current
+            PhoneSetupScreen(
+                state.lang, vm::setLang, vm.calibration, vm.rules.camera,
+                onFinish = {
+                    vm.phoneSetup.markDone()
+                    Toast.makeText(context, SShop.setupSaved[state.lang], Toast.LENGTH_SHORT).show()
+                    nav.popBackStack()
+                },
+                onSkip = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.DIAGNOSTICS) {
+            DiagnosticsScreen(
+                state.lang, vm::setLang,
+                onCamera = { nav.navigate(Routes.CAMERA_DEBUG) },
+                onPrecision = { nav.navigate(Routes.PRECISION) },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        // Precision mode: the full staff protocol (blue/white far point, retakes, near point, letter chart, grid).
+        composable(Routes.PRECISION) {
+            val l = state.lang
+            StepFrame(l, vm::setLang, SShop.precisionMode[l], onBack = { nav.popBackStack() }) {
+                CameraVisionTestFlow(
+                    l, vm.rules, vm.calibration, age = null, occupation = null,
+                    onDone = { _, _ -> nav.popBackStack() },
+                    onCancel = { nav.popBackStack() },
+                    modifier = Modifier.fillMaxSize(),
+                    onInstruction = { voice.instructionSpeaker.speak(it, l) },
+                    allowDemoWithoutCamera = true,
+                )
+            }
         }
         composable(Routes.CONSENT) {
             ConsentScreen(
                 state.lang, vm::setLang,
-                onContinue = { vm.giveConsent(); nav.navigate(Routes.INTERVIEW) { popUpTo(Routes.HOME) } },
+                onContinue = { vm.giveConsent(); nav.navigate(Routes.LANGUAGE) { popUpTo(Routes.HOME) } },
                 onCancel = { goHome() },
             )
+        }
+        composable(Routes.LANGUAGE) {
+            var checking by remember { mutableStateOf(false) }
+            LanguageScreen(
+                state.lang,
+                onPick = { lang ->
+                    if (!checking) {
+                        vm.setLang(lang)
+                        checking = true
+                        // AI voice interview when the backend answers; otherwise the scripted questions.
+                        scope.launch {
+                            val ai = !state.demo && vm.aiReachable()
+                            checking = false
+                            vm.startStage(Stage.CORE)
+                            nav.navigate(if (ai) Routes.AI_CONSENT else Routes.INTERVIEW)
+                        }
+                    }
+                },
+                onBack = { goHome() },
+            )
+            if (checking) androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
         }
         composable(Routes.INTERVIEW) {
             InterviewScreen(
                 state, vm.choiceContext, vm::setLang,
-                onAnswer = { id, update -> if (vm.answer(id, update)) toConfirm() },
+                onAnswer = { id, update ->
+                    val editing = vm.state.value.editingFromConfirm
+                    val stage = vm.state.value.stage
+                    val done = vm.answer(id, update)
+                    when {
+                        editing && id == Questions.POWER_KNOWN -> { powerFromEdit = true; startPowerPath() }
+                        editing -> if (done) toEdit()
+                        !done -> Unit
+                        stage == Stage.CORE -> afterCore()
+                        else -> computeAndShow()
+                    }
+                },
                 onOldNumbersYes = { nav.navigate(Routes.OLD_NUMBERS) },
                 onBack = {
                     when {
-                        state.editingFromConfirm -> toConfirm()
+                        state.editingFromConfirm -> toEdit()
                         !vm.previousQuestion() -> nav.popBackStack()
                     }
                 },
                 voice = voice,
             )
         }
+        composable(Routes.AI_CONSENT) {
+            AiConsentScreen(
+                state.lang, vm::setLang, voice.instructionSpeaker,
+                onContinue = { lang ->
+                    vm.startAiInterview(lang)
+                    nav.navigate(Routes.AI_INTERVIEW) { popUpTo(Routes.AI_CONSENT) { inclusive = true } }
+                },
+                onUseButtons = { nav.navigate(Routes.INTERVIEW) { popUpTo(Routes.AI_CONSENT) { inclusive = true } } },
+            )
+        }
+        composable(Routes.AI_INTERVIEW) {
+            val ai by vm.aiState.collectAsStateWithLifecycle()
+            /** Then the scripted questions the AI did not cover (red flags if unclear, power), or straight on. */
+            fun leave(fellBack: Boolean) = vm.finishAiInterview(fellBack) { all ->
+                nav.navigate(Routes.INTERVIEW) { popUpTo(Routes.AI_INTERVIEW) { inclusive = true } }
+                if (all) afterCore()
+            }
+            AiInterviewScreen(
+                state.lang, vm::setLang, ai, voice.instructionSpeaker,
+                onAnswer = vm::aiAnswer,
+                onMicFailed = vm::aiMicFailed,
+                onRetry = vm::aiRetry,
+                onEnd = { leave(fellBack = ai.phase == com.drishtisaathi.aivoice.AiUiState.Phase.FALLBACK) },
+                onContinue = { fellBack -> leave(fellBack) },
+            )
+        }
         composable(Routes.OLD_NUMBERS) {
             OldNumbersScreen(
                 state.lang, state.answers.knownRx, vm::setLang,
+                // Power path YES: the entered numbers are the power source ("customer's known power").
                 onSave = { rx ->
-                    nav.popBackStack()
-                    if (vm.answer(Questions.KNOWN_RX) { it.copy(knownRx = rx) }) toConfirm()
+                    vm.setKnownRx(rx)
+                    if (vm.offerCompare()) nav.navigate(Routes.COMPARE_OFFER) else finishPowerPath()
                 },
-                onNone = {
-                    nav.popBackStack()
-                    if (vm.answer(Questions.KNOWN_RX) { it.copy(knownRx = null) }) toConfirm()
-                },
+                // "No numbers available": continue as NO, with the eye check.
+                onNone = { vm.setPowerKnown(PowerKnown.NO); startQuick(primary = true) },
+                // Back: return to the power question.
+                onBack = { powerFromEdit = false; nav.popBackStack() },
+            )
+        }
+        composable(Routes.COMPARE_OFFER) {
+            CompareOfferScreen(
+                state.lang, vm::setLang, voice.instructionSpeaker,
+                onCheck = { startQuick(primary = false) },
+                onSkip = { finishPowerPath() },
                 onBack = { nav.popBackStack() },
             )
         }
-        composable(Routes.CONFIRM) {
+        composable(
+            Routes.QUICK,
+            arguments = listOf(
+                navArgument("primary") { type = NavType.BoolType; defaultValue = true },
+                navArgument("gridOnly") { type = NavType.BoolType; defaultValue = false },
+            ),
+        ) { entry ->
+            val l = state.lang
+            val primary = entry.arguments?.getBoolean("primary") ?: true
+            val gridOnly = entry.arguments?.getBoolean("gridOnly") ?: false
+            val plan = androidx.compose.runtime.remember { vm.eyeCheckPlan() }
+            StepFrame(l, vm::setLang, SShop.eyeCheckTitle[l], onBack = { nav.popBackStack() }) {
+                CameraQuickEstimateFlow(
+                    l, vm.rules, vm.calibration, plan, state.answers, primary,
+                    onDone = { q, tests ->
+                        when {
+                            gridOnly -> vm.setVisionTests(tests)
+                            // the line and grid checks of the customer's own eye check (not of the comparison)
+                            primary -> { vm.setQuick(q); vm.setVisionTests(tests) }
+                            else -> vm.setQuick(q)
+                        }
+                        finishPowerPath()
+                    },
+                    onSkip = {
+                        if (!gridOnly) vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
+                        finishPowerPath()
+                    },
+                    gridOnly = gridOnly,
+                    modifier = Modifier.fillMaxSize(),
+                    voice = voice,
+                    onInstruction = { voice.instructionSpeaker.speak(it, l) },
+                    allowDemoWithoutCamera = state.demo,
+                )
+            }
+        }
+        composable(Routes.EDIT) {
             ConfirmScreen(
                 state, vm.choiceContext, vm::setLang,
                 onEdit = { id -> vm.editQuestion(id); nav.navigate(Routes.INTERVIEW) },
                 onStaffMeasurements = vm::setStaffMeasurements,
-                onSeeResults = {
-                    // Demo customers already carry camera and screen-test results.
-                    if (state.demo) { computeAndShow(); return@ConfirmScreen }
-                    // Red flags from the interview: no camera, no screen tests, straight to the referral.
-                    if (vm.interviewNeedsUrgentReferral()) {
-                        vm.skipCapture(); vm.skipVisionTests(); computeAndShow()
-                    } else nav.navigate(Routes.CARD)
-                },
-                onBack = { goHome() },
+                onSeeResults = { computeAndShow() },
+                onBack = { nav.popBackStack() },
             )
         }
 
-        // ---- M0 per customer: forehead card → personal iris size (optional) ----
+        // ---- face measurement for frame fit: forehead card (optional) → capture → outcome ----
         composable(Routes.CARD) {
             val l = state.lang
             StepFrame(l, vm::setLang, SFlow.stepCard[l], onBack = { nav.popBackStack() }) {
@@ -183,14 +432,13 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 )
             }
         }
-        // ---- M2 face capture ----
         composable(Routes.CAPTURE) {
             val l = state.lang
             StepFrame(l, vm::setLang, SFlow.stepCapture[l], onBack = { nav.popBackStack() }) {
                 FaceCaptureScreen(
                     l, vm.rules.camera,
                     onDone = { frames -> vm.setCapture(frames); nav.navigate(Routes.CAPTURE_OUTCOME) },
-                    onSkip = { vm.skipCapture(); nav.navigate(Routes.TESTS) },
+                    onSkip = { vm.skipCapture(); toLater() },
                     modifier = Modifier.fillMaxSize(),
                     speaker = voice.instructionSpeaker,
                 )
@@ -198,33 +446,18 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         composable(Routes.CAPTURE_OUTCOME) {
             val status = state.captureStatus
-            if (status == null) androidx.compose.runtime.LaunchedEffect(Unit) { nav.navigate(Routes.TESTS) }
+            if (status == null) androidx.compose.runtime.LaunchedEffect(Unit) { toLater() }
             else CaptureOutcomeScreen(
                 state.lang, vm::setLang, status,
                 onRetry = { nav.navigate(Routes.CAPTURE) { popUpTo(Routes.CAPTURE) { inclusive = true } } },
-                onContinue = { nav.navigate(Routes.TESTS) },
+                onContinue = { toLater() },
             )
-        }
-        // ---- M3 screen tests → M4 fusion (engine) ----
-        composable(Routes.TESTS) {
-            val l = state.lang
-            StepFrame(l, vm::setLang, SFlow.stepTests[l], onBack = null) {
-                CameraVisionTestFlow(
-                    l, vm.rules, vm.calibration, state.answers.age, state.answers.occupation,
-                    onDone = { tests, _ -> vm.setVisionTests(tests); computeAndShow() },
-                    onCancel = { vm.skipVisionTests(); computeAndShow() },
-                    modifier = Modifier.fillMaxSize(),
-                    onInstruction = { voice.instructionSpeaker.speak(it, l) },
-                    // Staff can demo the tests without a camera using the distance slider.
-                    allowDemoWithoutCamera = state.staffMode,
-                )
-            }
         }
 
         composable(Routes.REFERRAL) {
             ReferralScreen(
                 state, vm.rules, vm::setLang,
-                onContinue = { nav.navigate(Routes.RESULT) { popUpTo(Routes.CONFIRM) } },
+                onContinue = { nav.navigate(Routes.RESULT) { popUpTo(Routes.HOME) } },
                 onBack = { nav.popBackStack() },
             )
         }
@@ -234,7 +467,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onSaveVerification = vm::saveVerification,
                 onDelete = { vm.deleteCurrentSession { goHome() } },
                 onDone = { goHome() },
-                onBack = { nav.popBackStack() },
+                onBack = { goHome() },
+                onEditAnswers = { nav.navigate(Routes.EDIT) },
                 extraActions = {
                     val context = LocalContext.current
                     val l = state.lang
@@ -249,6 +483,31 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onToggleCompare = vm::toggleCompare,
                 onCompare = { nav.navigate(Routes.COMPARE) },
                 onTryOn = { id -> nav.navigate(Routes.tryOn(id)) },
+                remoteCard = {
+                    val bridge by vm.bridgeSettings.config.collectAsStateWithLifecycle()
+                    RemoteReviewCard(
+                        state, configured = bridge.isValid,
+                        onSend = { vm.clearBridgeError(); nav.navigate(Routes.BRIDGE_CONSENT) },
+                        onCheck = { vm.checkReview() },
+                        onPoll = { vm.checkReview(silent = true) },
+                    )
+                },
+            )
+        }
+        composable(Routes.BRIDGE_CONSENT) {
+            BridgeConsentScreen(
+                state.lang, vm::setLang, voice.instructionSpeaker, state.bridgeBusy, state.bridgeError,
+                onSend = { consent -> vm.sendToOptometrist(consent) { nav.popBackStack() } },
+                onCancel = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.BRIDGE_SETTINGS) {
+            val bridge by vm.bridgeSettings.config.collectAsStateWithLifecycle()
+            BridgeSettingsScreen(
+                state.lang, vm::setLang, bridge,
+                onSave = vm.bridgeSettings::save,
+                onTest = vm::testBridge,
+                onBack = { nav.popBackStack() },
             )
         }
         // ---- M5 live try-on (addition 8) ----
@@ -279,15 +538,18 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         composable(Routes.HISTORY) {
             val sessions by vm.sessions.collectAsState(initial = emptyList())
+            val remote by vm.remoteReviews.collectAsState(initial = emptyMap())
+            // Check sent sessions for replies when Past sessions opens, then every 15 s while it is open.
+            androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { vm.checkAllWaiting(); kotlinx.coroutines.delay(15_000) } }
             HistoryScreen(
-                state.lang, sessions, vm::setLang,
+                state.lang, sessions, vm::setLang, remote = remote,
                 onOpen = { id -> vm.openSession(id) { nav.navigate(Routes.RESULT) } },
                 onDelete = { id -> vm.deleteSession(id) },
                 onBack = { nav.popBackStack() },
             )
         }
 
-        // ---- staff tools ----
+        // ---- shop tools ----
         composable(Routes.CAMERA_DEBUG) {
             val l = state.lang
             StepFrame(l, vm::setLang, SFlow.cameraCheck[l], onBack = { nav.popBackStack() }) {
@@ -297,23 +559,10 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.DEMO) {
             DemoScreen(
                 state.lang, vm::setLang, DemoCustomers.all,
-                onPick = { c -> vm.loadDemo(c); nav.navigate(Routes.CONFIRM) { popUpTo(Routes.HOME) } },
+                // Sample customers carry every answer and measurement: straight to the results.
+                onPick = { c -> vm.loadDemo(c); computeAndShow() },
                 onBack = { nav.popBackStack() },
             )
-        }
-        composable(Routes.SCREEN_CAL) {
-            val l = state.lang
-            val context = LocalContext.current
-            StepFrame(l, vm::setLang, SFlow.screenCalibration[l], onBack = { nav.popBackStack() }) {
-                ScreenCardCalibrationScreen(
-                    l, vm.calibration, vm.rules.camera,
-                    onDone = {
-                        Toast.makeText(context, SFlow.screenCalibrated[l], Toast.LENGTH_SHORT).show()
-                        nav.popBackStack()
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
         }
     }
     if (state.demo) DemoBadge(state.lang, Modifier.align(androidx.compose.ui.Alignment.TopCenter))

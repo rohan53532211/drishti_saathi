@@ -47,6 +47,8 @@ fun CameraDebugScreen(
     calibration: CalibrationRepository,
     onSkip: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Quick-estimate SE for a distance in metres ("If blur starts here: about −X.XX D"); null = not shown. */
+    liveSeD: ((Double) -> Double)? = null,
 ) {
     CameraPermissionGate(lang, onSkip = onSkip) {
         val tracker = rememberFaceTracker(config)
@@ -77,6 +79,9 @@ fun CameraDebugScreen(
                     add("image %s".fmt(face?.let { "${it.imageWidthPx}×${it.imageHeightPx}" } ?: "-"))
                     add("distance %s mm  [%s]%s".fmt(reading?.distanceMm?.let { "%.0f".fmt(it) } ?: "-",
                         reading?.confidence ?: "-", if (reading?.faceVisible == false) " (face lost)" else ""))
+                    if (liveSeD != null) add(reading?.takeIf { it.faceVisible && it.distanceMm > 0 }
+                        ?.let { com.drishtisaathi.i18n.SAnamnesis.quickLive.format(com.drishtisaathi.i18n.fmtD(liveSeD(it.distanceMm / 1000.0)))[lang] }
+                        ?: com.drishtisaathi.i18n.SAnamnesis.quickLive.format("-")[lang])
                     add("PD (provisional) %s mm".fmt(pd?.let { "%.1f".fmt(it) } ?: "-"))
                     add("iris %s px; calibrated iris %s mm".fmt(face?.let(FaceMetrics::meanIrisDiameterPx)?.let { "%.1f".fmt(it) } ?: "-",
                         cal.irisDiameterMm?.let { "%.2f".fmt(it) } ?: "prior"))
@@ -94,7 +99,7 @@ fun CameraDebugScreen(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     lines.forEach {
-                        Text(it, color = Color.White, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                        Text(it, color = Color.White, style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"))
                     }
                 }
             }

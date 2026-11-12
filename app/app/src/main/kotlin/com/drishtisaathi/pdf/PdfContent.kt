@@ -8,6 +8,8 @@ import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
 import com.drishtisaathi.interview.ChoiceContext
 import com.drishtisaathi.ui.Fmt
+import com.drishtisaathi.ui.PowerPathText
+import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.ui.answerText
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -34,6 +36,19 @@ object PdfContent {
         ReferralLevel.NONE -> Tone.ACCENT
     }
 
+    /** Urgent reasons (red) and routine reasons (amber) as separate labelled groups. */
+    private fun reasonGroups(r: com.drishtisaathi.engine.Referral, rules: RulesConfig, l: Lang, out: MutableList<Block>) {
+        val g = com.drishtisaathi.ui.ReferralGroups.of(r)
+        if (g.urgent.isNotEmpty()) {
+            out += Block.Para(S.urgentGroup[l], bold = true, tone = Tone.URGENT)
+            g.urgent.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], Tone.URGENT) }
+        }
+        if (g.routine.isNotEmpty()) {
+            out += Block.Para(S.routineGroup[l], bold = true, tone = Tone.ROUTINE)
+            g.routine.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], Tone.ROUTINE) }
+        }
+    }
+
     /** Full staff summary in the shop's chosen language. */
     fun shopCopy(state: UiState, rules: RulesConfig, ctx: ChoiceContext, l: Lang): List<Block> {
         val r = state.result ?: return emptyList()
@@ -47,7 +62,8 @@ object PdfContent {
 
         out += Block.Heading(S.referral[l])
         out += Block.Para(S.referralLevel(a.referral.level)[l], bold = true, tone = referralTone(a.referral.level))
-        a.referral.reasons.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], referralTone(a.referral.level)) }
+        reasonGroups(a.referral, rules, l, out)
+        if (state.glassesOn) out += Block.Para(com.drishtisaathi.i18n.SFlow.glassesOnNote[l], bold = true, tone = Tone.ROUTINE)
 
         val adv = a.advice
         if (adv == null) {
@@ -68,6 +84,20 @@ object PdfContent {
             adv.add?.let { out += Block.Para("${S.readingAdd[l]}: ${Fmt.band(it.value, l)} ${Fmt.meta(it, l)}") }
             if (adv.confirmAddWithReadyReader) out += Block.Bullet(S.confirmReadyReader[l], Tone.ACCENT)
             if (adv.eyes.isNotEmpty()) out += Block.Para(S.startingLensHint[l], tone = Tone.MUTED)
+            PowerPathText.sourceLine(adv)?.let { out += Block.Para(it[l], bold = true) }
+            val quick = PowerPathText.quickLines(state)
+            if (quick.isNotEmpty()) {
+                out += Block.Para(SAnamnesis.quickHeading[l], tone = Tone.MUTED)
+                quick.forEach { out += Block.Bullet(it[l]) }
+            }
+            val compare = PowerPathText.compareLines(state, adv)
+            if (compare.isNotEmpty()) {
+                out += Block.Para(SAnamnesis.compareHeading[l], bold = true, tone = Tone.ROUTINE)
+                compare.forEach { out += Block.Bullet(it[l], Tone.ROUTINE) }
+            }
+
+            out += Block.Heading(SAnamnesis.profileTitle[l])
+            PowerPathText.profileLines(state, rules).forEach { out += Block.Bullet(it[l]) }
 
             out += Block.Heading(S.lensPackage[l])
             out += Block.Bullet("${S.lensType[l]}: ${S.lensType(adv.lensType.value)[l]} ${Fmt.meta(adv.lensType, l)}")
@@ -76,6 +106,7 @@ object PdfContent {
                 if (adv.coatings.isEmpty()) S.noCoatings[l] else adv.coatings.joinToString(", ") { S.coating(it)[l] })
 
             out += Block.Heading(S.suggestedFrames[l])
+            out += Block.Para(S.demoCatalogue[l], bold = true, tone = Tone.ROUTINE)
             r.frames.forEachIndexed { i, rf ->
                 out += Block.Para("${i + 1}. ${rf.frame.name} (${rf.frame.id}) · ${Fmt.frameLine(rf, l)}", bold = true)
                 Fmt.label(rf, l)?.let { out += Block.Para(it, bold = true, tone = Tone.ACCENT) }
@@ -93,6 +124,18 @@ object PdfContent {
 
         out += Block.Heading(S.profile[l])
         state.visibleQuestions.forEach { q -> out += Block.Bullet("${q.text[l]}  →  ${answerText(q, state, ctx)[l]}") }
+
+        // AI voice interview transcript: shop copy only (never the customer copy, never sent to the optometrist)
+        state.aiInterview?.let { rec ->
+            val V = com.drishtisaathi.i18n.SAiVoice
+            out += Block.Heading(V.transcriptTitle[l])
+            rec.turns.forEach { t ->
+                out += Block.Para(V.transcriptQ.format(t.n, t.question)[l], bold = true)
+                out += Block.Bullet(V.transcriptA.format(t.answer ?: V.transcriptNoAnswer[l])[l])
+            }
+            if (rec.fellBack) out += Block.Para(V.transcriptFellBack[l], tone = Tone.ROUTINE)
+            out += Block.Para(V.transcriptNote[l], tone = Tone.MUTED)
+        }
 
         state.verification.verifiedAt?.let {
             val v = state.verification
@@ -131,7 +174,7 @@ object PdfContent {
             ReferralLevel.ROUTINE -> { out += Block.Heading(S.routineTitle[l]); out += Block.Para(S.routineBody[l], tone = tone) }
             ReferralLevel.NONE -> { out += Block.Heading(S.referral[l]); out += Block.Para(S.referralLevel(a.referral.level)[l], tone = tone) }
         }
-        a.referral.reasons.forEach { out += Block.Bullet(S.referralReason(it, rules)[l], tone) }
+        reasonGroups(a.referral, rules, l, out)
 
         a.advice?.let { adv ->
             out += Block.Heading(S.lensPackage[l])

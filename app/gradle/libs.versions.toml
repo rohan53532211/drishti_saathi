@@ -13,6 +13,7 @@ junit = "4.13.2"
 camerax = "1.5.3"
 mediapipe = "0.10.26.1"
 opencv = "4.12.0"
+sqlcipher = "4.6.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -36,6 +37,7 @@ camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref =
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 mediapipe-tasks-vision = { module = "com.google.mediapipe:tasks-vision", version.ref = "mediapipe" }
 opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
+sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

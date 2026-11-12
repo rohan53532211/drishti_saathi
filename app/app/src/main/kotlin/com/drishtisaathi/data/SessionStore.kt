@@ -13,6 +13,7 @@ import androidx.room.Update
 import androidx.room.Upsert
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.SessionResult
 import com.drishtisaathi.engine.StaffMeasurements
@@ -49,13 +50,22 @@ data class SessionEntity(
     val measurementsJson: String? = null,
 )
 
-/** Camera capture (M2) and on-screen test (M3) results stored with a session. Numbers only, never images. */
+/**
+ * Camera capture (M2) and on-screen test (M3) results stored with a session. Numbers only, never images.
+ * [aiInterview] is the AI voice interview's questions and transcribed answers (text only, no audio): staff view and
+ * shop PDF only; it is deleted with the session.
+ */
 @kotlinx.serialization.Serializable
 data class Measurements(
     val face: com.drishtisaathi.engine.MeasuredFace? = null,
     val tests: com.drishtisaathi.engine.VisionTests? = null,
     /** Staff demo mode: invented sample customer, labelled DEMO on every screen and PDF. */
     val demo: Boolean = false,
+    /** Staff override: camera steps and screen tests were done with the customer's glasses on. */
+    val glassesOn: Boolean = false,
+    /** Power path quick estimate (phone estimate, approximate); null = not run. */
+    val quick: com.drishtisaathi.engine.QuickEstimate? = null,
+    val aiInterview: com.drishtisaathi.aivoice.AiInterviewRecord? = null,
 )
 
 /**
@@ -88,6 +98,39 @@ interface DeviceCorrectionDao {
     @Query("DELETE FROM device_corrections WHERE phoneModel = :model") suspend fun delete(model: String)
 }
 
+/**
+ * Remote Optometrist Bridge: one row per session sent with the customer's spoken and tapped consent. Holds the
+ * server's profile id and the optometrist's reply; deleted with the session (and the server copy is deleted too).
+ */
+@Entity(tableName = "remote_reviews")
+data class RemoteReviewEntity(
+    @PrimaryKey val sessionId: Long,
+    val remoteId: String,
+    val backendUrl: String,
+    val sentAt: Long,
+    val consentAt: Long,
+    /** WAITING or REVIEWED. */
+    val status: String,
+    val advice: String? = null,
+    val needsInPersonExam: Boolean? = null,
+    val reviewedAt: Long? = null,
+    val checkedAt: Long? = null,
+) {
+    val reviewed: Boolean get() = status == "REVIEWED"
+    /** Short case number, the same one the optometrist's page shows. */
+    val caseId: String get() = com.drishtisaathi.bridge.BridgeProfile.caseId(remoteId)
+}
+
+@Dao
+interface RemoteReviewDao {
+    @Query("SELECT * FROM remote_reviews WHERE sessionId = :sessionId") suspend fun get(sessionId: Long): RemoteReviewEntity?
+    @Upsert suspend fun upsert(e: RemoteReviewEntity)
+    @Query("DELETE FROM remote_reviews WHERE sessionId = :sessionId") suspend fun delete(sessionId: Long)
+    /** Sent sessions still waiting for the optometrist (checked when Past sessions is open). */
+    @Query("SELECT * FROM remote_reviews WHERE status != 'REVIEWED'") suspend fun waiting(): List<RemoteReviewEntity>
+    @Query("SELECT * FROM remote_reviews") fun observeAll(): Flow<List<RemoteReviewEntity>>
+}
+
 @Dao
 interface SessionDao {
     @Query("SELECT * FROM sessions WHERE phoneModel = :model AND verifiedAt IS NOT NULL")
@@ -99,13 +142,15 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :id") suspend fun delete(id: Long)
 }
 
-@Database(entities = [SessionEntity::class, DeviceCorrectionEntity::class], version = 4, exportSchema = true)
+@Database(entities = [SessionEntity::class, DeviceCorrectionEntity::class, RemoteReviewEntity::class], version = 5, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun sessions(): SessionDao
     abstract fun deviceCorrections(): DeviceCorrectionDao
+    abstract fun remoteReviews(): RemoteReviewDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
+        const val DB_NAME = "drishti.db"
 
         /** v2 adds consentAt. Keeps sessions saved by earlier test builds. */
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -127,9 +172,19 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) = db.execSQL(CREATE_DEVICE_CORRECTIONS)
         }
+        /** v5 adds remote_reviews (Remote Optometrist Bridge). SQL matches schemas/.../5.json. */
+        const val CREATE_REMOTE_REVIEWS =
+            "CREATE TABLE IF NOT EXISTS `remote_reviews` (`sessionId` INTEGER NOT NULL, `remoteId` TEXT NOT NULL, " +
+                "`backendUrl` TEXT NOT NULL, `sentAt` INTEGER NOT NULL, `consentAt` INTEGER NOT NULL, `status` TEXT NOT NULL, " +
+                "`advice` TEXT, `needsInPersonExam` INTEGER, `reviewedAt` INTEGER, `checkedAt` INTEGER, PRIMARY KEY(`sessionId`))"
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) = db.execSQL(CREATE_REMOTE_REVIEWS)
+        }
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
-            instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "drishti.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, DB_NAME)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                // Encrypted with SQLCipher; a plain database from an earlier build is encrypted first (DbEncryption).
+                .openHelperFactory(SupportOpenHelperFactory(DbEncryption.prepare(context.applicationContext, DB_NAME)))
                 .build().also { instance = it }
         }
     }

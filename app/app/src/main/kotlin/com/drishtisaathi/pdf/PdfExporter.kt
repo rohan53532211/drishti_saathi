@@ -10,6 +10,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.core.content.FileProvider
+import androidx.core.content.res.ResourcesCompat
 import java.io.File
 
 /** Draws [Block]s onto A4 pages with Android's PdfDocument. StaticLayout handles Devanagari shaping and wrapping. */
@@ -29,6 +30,9 @@ object PdfExporter {
     }
 
     fun write(context: Context, blocks: List<Block>, file: File): File {
+        // Same bundled Noto font as the screens, so the PDF does not depend on the phone's font either.
+        val regular = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.noto_regular) ?: Typeface.DEFAULT
+        val boldFace = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.noto_bold) ?: Typeface.DEFAULT_BOLD
         val doc = PdfDocument()
         var pageNo = 0
         var page: PdfDocument.Page? = null
@@ -40,13 +44,13 @@ object PdfExporter {
             page = doc.startPage(PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, pageNo).create())
             y = MARGIN
             // footer page number
-            val p = Paint().apply { color = Color.GRAY; textSize = 9f }
+            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.GRAY; textSize = 9f; typeface = regular }
             page!!.canvas.drawText("$pageNo", PAGE_W - MARGIN, PAGE_H - 20f, p)
         }
 
         fun paint(size: Float, bold: Boolean, tone: Tone) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = size
-            typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            typeface = if (bold) boldFace else regular
             color = when (tone) {
                 Tone.NORMAL -> Color.rgb(33, 33, 33)
                 Tone.MUTED -> Color.rgb(97, 97, 97)
