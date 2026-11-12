@@ -67,8 +67,11 @@ class TestEnv(
     val scale: ScreenScale,
     /** Called with each new instruction or pause message, so the voice track can speak it. */
     val onInstruction: (Txt) -> Unit,
+    /** The customer eye check runs each test once: a copy of the config with repeats = 1. */
+    private val cfgOverride: VisionTestConfig? = null,
 ) {
-    val cfg: VisionTestConfig get() = rules.visionTests
+    val cfg: VisionTestConfig get() = cfgOverride ?: rules.visionTests
+    fun singleRun(): TestEnv = TestEnv(lang, rules, scale, onInstruction, rules.visionTests.copy(repeats = 1))
     val vm = VisionMath(rules)
 }
 
@@ -106,29 +109,47 @@ internal fun TestLayout(
     holdAtMm: Double? = null,
     /** Show the live distance large (quick estimate), without the repeat counter. */
     bigDistance: Boolean = false,
+    /** Customer eye check: "Right eye: Power check" replaces the title line. */
+    header: Txt? = null,
+    /**
+     * Customer eye check: quality gates run silently (no pause card, nothing spoken); only when the face has been
+     * lost for 5 s one hint shows: "Keep your face in the frame".
+     */
+    quiet: Boolean = false,
     target: @Composable BoxScope.() -> Unit,
     controls: @Composable ColumnScope.() -> Unit,
 ) {
     val l = env.lang
     val fg = if (background.luminance() < 0.4f) Color.White else Color.Black
-    val pause = pauseText(status)
+    val pause = if (quiet) null else pauseText(status)
     LaunchedEffect(instruction) { env.onInstruction(instruction) }
     LaunchedEffect(pause) { pause?.let(env.onInstruction) }
+    val faceLost = status == DistanceStatus.NO_FACE || status == DistanceStatus.NO_READING
+    var showFaceHint by remember { mutableStateOf(false) }
+    LaunchedEffect(quiet && faceLost) {
+        showFaceHint = false
+        if (quiet && faceLost) { kotlinx.coroutines.delay(FACE_HINT_AFTER_MS); showFaceHint = true }
+    }
 
     Column(
         Modifier.fillMaxSize().background(background).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(title[l] + (subtitle?.let { " · " + it[l] } ?: ""), color = fg, style = MaterialTheme.typography.titleLarge)
-        Text(eyeInstruction(eye)[l], color = fg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        if (header != null) Text(header[l], color = fg, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        else Text(title[l] + (subtitle?.let { " · " + it[l] } ?: ""), color = fg, style = MaterialTheme.typography.titleLarge)
+        if (header == null || eye != TestEye.BOTH) {
+            Text(eyeInstruction(eye)[l], color = fg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
         Text(instruction[l], color = fg, style = MaterialTheme.typography.bodyLarge)
         val dist = reading?.let { SVision.distanceNow.format((it.distanceMm / 10.0).roundToInt())[l] } ?: SVision.distanceUnknown[l]
         val hold = holdAtMm?.let { "  ·  " + SVision.holdAt.format((it / 10.0).roundToInt())[l] } ?: ""
-        if (bigDistance) Text(dist + hold, color = fg, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+        if (bigDistance || quiet) Text(dist + hold, color = fg, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         else Text(
             dist + hold + "  ·  " + SVision.repeatOf.format(repeatIndex + 1, repeats)[l],
             color = fg, style = MaterialTheme.typography.bodyMedium,
         )
+        if (showFaceHint) Text(com.drishtisaathi.i18n.SShop.faceHint[l], color = Color(0xFFB26A00),
+            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             if (pause == null) target()
             else Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1))) {
@@ -146,6 +167,9 @@ internal fun TestLayout(
         }
     }
 }
+
+/** Customer eye check: the face-lost hint appears after this long. */
+const val FACE_HINT_AFTER_MS = 5_000L
 
 // =================================================================================================
 // 2. Far point
@@ -212,7 +236,8 @@ fun FarPointTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, on
 
 @Composable
 fun ClockDialTestScreen(
-    env: TestEnv, eye: TestEye, targetMm: Double, reading: DistanceReading?, onSkip: () -> Unit, onComplete: (ClockDialProcedure) -> Unit,
+    env: TestEnv, eye: TestEye, targetMm: Double, reading: DistanceReading?, onSkip: () -> Unit,
+    header: Txt? = null, quiet: Boolean = false, onComplete: (ClockDialProcedure) -> Unit,
 ) {
     val cfg = env.cfg
     var proc by remember { mutableStateOf(ClockDialProcedure(cfg.repeats)) }
@@ -225,6 +250,7 @@ fun ClockDialTestScreen(
 
     TestLayout(
         env, SVision.dialTitle, eye, instruction, reading, status, proc.repeatIndex, cfg.repeats, onSkip, holdAtMm = targetMm,
+        header = header, quiet = quiet,
         target = {
             Canvas(
                 Modifier.fillMaxSize().pointerInput(proc.repeatIndex) {
@@ -370,7 +396,13 @@ fun NearAcuityTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, 
 // =================================================================================================
 
 @Composable
-fun AmslerTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, onSkip: () -> Unit, onComplete: (AmslerProcedure) -> Unit) {
+fun AmslerTestScreen(
+    env: TestEnv, eye: TestEye, reading: DistanceReading?, onSkip: () -> Unit,
+    header: Txt? = null, quiet: Boolean = false,
+    /** Customer eye check: a plain yes / no, without marking where the lines look wrong. */
+    yesNoOnly: Boolean = false,
+    onComplete: (AmslerProcedure) -> Unit,
+) {
     val cfg = env.cfg
     var proc by remember { mutableStateOf(AmslerProcedure(cfg.repeats)) }
     var marking by remember { mutableStateOf(false) }
@@ -385,8 +417,9 @@ fun AmslerTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, onSk
     val currentMarking by rememberUpdatedState(marking)
 
     TestLayout(
-        env, SVision.amslerTitle, eye, if (marking) SVision.amslerMarkHint else SVision.amslerQuestion, reading, status,
-        proc.repeatIndex, cfg.repeats, onSkip,
+        env, SVision.amslerTitle, eye,
+        if (marking) SVision.amslerMarkHint else if (yesNoOnly) com.drishtisaathi.i18n.SShop.gridInstruction else SVision.amslerQuestion,
+        reading, status, proc.repeatIndex, cfg.repeats, onSkip, header = header, quiet = quiet,
         target = {
             Canvas(
                 Modifier.fillMaxSize().pointerInput(Unit) {
@@ -420,8 +453,13 @@ fun AmslerTestScreen(env: TestEnv, eye: TestEye, reading: DistanceReading?, onSk
                 BigButton(SVision.done[env.lang], selected = true, onClick = { finish(true) })
             } else {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    BigButton(SVision.yes[env.lang], enabled = ok, modifier = Modifier.weight(1f), onClick = { marking = true })
-                    BigButton(SVision.no[env.lang], enabled = ok, modifier = Modifier.weight(1f), onClick = { finish(false) })
+                    if (yesNoOnly) {
+                        BigButton(com.drishtisaathi.i18n.SShop.gridWavy[env.lang], enabled = ok, modifier = Modifier.weight(1f), onClick = { finish(true) })
+                        BigButton(com.drishtisaathi.i18n.SShop.gridFine[env.lang], enabled = ok, modifier = Modifier.weight(1f), onClick = { finish(false) })
+                    } else {
+                        BigButton(SVision.yes[env.lang], enabled = ok, modifier = Modifier.weight(1f), onClick = { marking = true })
+                        BigButton(SVision.no[env.lang], enabled = ok, modifier = Modifier.weight(1f), onClick = { finish(false) })
+                    }
                 }
             }
         },

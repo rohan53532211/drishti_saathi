@@ -377,7 +377,12 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             StepFrame(l, vm::setLang, SShop.eyeCheckTitle[l], onBack = { nav.popBackStack() }) {
                 CameraQuickEstimateFlow(
                     l, vm.rules, vm.calibration, plan, state.answers, primary,
-                    onDone = { q -> vm.setQuick(q); finishPowerPath() },
+                    onDone = { q, tests ->
+                        vm.setQuick(q)
+                        // the line and grid checks of the customer's own eye check (not of the comparison)
+                        if (primary) vm.setVisionTests(tests)
+                        finishPowerPath()
+                    },
                     onSkip = {
                         vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
                         finishPowerPath()
@@ -386,7 +391,6 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     voice = voice,
                     onInstruction = { voice.instructionSpeaker.speak(it, l) },
                     allowDemoWithoutCamera = state.demo,
-                    autoStart = true,
                 )
             }
         }

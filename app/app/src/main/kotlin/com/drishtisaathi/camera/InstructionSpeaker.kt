@@ -64,6 +64,23 @@ class InstructionRateLimiter(
     }
 }
 
+/**
+ * Eye-check voice: each instruction is spoken once. The same instruction again (a repeat) only after [repeatMs]
+ * (8 s); a different one (the state changed) at once.
+ */
+class InstructionPacer(private val repeatMs: Long = 8_000, private val clock: () -> Long = System::currentTimeMillis) {
+    private var lastKey: String? = null
+    private var lastAt = Long.MIN_VALUE / 2
+
+    fun allow(key: String): Boolean {
+        val now = clock()
+        if (key == lastKey && now - lastAt < repeatMs) return false
+        lastKey = key
+        lastAt = now
+        return true
+    }
+}
+
 /** Glue: gate result → rate limiter → speaker. */
 class InstructionAnnouncer(
     private val speaker: InstructionSpeaker,

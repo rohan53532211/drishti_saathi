@@ -133,9 +133,20 @@ class VoiceController(
      * open a second engine. `shutdown()` on it is a no-op: the controller owns the engine ([release]).
      */
     val instructionSpeaker: InstructionSpeaker = object : InstructionSpeaker {
-        override fun speak(text: Txt, lang: Lang) = speaker.speak(text, lang) {}
+        override fun speak(text: Txt, lang: Lang) {
+            if (!_instructionsMuted.value && pacer.allow(text[lang])) speaker.speak(text, lang) {}
+        }
         override fun stop() = speaker.stop()
         override fun shutdown() {}
+    }
+
+    private val pacer = com.drishtisaathi.camera.InstructionPacer()
+    private val _instructionsMuted = MutableStateFlow(false)
+    /** The mute button on the eye check: no spoken instructions while true. */
+    val instructionsMuted: StateFlow<Boolean> = _instructionsMuted.asStateFlow()
+    fun setInstructionsMuted(muted: Boolean) {
+        _instructionsMuted.value = muted
+        if (muted) speaker.stop()
     }
 
     private class Session(val q: Question, val lang: Lang, val ctx: ChoiceContext, val onAction: (VoiceAnswers.Action) -> Unit)
