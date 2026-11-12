@@ -216,6 +216,170 @@
           "priority": 1
         }
       }
+    },
+    "visionProblem": {
+      "numberMode": "none",
+      "options": {
+        "DISTANCE": {
+          "hi": ["दूर", "दूर का", "दूर की", "दूर वाला"],
+          "en": ["far", "distance", "far away", "door", "door ka"]
+        },
+        "NEAR": {
+          "hi": ["पास", "पास का", "पास की", "पढ़ने में", "पढने में", "नजदीक"],
+          "en": ["near", "close", "reading", "paas", "paas ka"]
+        },
+        "BOTH": {
+          "hi": ["दोनों", "दोनो", "दूर और पास", "दोनों में"],
+          "en": ["both", "far and near", "near and far", "dono"],
+          "priority": 1
+        },
+        "NONE": {
+          "hi": ["कोई दिक्कत नहीं", "कोई परेशानी नहीं", "कुछ नहीं", "ठीक है", "सब ठीक", "दिक्कत नहीं"],
+          "en": ["none", "no trouble", "no problem", "nothing", "fine", "all fine", "koi dikkat nahi"],
+          "priority": 2
+        }
+      }
+    },
+    "distanceSituation": {
+      "numberMode": "none",
+      "options": {
+        "DRIVING": {
+          "hi": ["गाड़ी", "गाडी", "गाड़ी चलाते", "ड्राइविंग", "बाइक", "स्कूटर"],
+          "en": ["driving", "drive", "car", "bike", "gaadi"]
+        },
+        "TV": {
+          "hi": ["टीवी", "टी वी", "टेलीविजन"],
+          "en": ["tv", "television", "t v"]
+        },
+        "SIGNBOARDS": {
+          "hi": ["बोर्ड", "साइन बोर्ड", "बस का नंबर", "बस नंबर", "दुकान का नाम"],
+          "en": ["signboard", "signboards", "sign", "bus number", "board"]
+        },
+        "CLASSROOM_BOARD": {
+          "hi": ["क्लास", "ब्लैकबोर्ड", "क्लास का बोर्ड", "स्कूल", "कॉलेज"],
+          "en": ["classroom", "class", "blackboard", "school", "college"],
+          "priority": 1
+        },
+        "OTHER": {
+          "hi": ["कुछ और", "दूसरा", "और कहीं"],
+          "en": ["other", "something else", "kuch aur"]
+        }
+      }
+    },
+    "distanceSince": {
+      "numberMode": "none",
+      "options": {
+        "UNDER_6_MONTHS": {
+          "hi": ["6 महीने से कम", "छह महीने से कम", "कुछ महीने", "हाल ही में", "अभी अभी", "थोड़े दिन"],
+          "en": ["less than 6 months", "few months", "recently", "recent", "new"]
+        },
+        "MONTHS_6_TO_24": {
+          "hi": ["एक साल", "1 साल", "डेढ़ साल", "6 महीने से 2 साल", "साल भर"],
+          "en": ["one year", "a year", "1 year", "6 months to 2 years"]
+        },
+        "OVER_2_YEARS": {
+          "hi": ["2 साल से ज्यादा", "दो साल से ज्यादा", "कई साल", "बहुत साल", "बहुत पहले", "बचपन"],
+          "en": ["more than 2 years", "many years", "long ago", "years", "childhood"],
+          "priority": 1
+        }
+      }
+    },
+    "nearTask": {
+      "numberMode": "none",
+      "options": {
+        "PHONE": {
+          "hi": ["मोबाइल", "फोन", "फ़ोन", "व्हाट्सएप"],
+          "en": ["phone", "mobile", "whatsapp"]
+        },
+        "NEWSPAPER": {
+          "hi": ["अखबार", "अख़बार", "किताब", "पढ़ना", "पढना"],
+          "en": ["newspaper", "paper", "book", "books", "akhbar"]
+        },
+        "SEWING": {
+          "hi": ["सिलाई", "सुई", "बारीक काम", "कढ़ाई"],
+          "en": ["sewing", "needle", "stitching", "fine work", "silai"]
+        },
+        "ACCOUNTS": {
+          "hi": ["हिसाब", "हिसाब किताब", "बिल", "खाता", "बही"],
+          "en": ["accounts", "bills", "bill", "hisab"]
+        },
+        "OTHER": {
+          "hi": ["कुछ और", "दूसरा"],
+          "en": ["other", "something else", "kuch aur"]
+        }
+      }
+    },
+    "nearDistance": {
+      "numberMode": "none",
+      "options": {
+        "VERY_CLOSE": {
+          "hi": ["बहुत पास", "आँख के पास", "एकदम पास", "बिल्कुल पास"],
+          "en": ["very close", "very near", "bahut paas"],
+          "priority": 1
+        },
+        "NORMAL": {
+          "hi": ["सामान्य", "नॉर्मल", "ठीक दूरी", "आम"],
+          "en": ["normal", "usual", "regular"]
+        },
+        "ARM_LENGTH": {
+          "hi": ["दूर", "हाथ भर", "हाथ की दूरी", "हाथ लंबा करके"],
+          "en": ["far", "arm", "arm length", "arms length", "haath bhar"]
+        }
+      }
+    },
+    "redFlagOnset": {
+      "numberMode": "none",
+      "options": {
+        "TODAY": {
+          "hi": ["आज", "आज ही", "अभी"],
+          "en": ["today", "aaj", "just now"]
+        },
+        "THIS_WEEK": {
+          "hi": ["इस हफ्ते", "इस हफ़्ते", "कल", "परसों", "कुछ दिन"],
+          "en": ["this week", "yesterday", "few days", "kal"]
+        },
+        "LONGER": {
+          "hi": ["पहले", "बहुत पहले", "महीना", "महीने", "उससे पहले"],
+          "en": ["longer", "long ago", "earlier", "month", "months"],
+          "priority": 1
+        }
+      }
+    },
+    "redFlagEye": {
+      "numberMode": "none",
+      "options": {
+        "RIGHT": {
+          "hi": ["दायीं", "दाईं", "दाहिनी", "दायां", "सीधी"],
+          "en": ["right", "daayi", "seedhi"]
+        },
+        "LEFT": {
+          "hi": ["बायीं", "बाईं", "बायां", "उल्टी"],
+          "en": ["left", "baayi", "ulti"]
+        },
+        "BOTH": {
+          "hi": ["दोनों", "दोनो"],
+          "en": ["both", "dono"],
+          "priority": 1
+        }
+      }
+    },
+    "powerKnown": {
+      "numberMode": "none",
+      "options": {
+        "YES": {
+          "hi": ["हाँ", "हां", "याद है", "पर्ची है", "पर्ची", "पता है", "मालूम है"],
+          "en": ["yes", "haan", "han", "slip", "i know", "i remember", "yaad hai"]
+        },
+        "NOT_SURE": {
+          "hi": ["पक्का नहीं", "पक्का नही", "पता नहीं", "पता नही", "नहीं पता", "शायद", "ठीक से याद नहीं", "मालूम नहीं"],
+          "en": ["not sure", "maybe", "dont know", "don't know", "pata nahi", "pakka nahi", "shayad"],
+          "priority": 2
+        },
+        "NO": {
+          "hi": ["नहीं", "नही", "याद नहीं", "याद नही", "नहीं है", "कोई पर्ची नहीं"],
+          "en": ["no", "nahi", "nahin", "no slip", "dont remember", "don't remember", "yaad nahi"]
+        }
+      }
     }
   }
 }

@@ -31,6 +31,7 @@ import com.drishtisaathi.engine.RulesConfig
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
 import com.drishtisaathi.i18n.SFlow
+import com.drishtisaathi.i18n.SAnamnesis
 
 /** M6: one screen with profile, bands + confidence, starting trial lens, lens package, frames, referral status. */
 @Composable
@@ -98,6 +99,14 @@ fun ResultScreen(
                         }
                         Text(S.startingLensHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }
+                    PowerPathText.sourceLine(adv)?.let { Text(it[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
+                    PowerPathText.quickLines(state).forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyMedium) }
+                    val compare = PowerPathText.compareLines(state, adv)
+                    if (compare.isNotEmpty()) {
+                        HorizontalDivider()
+                        Text(SAnamnesis.compareHeading[l], style = MaterialTheme.typography.titleSmall, color = RoutineAmber)
+                        compare.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyMedium) }
+                    }
                     adv.add?.let { add ->
                         HorizontalDivider()
                         Text("${S.readingAdd[l]}: ${Fmt.band(add.value, l)}", style = MaterialTheme.typography.titleMedium)
@@ -106,6 +115,11 @@ fun ResultScreen(
                             Text("• " + S.confirmReadyReader[l], style = MaterialTheme.typography.titleMedium, color = Teal)
                         }
                     }
+                }
+
+                // ---- Functional vision profile ----
+                SectionCard(SAnamnesis.profileTitle[l]) {
+                    PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
                 }
 
                 // ---- Lens package ----

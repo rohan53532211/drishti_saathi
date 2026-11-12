@@ -374,5 +374,28 @@
     "slopeMax": 1.3,
     "excludePairAbsDiffOverD": 3.0,
     "maxCorrectionD": 1.0
+  },
+  "quickEstimate": {
+    "_comment": "Power path (NOT SURE / NO): quick far point per eye, glasses off, one eye covered, distance-locked letters; live SE white -1/d, blue -1/d + optics.lcaBlueOffsetD, rounded to optics.powerStepD. Near point -> add (VisionMath.fuseAdd: near-point formula + Hofstetter age check) only from nearAddFromAge. Approximate: always confirmed with the trial lens.",
+    "target": "WHITE",
+    "letterLogMar": 0.0,
+    "nearAddFromAge": 38,
+    "compareIfGlassesOlderThanYears": 2,
+    "bandHalfWidthD": 0.75,
+    "workingDistanceM": { "VERY_CLOSE": 0.25, "NORMAL": 0.35, "ARM_LENGTH": 0.45 }
+  },
+  "functionalProfile": {
+    "_comment": "Estimated daily hours per zone (near < 40 cm, intermediate 40-100 cm, distance) from the interview. Hours are rough starting values, not measured: review with pilot data.",
+    "nearHoursByReading": { "RARELY": 0.5, "SOMETIMES": 1.5, "DAILY_LONG": 3.5 },
+    "nearHoursByTask": { "PHONE": 1.0, "NEWSPAPER": 0.5, "SEWING": 2.0, "ACCOUNTS": 2.0, "OTHER": 0.5 },
+    "screenHours": { "H0_2": 1.0, "H2_4": 3.0, "H4_PLUS": 6.0 },
+    "screenIntermediateShareByOccupation": { "OFFICE_COMPUTER": 0.8, "STUDENT": 0.5, "SHOP_BUSINESS": 0.4 },
+    "screenIntermediateShareDefault": 0.2,
+    "distanceHoursBase": 1.0,
+    "distanceHoursByOccupation": { "DRIVER": 6.0, "FIELD_OUTDOOR": 5.0, "SPORT_ACTIVE": 3.0, "STUDENT": 2.0 },
+    "distanceHoursOutdoorWork": 3.0,
+    "distanceHoursNightDriving": 1.0,
+    "distanceHoursBySituation": { "DRIVING": 2.0, "TV": 2.0, "SIGNBOARDS": 1.0, "CLASSROOM_BOARD": 3.0, "OTHER": 0.5 },
+    "dominantMinShare": 0.45
   }
 }

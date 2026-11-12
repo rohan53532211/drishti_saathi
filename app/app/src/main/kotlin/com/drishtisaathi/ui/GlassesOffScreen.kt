@@ -44,3 +44,28 @@ fun GlassesOffScreen(
         }
     }
 }
+
+/** Power path YES with old glasses or blur still reported: offer the optional quick check (shown to staff). */
+@Composable
+fun CompareOfferScreen(
+    l: Lang,
+    onLang: (Lang) -> Unit,
+    speaker: InstructionSpeaker,
+    onCheck: () -> Unit,
+    onSkip: () -> Unit,
+    onBack: () -> Unit,
+) {
+    LaunchedEffect(l) { speaker.speak(com.drishtisaathi.i18n.SAnamnesis.compareBody, l) }
+    val s = com.drishtisaathi.i18n.SAnamnesis
+    AppScaffold(l, onLang, title = s.compareTitle[l], onBack = onBack) { pad ->
+        Column(
+            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(s.compareTitle[l], style = MaterialTheme.typography.headlineMedium, color = Teal)
+            Text(s.compareBody[l], style = MaterialTheme.typography.bodyLarge)
+            BigButton(s.compareYes[l], { speaker.stop(); onCheck() }, container = Teal)
+            BigButton(s.compareNo[l], { speaker.stop(); onSkip() })
+        }
+    }
+}

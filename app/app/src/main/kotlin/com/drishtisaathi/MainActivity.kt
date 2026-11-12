@@ -51,6 +51,13 @@ import com.drishtisaathi.ui.GlassesOffScreen
 import com.drishtisaathi.ui.DemoBadge
 import com.drishtisaathi.demo.DemoCustomers
 import com.drishtisaathi.vision.CameraVisionTestFlow
+import com.drishtisaathi.vision.CameraQuickEstimateFlow
+import com.drishtisaathi.ui.CompareOfferScreen
+import com.drishtisaathi.engine.PowerKnown
+import com.drishtisaathi.engine.QuickEstimate
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.drishtisaathi.voice.rememberVoiceController
 
 class MainActivity : ComponentActivity() {
@@ -65,6 +72,12 @@ private object Routes {
     const val CONSENT = "consent"
     const val INTERVIEW = "interview"
     const val OLD_NUMBERS = "oldNumbers"
+    // Power path: optional compare offer (YES), glasses off and the quick estimate (NOT SURE / NO, or the compare)
+    const val COMPARE_OFFER = "compareOffer"
+    const val POWER_GLASSES_OFF = "powerGlassesOff?primary={primary}"
+    const val QUICK = "quick?primary={primary}"
+    fun powerGlassesOff(primary: Boolean) = "powerGlassesOff?primary=$primary"
+    fun quick(primary: Boolean) = "quick?primary=$primary"
     const val CONFIRM = "confirm"
     // Integrated flow: card check (optional) → face capture → outcome → screen tests → results
     const val GLASSES_OFF = "glassesOff"
@@ -100,6 +113,22 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     fun goHome() = nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
     fun toConfirm() = nav.navigate(Routes.CONFIRM) { popUpTo(Routes.HOME) }
 
+    // ---- power path: side screens opened from the POWER_KNOWN question, then back to the interview ----
+    /** The power answer finished the interview (last question, or an edit from the confirmation screen). */
+    var powerToConfirm by remember { mutableStateOf(false) }
+    fun finishPowerPath() {
+        nav.popBackStack(Routes.INTERVIEW, inclusive = false)
+        if (powerToConfirm) { powerToConfirm = false; toConfirm() }
+    }
+    /** Runs the quick estimate (glasses off first), or stores the no-test outcome and returns at once. */
+    fun startQuick(primary: Boolean) {
+        val plan = vm.quickPlan()
+        if (!plan.runsAnything) {
+            vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
+            finishPowerPath()
+        } else nav.navigate(Routes.powerGlassesOff(primary))
+    }
+
     /** Runs the engine with everything gathered so far; any referral is shown before the summary. */
     fun computeAndShow() {
         val r = vm.computeResult()
@@ -132,7 +161,15 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.INTERVIEW) {
             InterviewScreen(
                 state, vm.choiceContext, vm::setLang,
-                onAnswer = { id, update -> if (vm.answer(id, update)) toConfirm() },
+                onAnswer = { id, update ->
+                    val done = vm.answer(id, update)
+                    if (id == Questions.POWER_KNOWN) {
+                        powerToConfirm = done
+                        vm.setQuick(null)
+                        if (vm.state.value.answers.powerKnown == PowerKnown.YES) nav.navigate(Routes.OLD_NUMBERS)
+                        else startQuick(primary = true)
+                    } else if (done) toConfirm()
+                },
                 onOldNumbersYes = { nav.navigate(Routes.OLD_NUMBERS) },
                 onBack = {
                     when {
@@ -146,22 +183,66 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.OLD_NUMBERS) {
             OldNumbersScreen(
                 state.lang, state.answers.knownRx, vm::setLang,
+                // Power path YES: the entered numbers are the power source ("customer's known power").
                 onSave = { rx ->
-                    nav.popBackStack()
-                    if (vm.answer(Questions.KNOWN_RX) { it.copy(knownRx = rx) }) toConfirm()
+                    vm.setKnownRx(rx)
+                    if (vm.offerCompare()) nav.navigate(Routes.COMPARE_OFFER) { popUpTo(Routes.INTERVIEW) }
+                    else finishPowerPath()
                 },
-                onNone = {
-                    nav.popBackStack()
-                    if (vm.answer(Questions.KNOWN_RX) { it.copy(knownRx = null) }) toConfirm()
-                },
+                // "No numbers available": continue as NO, with the quick estimate.
+                onNone = { vm.setPowerKnown(PowerKnown.NO); startQuick(primary = true) },
+                // Back: return to the power question.
+                onBack = { powerToConfirm = false; vm.previousQuestion(); nav.popBackStack() },
+            )
+        }
+        composable(Routes.COMPARE_OFFER) {
+            CompareOfferScreen(
+                state.lang, vm::setLang, voice.instructionSpeaker,
+                onCheck = { nav.navigate(Routes.powerGlassesOff(primary = false)) },
+                onSkip = { finishPowerPath() },
+                onBack = { finishPowerPath() },
+            )
+        }
+        composable(
+            Routes.POWER_GLASSES_OFF,
+            arguments = listOf(navArgument("primary") { type = NavType.BoolType; defaultValue = true }),
+        ) { entry ->
+            val primary = entry.arguments?.getBoolean("primary") ?: true
+            GlassesOffScreen(
+                state.lang, vm::setLang, state.staffMode, voice.instructionSpeaker,
+                onOff = { vm.setGlassesOn(false); nav.navigate(Routes.quick(primary)) },
+                onKeepOn = { vm.setGlassesOn(true); nav.navigate(Routes.quick(primary)) },
                 onBack = { nav.popBackStack() },
             )
+        }
+        composable(
+            Routes.QUICK,
+            arguments = listOf(navArgument("primary") { type = NavType.BoolType; defaultValue = true }),
+        ) { entry ->
+            val l = state.lang
+            val primary = entry.arguments?.getBoolean("primary") ?: true
+            val plan = androidx.compose.runtime.remember { vm.quickPlan() }
+            StepFrame(l, vm::setLang, com.drishtisaathi.i18n.SAnamnesis.quickTitle[l], onBack = { nav.popBackStack() }) {
+                CameraQuickEstimateFlow(
+                    l, vm.rules, vm.calibration, plan, state.answers, primary,
+                    onDone = { q -> vm.setQuick(q); finishPowerPath() },
+                    onSkip = {
+                        vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
+                        finishPowerPath()
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    voice = voice,
+                    onInstruction = { voice.instructionSpeaker.speak(it, l) },
+                    allowDemoWithoutCamera = state.staffMode,
+                )
+            }
         }
         composable(Routes.CONFIRM) {
             ConfirmScreen(
                 state, vm.choiceContext, vm::setLang,
                 onEdit = { id -> vm.editQuestion(id); nav.navigate(Routes.INTERVIEW) },
                 onStaffMeasurements = vm::setStaffMeasurements,
+                onFullFarTest = vm::setFullFarTest,
                 onSeeResults = {
                     // Demo customers already carry camera and screen-test results.
                     if (state.demo) { computeAndShow(); return@ConfirmScreen }
@@ -222,6 +303,10 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             StepFrame(l, vm::setLang, SFlow.stepTests[l], onBack = null) {
                 CameraVisionTestFlow(
                     l, vm.rules, vm.calibration, state.answers.age, state.answers.occupation,
+                    // Power path: the power is known or estimated already; staff can still ask for the full far point.
+                    farPoint = state.answers.powerKnown == null || state.fullFarTest,
+                    nearPoint = state.quick?.let { it.nearPointCm == null && it.addD == null } ?: true,
+                    workingDistanceM = state.answers.nearDistance?.let { vm.quickEstimator.workingDistanceM(state.answers) },
                     onDone = { tests, _ -> vm.setVisionTests(tests); computeAndShow() },
                     onCancel = { vm.skipVisionTests(); computeAndShow() },
                     modifier = Modifier.fillMaxSize(),

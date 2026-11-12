@@ -2,6 +2,7 @@ package com.drishtisaathi.engine.config
 
 import com.drishtisaathi.engine.Confidence
 import com.drishtisaathi.engine.FrameShape
+import com.drishtisaathi.engine.Occupation
 import com.drishtisaathi.engine.face.FaceShape
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -423,5 +424,62 @@ data class DeviceCorrectionConfig(
     }
     companion object {
         operator fun invoke(): DeviceCorrectionConfig = missingSection("deviceCorrection")
+    }
+}
+
+/** Power path quick estimate (interview → "do you remember your power?" NOT SURE / NO). */
+@Serializable
+data class QuickEstimateConfig(
+    @SerialName("_comment") val comment: String? = null,
+    /** Target for the quick far point: WHITE (SE = −1/d) or BLUE (SE = −1/d + optics.lcaBlueOffsetD). */
+    val target: com.drishtisaathi.engine.QuickTarget,
+    /** Logarithm of the minimum angle of resolution of the distance-locked letters (0.0 = 20/20). */
+    val letterLogMar: Double,
+    /** Near point → reading add only from this age; younger near-only problems get "possible long-sightedness". */
+    val nearAddFromAge: Int,
+    /** YES path: offer an optional quick check when the glasses are older than this (years) or blur is still reported. */
+    val compareIfGlassesOlderThanYears: Int,
+    /** ± around the estimate for the "estimated band" of a phone estimate (D). */
+    val bandHalfWidthD: Double,
+    /** Usual reading distance answer → working distance (m) for the add. */
+    val workingDistanceM: Map<com.drishtisaathi.engine.NearDistance, Double>,
+) {
+    init {
+        require(bandHalfWidthD > 0 && nearAddFromAge in 30..60 && compareIfGlassesOlderThanYears >= 0) { "quickEstimate: bad values" }
+        require(workingDistanceM.keys == com.drishtisaathi.engine.NearDistance.entries.toSet() && workingDistanceM.values.all { it in 0.15..0.8 }) {
+            "quickEstimate.workingDistanceM needs every NearDistance, 0.15-0.8 m"
+        }
+    }
+    companion object {
+        operator fun invoke(): QuickEstimateConfig = missingSection("quickEstimate")
+    }
+}
+
+/** Functional vision profile: estimated daily hours per zone from the interview answers. */
+@Serializable
+data class FunctionalProfileConfig(
+    @SerialName("_comment") val comment: String? = null,
+    val nearHoursByReading: Map<com.drishtisaathi.engine.ReadingFrequency, Double>,
+    val nearHoursByTask: Map<com.drishtisaathi.engine.NearTask, Double>,
+    /** Screen hours answer → hours; split between intermediate (computer) and near (phone) by occupation. */
+    val screenHours: Map<com.drishtisaathi.engine.ScreenHours, Double>,
+    val screenIntermediateShareByOccupation: Map<Occupation, Double>,
+    val screenIntermediateShareDefault: Double,
+    val distanceHoursBase: Double,
+    val distanceHoursByOccupation: Map<Occupation, Double>,
+    val distanceHoursOutdoorWork: Double,
+    val distanceHoursNightDriving: Double,
+    val distanceHoursBySituation: Map<com.drishtisaathi.engine.DistanceSituation, Double>,
+    /** A zone is "dominant" when it has at least this share of the total hours; otherwise MIXED. */
+    val dominantMinShare: Double,
+) {
+    init {
+        require(dominantMinShare in 0.34..1.0) { "functionalProfile.dominantMinShare must be 0.34-1" }
+        require(screenIntermediateShareDefault in 0.0..1.0 && screenIntermediateShareByOccupation.values.all { it in 0.0..1.0 }) {
+            "functionalProfile: screen shares must be 0-1"
+        }
+    }
+    companion object {
+        operator fun invoke(): FunctionalProfileConfig = missingSection("functionalProfile")
     }
 }

@@ -91,7 +91,7 @@ private fun eyeInstruction(eye: TestEye): Txt = when (eye) {
  * while the face is lost or the distance is out of range) and the answer controls.
  */
 @Composable
-private fun TestLayout(
+internal fun TestLayout(
     env: TestEnv,
     title: Txt,
     eye: TestEye,

@@ -12,7 +12,13 @@ enum class Confidence { HIGH, MEDIUM, LOW;
 }
 
 /** Where a value came from. Printed next to every output so staff know how far to trust it. */
-enum class Source { MEASURED, OLD_GLASSES_NUMBERS, AGE_TABLE, INTERVIEW, STAFF_ENTRY, POPULATION_AVERAGE, RULE }
+enum class Source {
+    MEASURED, OLD_GLASSES_NUMBERS, AGE_TABLE, INTERVIEW, STAFF_ENTRY, POPULATION_AVERAGE, RULE,
+    /** Power path YES: the numbers the customer remembered or brought on the slip. */
+    KNOWN_POWER,
+    /** Power path NOT SURE / NO: the phone's quick far-point / near-point estimate (approximate). */
+    PHONE_ESTIMATE,
+}
 
 /** Every engine output carries a confidence level and a source (Section 9). */
 @Serializable
@@ -75,7 +81,68 @@ data class InterviewAnswers(
     val lookPreference: LookPref? = null,
     val firstTimeWearer: Boolean? = null,
     val readingFrequency: ReadingFrequency? = null,
+    // ---- Adaptive anamnesis (12 Nov) ----
+    /** Early question; also fills [distanceBlur] / [nearBlur] so every existing rule keeps working. */
+    val visionProblem: VisionProblem? = null,
+    val distanceSituation: DistanceSituation? = null,
+    val distanceSince: ProblemSince? = null,
+    val nearTask: NearTask? = null,
+    /** Usual reading distance: sets the working distance for the near add. */
+    val nearDistance: NearDistance? = null,
+    /** Existing wearers: happy with the current glasses? */
+    val happyWithGlasses: Boolean? = null,
+    val redFlagOnset: RedFlagOnset? = null,
+    val redFlagEye: AffectedEye? = null,
+    /** "Do you remember your glasses power, or have the slip?" */
+    val powerKnown: PowerKnown? = null,
+) {
+    /** Flashes/floaters/curtain or sudden loss/pain/redness/halos/double: urgent, stops the interview and the power path. */
+    val urgentRedFlag: Boolean get() = redFlagFlashes == true || redFlagOther == true
+}
+
+@Serializable enum class VisionProblem { DISTANCE, NEAR, BOTH, NONE;
+    val distance: Boolean get() = this == DISTANCE || this == BOTH
+    val near: Boolean get() = this == NEAR || this == BOTH
+}
+@Serializable enum class DistanceSituation { DRIVING, TV, SIGNBOARDS, CLASSROOM_BOARD, OTHER }
+@Serializable enum class ProblemSince { UNDER_6_MONTHS, MONTHS_6_TO_24, OVER_2_YEARS }
+@Serializable enum class NearTask { PHONE, NEWSPAPER, SEWING, ACCOUNTS, OTHER }
+@Serializable enum class NearDistance { VERY_CLOSE, NORMAL, ARM_LENGTH }
+@Serializable enum class RedFlagOnset { TODAY, THIS_WEEK, LONGER }
+@Serializable enum class AffectedEye { RIGHT, LEFT, BOTH }
+@Serializable enum class PowerKnown { YES, NOT_SURE, NO }
+
+/** Target used for the quick far-point estimate. */
+@Serializable enum class QuickTarget { WHITE, BLUE }
+
+/** One eye of the quick far-point estimate. */
+@Serializable
+data class QuickEye(
+    /** Approximate SE (D), rounded to 0.25; null when no blur was found within reach. */
+    val seD: Double?,
+    val blurAtCm: Double?,
+    val target: QuickTarget,
+    /** Still clear at arm's length: no myopia found, check with the trial lens. */
+    val noMyopiaAtReach: Boolean = false,
 )
+
+/**
+ * The power path's quick estimate, stored with the session. [primary] = it is the session's power source
+ * (NOT SURE / NO); false = an optional comparison next to the customer's known power (shown to staff only).
+ */
+@Serializable
+data class QuickEstimate(
+    val right: QuickEye? = null,
+    val left: QuickEye? = null,
+    /** Reading add from the quick near point (age ≥ quickEstimate.nearAddFromAge only). */
+    val addD: Double? = null,
+    val nearPointCm: Double? = null,
+    /** Near-only problem under quickEstimate.nearAddFromAge: no plus power is estimated, hand test instead. */
+    val possibleLongSight: Boolean = false,
+    val primary: Boolean = true,
+) {
+    val eyes: List<Pair<Eye, QuickEye>> get() = listOfNotNull(right?.let { Eye.RIGHT to it }, left?.let { Eye.LEFT to it })
+}
 
 /** Measurements typed in by staff (PD ruler, face width) until the camera flow exists. */
 @Serializable

@@ -213,13 +213,17 @@ object VisionFlowPlan {
      * Glasses off: per eye far point (blue, white) then the fogged dial (it is held just beyond that eye's far point);
      * then the push-up near point with both eyes (age ≥ ages.nearPointTestFrom, or age unknown); then, with reading
      * glasses if the customer has them: near acuity (per eye or both) and the Amsler grid per eye.
+     *
+     * Power path: [farPoint] false = the far point and dial are left out (the power came from the customer or the
+     * quick estimate; staff can still ask for the full test); [nearPoint] false = the quick estimate already took
+     * the near point.
      */
-    fun steps(age: Int?, rules: RulesConfig): List<VisionStep> = buildList {
+    fun steps(age: Int?, rules: RulesConfig, farPoint: Boolean = true, nearPoint: Boolean = true): List<VisionStep> = buildList {
         add(VisionStep.Intro)
-        for (eye in listOf(TestEye.RIGHT, TestEye.LEFT)) {
+        if (farPoint) for (eye in listOf(TestEye.RIGHT, TestEye.LEFT)) {
             add(VisionStep.FarPoint(eye)); add(VisionStep.ClockDial(eye))
         }
-        if (age == null || age >= rules.ages.nearPointTestFrom) add(VisionStep.NearPoint)
+        if (nearPoint && (age == null || age >= rules.ages.nearPointTestFrom)) add(VisionStep.NearPoint)
         if (rules.visionTests.nearAcuityPerEye) {
             add(VisionStep.NearAcuity(TestEye.RIGHT)); add(VisionStep.NearAcuity(TestEye.LEFT))
         } else add(VisionStep.NearAcuity(TestEye.BOTH))

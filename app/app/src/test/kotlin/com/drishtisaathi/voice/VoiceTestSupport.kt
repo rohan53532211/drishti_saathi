@@ -11,5 +11,9 @@ object VoiceTestSupport {
     val parser: VoiceParser by lazy { VoiceParser(lexicon) }
     val ctx = ChoiceContext(budgetLowCap = 2000, budgetMidCap = 5000)
 
-    fun q(id: String): Question = Questions.all.first { it.id == id }
+    /** The yes/no old-numbers question left the interview with the power path (12 Nov); its voice handling remains. */
+    private val legacyOldNumbers = Question.OldNumbers(Questions.KNOWN_RX, com.drishtisaathi.i18n.S.qKnownRx)
+
+    fun q(id: String): Question = Questions.all.firstOrNull { it.id == id } ?: legacyOldNumbers.takeIf { id == it.id }
+        ?: error("no question $id")
 }

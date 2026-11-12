@@ -131,6 +131,37 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
    - If the key can no longer be read, an encrypted database is moved aside, not deleted.
 8. "Demo catalogue: sizes are typical, not measured" on the frame list (staff mode), the comparison screen (staff mode) and the shop PDF.
 
+**Adaptive anamnesis and power path (12 Nov):**
+- Interview order:
+  - Age.
+  - "Trouble seeing far, near, or both?" (DISTANCE / NEAR / BOTH / NONE). It also fills the old `distanceBlur` and `nearBlur` fields, so every existing rule still works. The two old yes/no questions are gone.
+  - Far: where it shows (driving, TV, signboards, classroom board) and since when.
+  - Near: which task (phone, newspaper, sewing, accounts) and the usual distance (25 / 35 / 45 cm). The distance sets the working distance for the add.
+  - Glasses: wearers get glasses age and "happy with them?"; non-wearers get "first pair?".
+  - Headache, diabetes/BP, then the red flags.
+  - An urgent flag asks onset (today / this week / longer) and which eye. Nothing after that is asked: no power path, lifestyle or frames.
+- Power path: "Do you remember your glasses power, or have the slip?" (YES / NOT SURE / NO). It is skipped after an urgent flag, and when there is no trouble and no glasses.
+  - YES: the old-glasses screen opens. Those numbers become the power source (`Source.KNOWN_POWER`, "customer's known power").
+    - If the glasses are older than 2 years, or blur or unhappiness is still reported, an optional quick check is offered.
+    - Its values are shown to staff next to the known power (summary and shop PDF) and never used for the suggestions.
+    - "No numbers available" continues as NO.
+  - NOT SURE / NO: glasses off, then the quick estimate runs right away. The result is the power source (`Source.PHONE_ESTIMATE`, "phone estimate, approximate", LOW confidence, band ±0.75 D).
+    - Far point, DISTANCE/BOTH, each eye: distance-locked 20/20 letters (`quickEstimate.letterLogMar`).
+      - The live line "If blur starts here: about −X.XX D" appears once the phone has been close. White: −1/d. Blue: −1/d + 0.67. Rounded to 0.25 D.
+      - "Blur", or saying "dhundhla" / "धुंधला" / "blur", freezes it.
+      - "Still clear at arm's length" (from 0.60 m) gives "No myopia found at arm's length, check with trial lens".
+    - Near, age 38 and over: one near-point reading gives the reading add, with "Confirm with a ready-reader at the counter".
+    - Near under 38: no plus estimate, "Possible long-sightedness, check with trial lens" plus the hand test.
+- Screen tests after the power path leave out the full far point and clock dial; staff can tick "also run the full far-point test" on the confirmation screen. The near point is left out when the quick estimate already took it.
+- The quick estimate is stored in the session's measurements JSON (`quick`). No schema change.
+- The summary and shop PDF state the power source.
+- The functional vision profile card (summary + shop PDF) shows:
+  - daily hours at near (<40 cm), intermediate (40–100 cm) and distance
+  - the main zone (share ≥ 0.45, else mixed)
+  - the lens it points to
+  - thresholds in `rules.json` → `functionalProfile`
+- Voice: keywords for all new choice questions. NOT SURE outranks NO, so "पता नहीं" is not read as "नहीं". The blur keyword listener runs without a read-back (the tap does the same) and is not used with the system voice dialog, because it covers the screen.
+
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:
@@ -149,6 +180,10 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 9. Every clinical number in `rules.json` still needs optometrist review before field use.
 10. Addition 7 (temple length from a ~45° side capture) is not implemented.
 11. `deviceCorrection` thresholds (5 sessions, 0.5 D spread, slope 0.7–1.3, 3 D entry-error cut-off, ±1 D cap) are starting values: review with pilot data. The Room DAO and migration are checked against the exported schema in unit tests, not on a device.
+12. Power path on the phone:
+    - Check the quick far point against the full test on a few myopes.
+    - Check that "dhundhla" is recognised while the phone moves, and that the TTS instruction does not trigger it.
+    - The `functionalProfile` hours are starting guesses.
 
 ## Next steps
 1. Phone: install via adb, voice check, then the checklist above; feed measured values back into `rules.json`.

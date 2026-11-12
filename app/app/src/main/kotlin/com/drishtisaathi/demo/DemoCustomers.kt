@@ -1,5 +1,13 @@
 package com.drishtisaathi.demo
 
+import com.drishtisaathi.engine.AffectedEye
+import com.drishtisaathi.engine.DistanceSituation
+import com.drishtisaathi.engine.NearDistance
+import com.drishtisaathi.engine.NearTask
+import com.drishtisaathi.engine.PowerKnown
+import com.drishtisaathi.engine.ProblemSince
+import com.drishtisaathi.engine.RedFlagOnset
+import com.drishtisaathi.engine.VisionProblem
 import com.drishtisaathi.engine.Budget
 import com.drishtisaathi.engine.ColourPref
 import com.drishtisaathi.engine.Confidence
@@ -50,6 +58,8 @@ object DemoCustomers {
             budget = Budget.LOW, style = StylePref.MODERN,
             colourPreference = ColourPref.DARK, lightweightPreference = true, lookPreference = LookPref.CASUAL,
             readingFrequency = ReadingFrequency.SOMETIMES,
+            visionProblem = VisionProblem.DISTANCE, distanceSituation = DistanceSituation.CLASSROOM_BOARD,
+            distanceSince = ProblemSince.MONTHS_6_TO_24, powerKnown = PowerKnown.NO,
         ),
         face = MeasuredFace(
             pdMm = m(61.5), faceWidthMm = m(134.0), bridgeWidthMm = m(17.0, Confidence.MEDIUM),
@@ -76,6 +86,8 @@ object DemoCustomers {
             budget = Budget.MID, style = StylePref.CLASSIC,
             colourPreference = ColourPref.METALLIC, lightweightPreference = true, lookPreference = LookPref.PROFESSIONAL,
             readingFrequency = ReadingFrequency.DAILY_LONG,
+            visionProblem = VisionProblem.NEAR, nearTask = NearTask.ACCOUNTS, nearDistance = NearDistance.NORMAL,
+            powerKnown = PowerKnown.NO,
         ),
         face = MeasuredFace(
             pdMm = m(63.0, Confidence.LOW), faceWidthMm = m(140.0, Confidence.LOW), bridgeWidthMm = m(18.0, Confidence.LOW),
@@ -103,6 +115,9 @@ object DemoCustomers {
             budget = Budget.MID, style = StylePref.ANY,
             colourPreference = ColourPref.ANY, lightweightPreference = false, lookPreference = LookPref.BOTH,
             readingFrequency = ReadingFrequency.SOMETIMES,
+            visionProblem = VisionProblem.BOTH, distanceSituation = DistanceSituation.DRIVING,
+            distanceSince = ProblemSince.UNDER_6_MONTHS, nearTask = NearTask.NEWSPAPER, nearDistance = NearDistance.NORMAL,
+            happyWithGlasses = false, redFlagOnset = RedFlagOnset.THIS_WEEK, redFlagEye = AffectedEye.RIGHT,
         ),
     )
 

@@ -68,6 +68,12 @@ data class EyeAdvice(
      * sessions ("corrected with N shop records"). Null when no correction was applied.
      */
     val correctedWithShopRecords: Int? = null,
+    /**
+     * Power path YES with the optional quick check: the phone's estimate for this eye, shown to staff next to the
+     * customer's known power (never used for the suggestions). [phoneNoMyopiaAtReach] = still clear at arm's length.
+     */
+    val phoneEstimateSeD: Double? = null,
+    val phoneNoMyopiaAtReach: Boolean = false,
 )
 
 @Serializable
@@ -90,6 +96,12 @@ enum class Note {
     BAND_UNCERTAIN_REFINE_BY_HAND,
     /** PD / face width came from the camera without the card: shown with ±3 mm, no frame-fit claims. */
     MEASUREMENTS_NOT_CARD_CALIBRATED,
+    /** Power came from the phone's quick estimate: approximate, confirm with the trial lens. */
+    PHONE_ESTIMATE_APPROXIMATE,
+    /** Quick far point: still clear at arm's length, no myopia found; check with the trial lens. */
+    NO_MYOPIA_AT_ARMS_LENGTH,
+    /** Near-only problem under quickEstimate.nearAddFromAge: no plus power estimated; possible long-sightedness. */
+    POSSIBLE_LONG_SIGHT,
 }
 
 /** How to start the shop's hand test when there is no measured or known power. */
@@ -112,7 +124,10 @@ data class LensAdvice(
     val startingHints: List<StartingHint> = emptyList(),
     /** Rule 7 (readingAdd.verifyWithReadyReader): the reading add must be confirmed with a ready-reader at the counter. */
     val confirmAddWithReadyReader: Boolean = false,
-)
+) {
+    /** Where the distance power came from (stated on the summary and PDF); null when no power is known. */
+    val powerSource: Source? get() = eyes.firstOrNull()?.band?.source
+}
 
 @Serializable
 data class Assessment(
@@ -153,13 +168,15 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         face: MeasuredFace? = null,
         /** This phone model's fit from verified shop records; ignored when deviceCorrection.enabled is false. */
         correction: DeviceFit? = null,
+        /** Power path quick estimate (primary = the power source; otherwise a comparison for staff). */
+        quick: QuickEstimate? = null,
     ): Assessment {
         val notes = linkedSetOf<Note>()
-        val referral = referral(answers, tests)
+        val referral = referral(answers, tests, quick)
         val (pd, faceWidth) = anatomy(staff, face, notes)
 
         val fit = correction?.takeIf { rules.deviceCorrection.enabled }
-        val advice = if (referral.adviceWithheld) null else lensAdvice(answers, tests, notes, fit)
+        val advice = if (referral.adviceWithheld) null else lensAdvice(answers, tests, notes, fit, quick)
         val pm = rules.pdMeasurement
         val pdSd = when (pd.source) {
             Source.STAFF_ENTRY -> pm.sdCardMm
@@ -174,7 +191,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
 
     // ---- Section 6 referral ------------------------------------------------------------------
 
-    fun referral(a: InterviewAnswers, t: VisionTests): Referral {
+    fun referral(a: InterviewAnswers, t: VisionTests, quick: QuickEstimate? = null): Referral {
         val reasons = mutableListOf<ReferralReason>()
         if (a.redFlagFlashes == true) reasons += ReferralReason.FLASHES_FLOATERS_CURTAIN
         if (a.redFlagOther == true) reasons += ReferralReason.SUDDEN_LOSS_PAIN_REDNESS_HALOS_DOUBLE
@@ -190,7 +207,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         if (a.headacheStrain == true && a.glassesAgeYears != null &&
             a.glassesAgeYears > rules.referral.oldGlassesStrainOlderThanYears
         ) reasons += ReferralReason.OLD_GLASSES_WITH_STRAIN
-        if (a.distanceBlur == true && measured.isNotEmpty() && measured.all { it.noMyopiaAtArmsLength }) {
+        if (a.distanceBlur == true && noMyopiaAnywhere(measured, quick)) {
             reasons += ReferralReason.DISTANCE_BLUR_NO_MYOPIA_FOUND
         }
 
@@ -201,6 +218,13 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         }
         val withheld = level == ReferralLevel.URGENT || ReferralReason.LOW_CONFIDENCE_REPEATED in reasons
         return Referral(level, reasons, withheld)
+    }
+
+    /** Every measured eye (full test, or else the primary quick estimate) was still clear at arm's length. */
+    private fun noMyopiaAnywhere(measured: List<MeasuredEye>, quick: QuickEstimate?): Boolean {
+        if (measured.isNotEmpty()) return measured.all { it.noMyopiaAtArmsLength }
+        val q = quick?.takeIf { it.primary }?.eyes?.map { it.second }.orEmpty()
+        return q.isNotEmpty() && q.all { it.noMyopiaAtReach }
     }
 
     // ---- PD / face width -----------------------------------------------------------------------
@@ -234,24 +258,28 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
 
     // ---- Lens advice -------------------------------------------------------------------------
 
-    private fun lensAdvice(a: InterviewAnswers, t: VisionTests, notes: MutableSet<Note>, fit: DeviceFit?): LensAdvice {
+    private fun lensAdvice(a: InterviewAnswers, t: VisionTests, notes: MutableSet<Note>, fit: DeviceFit?, quick: QuickEstimate?): LensAdvice {
+        val primary = quick?.takeIf { it.primary && a.powerKnown != PowerKnown.YES }
+        val compare = quick?.takeIf { !it.primary }
         val eyes = listOfNotNull(
-            eyeAdvice(Eye.RIGHT, t.right, a.knownRx?.right, a, notes, fit),
-            eyeAdvice(Eye.LEFT, t.left, a.knownRx?.left, a, notes, fit),
+            eyeAdvice(Eye.RIGHT, t.right, a.knownRx?.right, a, notes, fit, primary?.right, compare?.right),
+            eyeAdvice(Eye.LEFT, t.left, a.knownRx?.left, a, notes, fit, primary?.left, compare?.left),
         )
+        if (primary?.possibleLongSight == true) { notes += Note.POSSIBLE_LONG_SIGHT; notes += Note.HAND_TEST_NEEDED }
         val measured = listOfNotNull(t.right, t.left)
         if (measured.any { it.astigmatismFlag }) notes += Note.CHECK_CYLINDER
 
         if (eyes.isEmpty()) { notes += Note.NO_POWER_INFORMATION; notes += Note.THICKNESS_AFTER_TRIAL_LENS }
         if (a.distanceBlur == true && eyes.isEmpty()) notes += Note.HAND_TEST_NEEDED
-        if (a.distanceBlur == true && measured.isNotEmpty() && measured.all { it.noMyopiaAtArmsLength }) {
+        if (a.distanceBlur == true && noMyopiaAnywhere(measured, primary)) {
             notes += Note.HYPEROPIA_POSSIBLE; notes += Note.HAND_TEST_NEEDED
         }
         if (a.headacheStrain == true && eyes.isEmpty()) notes += Note.HAND_TEST_NEEDED
 
-        val lensType = lensType(a, eyes, notes)
+        val quickAdd = primary?.addD
+        val lensType = lensType(a, eyes, notes, quickAdd != null)
         if (a.firstTimeWearer == true && lensType.value != LensType.NONE_SUGGESTED) notes += Note.FIRST_TIME_WEARER
-        val add = if (lensType.value in NEAR_TYPES) addBand(a, t, notes) else null
+        val add = if (lensType.value in NEAR_TYPES) addBand(a, t, notes, quickAdd) else null
         return LensAdvice(
             eyes, add, lensType, material(a, eyes), coatings(a), startingHints(a, eyes, measured),
             confirmAddWithReadyReader = add != null && rules.readingAdd.verifyWithReadyReader,
@@ -266,9 +294,21 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         }
     }
 
+    /**
+     * Power source per eye, in order:
+     * 1. power path YES: the customer's known power ([Source.KNOWN_POWER]); an optional quick check is attached for staff;
+     * 2. a full far-point test (staff mode), as before ([Source.MEASURED]);
+     * 3. power path NOT SURE / NO: the quick estimate ([Source.PHONE_ESTIMATE], approximate);
+     * 4. old numbers (sessions from before the power path) ([Source.OLD_GLASSES_NUMBERS]).
+     */
     private fun eyeAdvice(
         eye: Eye, m: MeasuredEye?, old: EyeRx?, a: InterviewAnswers, notes: MutableSet<Note>, fit: DeviceFit?,
+        quick: QuickEye?, compare: QuickEye?,
     ): EyeAdvice? {
+        if (a.powerKnown == PowerKnown.YES && old != null) {
+            return oldNumbersAdvice(eye, old, a, notes, Source.KNOWN_POWER)
+                .copy(phoneEstimateSeD = compare?.seD, phoneNoMyopiaAtReach = compare?.noMyopiaAtReach == true)
+        }
         val usableMeasure = m?.takeIf { it.seD != null && !it.noMyopiaAtArmsLength }
         if (usableMeasure != null && (usableMeasure.confidence != Confidence.LOW || old == null)) {
             // Learning loop: correct the raw far-point SE with this phone model's fit before any band is formed.
@@ -286,7 +326,27 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
                 correctedWithShopRecords = records,
             )
         }
+        if (quick != null) {
+            val se = quick.seD
+            if (se == null || quick.noMyopiaAtReach) {
+                notes += Note.NO_MYOPIA_AT_ARMS_LENGTH; notes += Note.HAND_TEST_NEEDED
+            } else {
+                notes += Note.PHONE_ESTIMATE_APPROXIMATE
+                val s = optics.roundToStep(se)
+                val hw = rules.quickEstimate.bandHalfWidthD
+                return EyeAdvice(
+                    eye,
+                    Estimate(PowerBand(s - hw, s + hw), Confidence.LOW, Source.PHONE_ESTIMATE),
+                    Estimate(TrialLens(s), Confidence.LOW, Source.PHONE_ESTIMATE),
+                    thicknessPowerD = s,
+                )
+            }
+        }
         if (old == null) return null
+        return oldNumbersAdvice(eye, old, a, notes, Source.OLD_GLASSES_NUMBERS)
+    }
+
+    private fun oldNumbersAdvice(eye: Eye, old: EyeRx, a: InterviewAnswers, notes: MutableSet<Note>, source: Source): EyeAdvice {
 
         val years = a.glassesAgeYears
         val fresh = years != null && years <= rules.oldNumbers.freshMaxYears
@@ -301,8 +361,8 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         val se = optics.roundToStep(old.sphericalEquivalent)
         return EyeAdvice(
             eye,
-            Estimate(PowerBand(se - hw, se + hw), conf, Source.OLD_GLASSES_NUMBERS),
-            Estimate(TrialLens(old.sph, old.cyl, old.axis), conf, Source.OLD_GLASSES_NUMBERS),
+            Estimate(PowerBand(se - hw, se + hw), conf, source),
+            Estimate(TrialLens(old.sph, old.cyl, old.axis), conf, source),
             thicknessPowerD = old.strongestMeridian,
         )
     }
@@ -329,12 +389,13 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         )
     }
 
-    private fun lensType(a: InterviewAnswers, eyes: List<EyeAdvice>, notes: MutableSet<Note>): Estimate<LensType> {
+    private fun lensType(a: InterviewAnswers, eyes: List<EyeAdvice>, notes: MutableSet<Note>, quickAdd: Boolean = false): Estimate<LensType> {
         val significant = rules.oldNumbers.significantDistanceSeD
         val needsDistance = a.distanceBlur == true || eyes.any { abs(it.band.value.midD) >= significant }
         val oldAdd = a.knownRx?.eyes?.any { (it.add ?: 0.0) > 0 } == true
         val nearNeed = a.nearBlur == true || oldAdd
-        val presbyopic = a.age != null && a.age >= rules.ages.presbyopiaFrom
+        // A quick near-point add (age >= quickEstimate.nearAddFromAge) counts as a near need for this age band too.
+        val presbyopic = (a.age != null && a.age >= rules.ages.presbyopiaFrom) || quickAdd
 
         val type = when {
             (presbyopic && nearNeed && needsDistance) || (oldAdd && needsDistance) -> multifocal(a)
@@ -358,10 +419,20 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         return if (screenUser) LensType.PROGRESSIVE else LensType.BIFOCAL_OR_SEPARATE_PAIRS
     }
 
-    private fun addBand(a: InterviewAnswers, t: VisionTests, notes: MutableSet<Note>): Estimate<PowerBand>? {
+    private fun addBand(a: InterviewAnswers, t: VisionTests, notes: MutableSet<Note>, quickAdd: Double? = null): Estimate<PowerBand>? {
+        if (a.powerKnown == PowerKnown.YES) {
+            a.knownRx?.eyes?.mapNotNull { it.add }?.filter { it > 0 }?.maxOrNull()?.let { known ->
+                val fresh = a.glassesAgeYears != null && a.glassesAgeYears <= rules.oldNumbers.freshMaxYears
+                return Estimate(PowerBand(known, known), if (fresh) Confidence.MEDIUM else Confidence.LOW, Source.KNOWN_POWER)
+            }
+        }
         t.measuredAddD?.let { m ->
             val add = optics.clampAdd(optics.roundToStep(m.value))
             return Estimate(PowerBand(add, add), m.confidence, Source.MEASURED)
+        }
+        quickAdd?.let { q ->
+            val add = optics.clampAdd(optics.roundToStep(q))
+            return Estimate(PowerBand(add, add), Confidence.LOW, Source.PHONE_ESTIMATE)
         }
         val ageRow = a.age?.let { age -> rules.addAgeTable.firstOrNull { age in it.minAge..it.maxAge } }
         val oldAdd = a.knownRx?.eyes?.mapNotNull { it.add }?.filter { it > 0 }?.maxOrNull()

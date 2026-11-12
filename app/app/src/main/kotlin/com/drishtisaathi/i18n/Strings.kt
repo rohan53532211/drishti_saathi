@@ -415,6 +415,8 @@ object S {
         Source.STAFF_ENTRY to t("entered by staff", "स्टाफ़ द्वारा भरा गया"),
         Source.POPULATION_AVERAGE to t("population average", "औसत मान"),
         Source.RULE to t("by rule", "नियम से"),
+        Source.KNOWN_POWER to t("customer's known power", "ग्राहक का बताया नंबर"),
+        Source.PHONE_ESTIMATE to t("phone estimate, approximate", "फ़ोन का अनुमान, लगभग"),
     )
 
     fun note(v: Note, freshYears: Int): Txt = if (v == Note.OLD_NUMBERS_STALE) STALE.format(freshYears) else NOTE.getValue(v)
@@ -446,6 +448,12 @@ object S {
             "PD and face width are camera estimates without the card (PD ±3 mm): check frame fit by trying on, measure PD with a ruler",
             "PD और चेहरे की चौड़ाई कार्ड के बिना कैमरे के अनुमान हैं (PD ±3 mm): फ़्रेम पहनकर देखें, PD रूलर से मापें",
         ),
+        Note.PHONE_ESTIMATE_APPROXIMATE to t(
+            "Phone estimate only (approximate): confirm with the trial lens",
+            "नंबर फ़ोन का अनुमान है (लगभग): ट्रायल लेंस से पक्का करें",
+        ),
+        Note.NO_MYOPIA_AT_ARMS_LENGTH to t("No myopia found at arm's length, check with trial lens", "हाथ भर दूरी तक कोई कमज़ोर दूर-नज़र नहीं मिली, ट्रायल लेंस से जाँचें"),
+        Note.POSSIBLE_LONG_SIGHT to t("Possible long-sightedness, check with trial lens", "दूर-दृष्टि (लॉन्ग-साइट) हो सकती है, ट्रायल लेंस से जाँचें"),
     )
 
     // ---- Addition 3: comparison ---------------------------------------------------------------

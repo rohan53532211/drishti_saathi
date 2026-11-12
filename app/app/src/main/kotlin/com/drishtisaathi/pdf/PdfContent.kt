@@ -8,6 +8,8 @@ import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
 import com.drishtisaathi.interview.ChoiceContext
 import com.drishtisaathi.ui.Fmt
+import com.drishtisaathi.ui.PowerPathText
+import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.ui.answerText
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -82,6 +84,20 @@ object PdfContent {
             adv.add?.let { out += Block.Para("${S.readingAdd[l]}: ${Fmt.band(it.value, l)} ${Fmt.meta(it, l)}") }
             if (adv.confirmAddWithReadyReader) out += Block.Bullet(S.confirmReadyReader[l], Tone.ACCENT)
             if (adv.eyes.isNotEmpty()) out += Block.Para(S.startingLensHint[l], tone = Tone.MUTED)
+            PowerPathText.sourceLine(adv)?.let { out += Block.Para(it[l], bold = true) }
+            val quick = PowerPathText.quickLines(state)
+            if (quick.isNotEmpty()) {
+                out += Block.Para(SAnamnesis.quickHeading[l], tone = Tone.MUTED)
+                quick.forEach { out += Block.Bullet(it[l]) }
+            }
+            val compare = PowerPathText.compareLines(state, adv)
+            if (compare.isNotEmpty()) {
+                out += Block.Para(SAnamnesis.compareHeading[l], bold = true, tone = Tone.ROUTINE)
+                compare.forEach { out += Block.Bullet(it[l], Tone.ROUTINE) }
+            }
+
+            out += Block.Heading(SAnamnesis.profileTitle[l])
+            PowerPathText.profileLines(state, rules).forEach { out += Block.Bullet(it[l]) }
 
             out += Block.Heading(S.lensPackage[l])
             out += Block.Bullet("${S.lensType[l]}: ${S.lensType(adv.lensType.value)[l]} ${Fmt.meta(adv.lensType, l)}")

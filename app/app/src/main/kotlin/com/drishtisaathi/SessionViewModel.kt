@@ -23,6 +23,10 @@ import com.drishtisaathi.engine.vision.DeviceFit
 import com.drishtisaathi.engine.DrishtiEngine
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.KnownRx
+import com.drishtisaathi.engine.PowerKnown
+import com.drishtisaathi.engine.QuickEstimate
+import com.drishtisaathi.engine.anamnesis.QuickEstimator
+import com.drishtisaathi.engine.anamnesis.QuickPlan
 import com.drishtisaathi.engine.RulesConfig
 import com.drishtisaathi.engine.SessionResult
 import com.drishtisaathi.engine.StaffMeasurements
@@ -79,6 +83,10 @@ data class UiState(
     val demo: Boolean = false,
     /** Staff override: camera steps and screen tests done with glasses on (noted on the summary and shop PDF). */
     val glassesOn: Boolean = false,
+    /** Power path quick estimate (primary = power source; otherwise a comparison for staff). */
+    val quick: QuickEstimate? = null,
+    /** Staff: also run the full far-point test (and clock dial) in the screen tests. */
+    val fullFarTest: Boolean = false,
 ) {
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
     val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
@@ -237,7 +245,29 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         return toConfirm
     }
 
-    fun setKnownRx(rx: KnownRx?) = _state.update { it.copy(answers = it.answers.copy(knownRx = rx)) }
+    fun setKnownRx(rx: KnownRx?) = _state.update { it.copy(answers = it.answers.copy(knownRx = rx), result = null) }
+
+    // ---- power path --------------------------------------------------------------------------
+
+    val quickEstimator: QuickEstimator by lazy { QuickEstimator(rules) }
+
+    /** Which quick tests run for the current answers (nothing after an urgent red flag). */
+    fun quickPlan(): QuickPlan = quickEstimator.plan(_state.value.answers)
+
+    /** YES path: offer the optional quick check next to the known power. */
+    fun offerCompare(): Boolean = quickEstimator.offerCompare(_state.value.answers)
+
+    /** "No numbers available" on the old-glasses screen: the power path continues as NO. */
+    fun setPowerKnown(v: PowerKnown) = _state.update {
+        it.copy(answers = it.answers.copy(powerKnown = v, knownRx = it.answers.knownRx.takeIf { v == PowerKnown.YES }), result = null)
+    }
+
+    fun setQuick(q: QuickEstimate?) = _state.update { it.copy(quick = q, result = null) }
+
+    fun setFullFarTest(on: Boolean) = _state.update { it.copy(fullFarTest = on) }
+
+    /** The quick estimate only counts while the power path still applies (an urgent flag clears it). */
+    private fun quickFor(s: UiState): QuickEstimate? = s.quick?.takeIf { !s.answers.urgentRedFlag && s.answers.powerKnown != null }
 
     /** Back within the interview. Returns false when already at the first question. */
     fun previousQuestion(): Boolean {
@@ -258,7 +288,9 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     fun computeResult(): SessionResult {
         val s = _state.value
         // Demo customers are never corrected, so recordings stay the same on every phone.
-        val result = engine.evaluate(s.answers, s.staff, s.tests, s.face, correction = if (s.demo) null else _deviceFit.value)
+        val result = engine.evaluate(
+            s.answers, s.staff, s.tests, s.face, correction = if (s.demo) null else _deviceFit.value, quick = quickFor(s),
+        )
         val createdAt = s.createdAt ?: System.currentTimeMillis()
         _state.update { it.copy(result = result, createdAt = createdAt) }
         val previous = saveJob
@@ -280,7 +312,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 finalAdd = s.verification.finalAdd.ifBlank { null },
                 pdMeterMm = s.verification.pdMeterMm,
                 verifiedAt = s.verification.verifiedAt,
-                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo, glassesOn = s.glassesOn)),
+                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo, glassesOn = s.glassesOn, quick = quickFor(s))),
             )
             if (current == null) {
                 val id = dao.insert(entity)
@@ -354,6 +386,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 testsDone = m.tests != null,
                 demo = m.demo,
                 glassesOn = m.glassesOn,
+                quick = m.quick,
                 verification = Verification(
                     e.finalTrialRight.orEmpty(), e.finalTrialLeft.orEmpty(), e.finalAdd.orEmpty(), e.pdMeterMm, e.verifiedAt,
                 ),

@@ -59,6 +59,8 @@ data class Measurements(
     val demo: Boolean = false,
     /** Staff override: camera steps and screen tests were done with the customer's glasses on. */
     val glassesOn: Boolean = false,
+    /** Power path quick estimate (phone estimate, approximate); null = not run. */
+    val quick: com.drishtisaathi.engine.QuickEstimate? = null,
 )
 
 /**
