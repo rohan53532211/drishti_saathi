@@ -87,6 +87,15 @@ object BridgeProfile {
                 put("knownPower", enc(com.drishtisaathi.engine.KnownRx.serializer(),
                     answers.knownRx?.takeIf { answers.powerKnown == PowerKnown.YES }))
                 put("phoneEstimate", enc(com.drishtisaathi.engine.QuickEstimate.serializer(), state.quick))
+                // The phone check as ranges (never one exact number), readable on the optometrist page.
+                put("phoneRange", buildJsonObject {
+                    state.quick?.right?.let { put("right", JsonPrimitive(com.drishtisaathi.vision.quickEyeText(it).en)) }
+                    state.quick?.left?.let { put("left", JsonPrimitive(com.drishtisaathi.vision.quickEyeText(it).en)) }
+                    state.quick?.nearPointCm?.let { cm ->
+                        val q = state.quick!!
+                        put("near", JsonPrimitive(com.drishtisaathi.vision.nearResultText(cm, q.addD, q.expectedNearPointCm, q.possibleLongSight).en))
+                    }
+                })
             })
             put("measurements", buildJsonObject {
                 put("pdMm", enc(com.drishtisaathi.engine.Estimate.serializer(kotlinx.serialization.serializer<Double>()), a.pdMm))

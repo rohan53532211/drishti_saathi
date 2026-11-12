@@ -195,7 +195,8 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
         val reasons = mutableListOf<ReferralReason>()
         if (a.redFlagFlashes == true) reasons += ReferralReason.FLASHES_FLOATERS_CURTAIN
         if (a.redFlagOther == true) reasons += ReferralReason.SUDDEN_LOSS_PAIN_REDNESS_HALOS_DOUBLE
-        if (t.amslerAbnormal) reasons += ReferralReason.AMSLER_DISTORTION
+        // Wavy or bent straight lines: the grid result, or the customer's own answer (no grid in the eye check).
+        if (t.amslerAbnormal || a.straightLinesBent == true) reasons += ReferralReason.AMSLER_DISTORTION
 
         val anyBlur = a.distanceBlur == true || a.nearBlur == true
         if (a.diabetesOrBp == true && anyBlur) reasons += ReferralReason.DIABETES_OR_BP_WITH_BLUR

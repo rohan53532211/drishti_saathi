@@ -163,7 +163,7 @@ class AnamnesisPowerPathTest {
         val eye = p.blur(r(400.0), est, QuickTarget.WHITE)
         assertEquals(-2.5, eye.seD!!, 1e-9)
         assertEquals(40.0, eye.blurAtCm!!, 1e-9)
-        assertEquals("Blur at 40 cm, about −2.50 D (approximate, confirm with trial lens)", com.drishtisaathi.vision.quickEyeText(eye).en)
+        assertTrue(com.drishtisaathi.vision.quickEyeText(eye).en.startsWith("Your approximate power: between −2.25 and −2.75 D (read up to 40 cm"))
     }
 
     @Test fun `still clear counts only from arm's length`() {
@@ -206,9 +206,11 @@ class AnamnesisPowerPathTest {
         assertEquals(Source.KNOWN_POWER, adv.powerSource)
         val state = UiState(answers = a, result = res, quick = compare)
         assertEquals("Power source: customer's known power", PowerPathText.sourceLine(adv)!!.en)
-        assertEquals(listOf("R: phone about −2.75 D, known −2.00 D", "L: phone about −1.50 D, known −1.50 D"),
+        assertEquals(listOf("R: phone between −2.50 and −3.00 D, known −2.00 D", "L: phone between −1.25 and −1.75 D, known −1.50 D"),
             PowerPathText.compareLines(state, adv).map { it.en })
-        assertTrue(PowerPathText.quickLines(state).isEmpty())
+        // compulsory eye check: the known power and the phone ranges are both shown
+        val lines = PowerPathText.quickLines(state).map { it.en }
+        assertTrue(lines.toString(), lines.first().startsWith("Known power (from the customer): R ") && lines.size == 3)
     }
 
     @Test fun `phone estimate is the stated power source on NOT SURE`() {

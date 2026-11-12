@@ -75,10 +75,10 @@ class QuickPathRegressionTest {
 
         val state = UiState(lang = Lang.EN, answers = ans, quick = q, result = result)
         val lines = PowerPathText.quickLines(state).map { it.en }
-        assertTrue(lines.toString(), lines.any { it.contains("Blur at 40 cm, about −2.50 D (approximate, confirm with trial lens)") })
+        assertTrue(lines.toString(), lines.any { it.contains("between −2.25 and −2.75 D (read up to 40 cm") })
         val ctx = ChoiceContext(rules.frameScoring.budgetMaxPriceInrLow, rules.frameScoring.budgetMaxPriceInrMid)
         val pdf = PdfContent.shopCopy(state, rules, ctx, Lang.EN).toString()
-        assertTrue(pdf.contains("Blur at 40 cm, about −2.50 D"))
+        assertTrue(pdf.contains("between −2.25 and −2.75 D"))
         assertTrue(pdf.contains(PowerPathText.sourceLine(adv)!!.en))
     }
 }

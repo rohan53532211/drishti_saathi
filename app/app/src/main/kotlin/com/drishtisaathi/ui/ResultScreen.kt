@@ -69,6 +69,15 @@ fun ResultScreen(
             // Order: functional vision profile, power and its source, referral, lens package, frames.
             // An urgent referral goes first.
             val urgent = a.referral.level == ReferralLevel.URGENT
+            // Urgent warning signs: a clear message at the very top, never hidden or softened.
+            if (urgent) SectionCard(S.referral[l], container = UrgentBg) {
+                Text(SShop.urgentTop[l], style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = UrgentRed)
+            }
+            // The eye check runs for everyone: its ranges show even when lens advice is withheld.
+            val eyeLines = PowerPathText.quickLines(state)
+            if (eyeLines.isNotEmpty()) SectionCard(SShop.eyeCheckTitle[l]) {
+                eyeLines.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyLarge) }
+            }
             SectionCard(SAnamnesis.profileTitle[l]) {
                 PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
             }
@@ -101,7 +110,6 @@ fun ResultScreen(
                         Text(S.startingLensHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }
                     PowerPathText.sourceLine(adv)?.let { Text(it[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
-                    PowerPathText.quickLines(state).forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyMedium) }
                     val compare = PowerPathText.compareLines(state, adv)
                     if (compare.isNotEmpty()) {
                         HorizontalDivider()
@@ -208,6 +216,7 @@ fun ResultScreen(
             extraActions()
             BigButton(SShop.finish[l], onDone, container = Teal)
             BigButton(S.deleteSession[l], { confirmDelete = true }, container = UrgentRed)
+            if (!urgent) Text(SShop.phoneCheckNote[l], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Disclaimer()
         }
     }
