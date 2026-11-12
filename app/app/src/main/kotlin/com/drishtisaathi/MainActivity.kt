@@ -56,6 +56,8 @@ import com.drishtisaathi.ui.CompareOfferScreen
 import com.drishtisaathi.ui.BridgeConsentScreen
 import com.drishtisaathi.ui.BridgeSettingsScreen
 import com.drishtisaathi.ui.RemoteReviewCard
+import com.drishtisaathi.ui.AiConsentScreen
+import com.drishtisaathi.ui.AiInterviewScreen
 import com.drishtisaathi.engine.PowerKnown
 import com.drishtisaathi.engine.QuickEstimate
 import androidx.compose.runtime.mutableStateOf
@@ -100,6 +102,9 @@ private object Routes {
     // Remote Optometrist Bridge
     const val BRIDGE_CONSENT = "bridgeConsent"
     const val BRIDGE_SETTINGS = "bridgeSettings"
+    // AI voice interview (Sarvam via the backend)
+    const val AI_CONSENT = "aiConsent"
+    const val AI_INTERVIEW = "aiInterview"
 
     fun tryOn(frameId: String?) = "tryOn" + (frameId?.let { "?frame=$it" } ?: "")
 }
@@ -185,6 +190,40 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     }
                 },
                 voice = voice,
+                startExtra = if (!vm.aiAvailable || state.aiInterview != null || state.demo) null else {
+                    {
+                        val l = state.lang
+                        androidx.compose.material3.Text(com.drishtisaathi.i18n.SAiVoice.startHint[l],
+                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                        BigButton(com.drishtisaathi.i18n.SAiVoice.startButton[l], { nav.navigate(Routes.AI_CONSENT) })
+                    }
+                },
+            )
+        }
+        composable(Routes.AI_CONSENT) {
+            AiConsentScreen(
+                state.lang, vm::setLang, voice.instructionSpeaker,
+                onContinue = { lang ->
+                    vm.startAiInterview(lang)
+                    nav.navigate(Routes.AI_INTERVIEW) { popUpTo(Routes.AI_CONSENT) { inclusive = true } }
+                },
+                onUseButtons = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.AI_INTERVIEW) {
+            val ai by vm.aiState.collectAsStateWithLifecycle()
+            /** Back to the standard interview at the first unanswered question (or the confirmation screen). */
+            fun leave(fellBack: Boolean) = vm.finishAiInterview(fellBack) { all ->
+                nav.popBackStack(Routes.INTERVIEW, inclusive = false)
+                if (all) toConfirm()
+            }
+            AiInterviewScreen(
+                state.lang, vm::setLang, ai, voice.instructionSpeaker,
+                onAnswer = vm::aiAnswer,
+                onMicFailed = vm::aiMicFailed,
+                onRetry = vm::aiRetry,
+                onEnd = { leave(fellBack = ai.phase == com.drishtisaathi.aivoice.AiUiState.Phase.FALLBACK) },
+                onContinue = { fellBack -> leave(fellBack) },
             )
         }
         composable(Routes.OLD_NUMBERS) {

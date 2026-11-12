@@ -194,6 +194,9 @@ fun ResultScreen(
                 Labeled(SFlow.screenTests[l], if (state.testsDone) SFlow.testsDone[l] else SFlow.testsNotDone[l], null)
             }
 
+            // AI interview transcript: staff mode only (the customer may be looking at this screen)
+            if (state.staffMode) state.aiInterview?.let { AiTranscriptCard(it, l) }
+
             if (state.staffMode && state.sessionId != null) VerificationCard(l, state.verification, onSaveVerification)
 
             extraActions()

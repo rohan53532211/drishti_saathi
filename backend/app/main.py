@@ -20,6 +20,15 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from . import anamnesis
+from .sarvam import SarvamClient
+
+try:  # backend/.env holds SARVAM_API_KEY (never committed); real environment variables win
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
+except ImportError:  # pragma: no cover
+    pass
+
 STATIC = Path(__file__).parent / "static"
 MAX_BODY_BYTES = 256 * 1024
 
@@ -96,7 +105,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 """
 
 
-def create_app(db_path: Optional[str] = None, token: Optional[str] = None) -> FastAPI:
+def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
+               sarvam: Optional[SarvamClient] = None) -> FastAPI:
     db_file = db_path or os.environ.get("BRIDGE_DB", str(Path(__file__).resolve().parent.parent / "bridge.db"))
     api_token = token if token is not None else os.environ.get("BRIDGE_TOKEN") or None
 
@@ -114,7 +124,8 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None) -> Fa
     with db() as con:
         con.executescript(SCHEMA)
 
-    app = FastAPI(title="Drishti Saathi Remote Optometrist Bridge", version="1.0")
+    app = FastAPI(title="Drishti Saathi Remote Optometrist Bridge", version="1.1")
+    voice = anamnesis.AnamnesisService(sarvam or SarvamClient())
 
     def check_token(x_bridge_token: Optional[str] = Header(default=None)) -> None:
         if api_token and not (x_bridge_token and secrets.compare_digest(x_bridge_token, api_token)):
@@ -144,7 +155,7 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None) -> Fa
     def health(x_bridge_token: Optional[str] = Header(default=None)) -> dict[str, Any]:
         """Lets the app test its settings: tokenOk is true when no token is needed or the given one is right."""
         ok = not api_token or bool(x_bridge_token and secrets.compare_digest(x_bridge_token, api_token))
-        return {"ok": True, "tokenRequired": bool(api_token), "tokenOk": ok}
+        return {"ok": True, "tokenRequired": bool(api_token), "tokenOk": ok, "voiceAi": voice.sarvam.configured}
 
     @app.post("/profiles", status_code=201, dependencies=[Depends(check_token)])
     async def create_profile(request: Request) -> dict[str, Any]:
@@ -221,6 +232,7 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None) -> Fa
             get_row(con, pid)
             return review_of(con, pid)
 
+    app.include_router(anamnesis.router(voice, check_token))
     return app
 
 

@@ -181,6 +181,29 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 - Plain `http://` is allowed in the debug build only (`src/debug/AndroidManifest.xml`).
 - Contract: `backend/tests/fixtures/app_profile.json` is produced by the app's `BridgeProfileTest` and must be accepted by the server.
 
+**Sarvam AI voice interview (12 Nov, branch `feature/sarvam-voice-anamnesis`):**
+- Optional "Voice interview (AI)" under the first interview question, shown when a backend address is set. The standard interview stays the default and the fallback.
+- Backend `app/anamnesis.py` + `app/sarvam.py`:
+  - `/anamnesis/start|turn|finish`; per turn Sarvam speech-to-text (saaras:v4), then chat (sarvam-105b, JSON mode), then text-to-speech (bulbul:v3).
+  - The key is only in `backend/.env`.
+  - Sessions are in memory, 30 min.
+- A coverage tracker in code chooses the topic and stops at 8 questions (or when everything is covered).
+  - Red flags are always question 3, with fixed wording; a "yes" ends the interview as urgent.
+  - The model's question is checked for diagnosis / power / lens words.
+  - Bad JSON or a failed call gives the scripted question.
+  - A red-flag keyword the model missed makes the red flag "unclear".
+- App (`aivoice/`):
+  - consent ("Your voice will be sent to a secure server for transcription. No name or photo is sent.") with Hindi / English
+  - 16 kHz WAV recording, auto-stop at 15 s
+  - the backend's audio plays (or the phone's own voice reads it if TTS failed)
+  - "You said: …", "Thinking…", "Question n of ~8", End, Retry
+- `AiProfileMapper` writes the answers into the existing `InterviewAnswers` through the interview's own setters. The existing functional profile, power path, tests and rules engine then run unchanged.
+  - The power question is pre-selected but asked again, so the power path still opens.
+  - An unclear or unasked red flag is left for the phone to ask.
+  - A red-flag "yes" is urgent in the rules engine exactly as before.
+- Two backend failures in a row, or a permanent one (no key, wrong token, no server), switch to the standard interview with the answers so far.
+- The transcript (text only) is stored in the session's measurements JSON (`aiInterview`). It appears only in staff mode on the summary and on the shop PDF. It is never on the customer copy and never in the optometrist profile, and it is deleted with the session.
+
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:
@@ -209,6 +232,13 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
     - the token is in plain app preferences (backups are off)
     - before real use: proper authentication, hosting with encryption at rest, a retention rule, a DPDP Act review
     - the optometrist's reply is shown as written (not translated)
+
+14. Sarvam AI voice interview:
+    - Not yet tried with a real Sarvam key on the phone. Check the speech-to-text quality for older voices and shop noise, the latency per turn (3 calls), and the cost per interview.
+    - The customer's voice goes to Sarvam (a third party): the consent says so, but a data-processing agreement and a DPDP review are needed before real use.
+    - Free speech may include a name. The transcript stays in the shop (staff view and shop PDF), but it is not filtered.
+    - The red-flag keyword list and the banned-word list need clinical review and a native-speaker check.
+    - If the customer answers many topics at once, it can end before 5 questions (nothing left to ask).
 
 ## Next steps
 1. Phone: install via adb, voice check, then the checklist above; feed measured values back into `rules.json`.

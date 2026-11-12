@@ -43,3 +43,6 @@ backend/*.db
 backend/.venv/
 **/__pycache__/
 backend/.pytest_cache/
+
+backend/.env
+!backend/.env.example

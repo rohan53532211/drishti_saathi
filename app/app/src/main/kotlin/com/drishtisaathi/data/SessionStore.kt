@@ -50,7 +50,11 @@ data class SessionEntity(
     val measurementsJson: String? = null,
 )
 
-/** Camera capture (M2) and on-screen test (M3) results stored with a session. Numbers only, never images. */
+/**
+ * Camera capture (M2) and on-screen test (M3) results stored with a session. Numbers only, never images.
+ * [aiInterview] is the AI voice interview's questions and transcribed answers (text only, no audio): staff view and
+ * shop PDF only; it is deleted with the session.
+ */
 @kotlinx.serialization.Serializable
 data class Measurements(
     val face: com.drishtisaathi.engine.MeasuredFace? = null,
@@ -61,6 +65,7 @@ data class Measurements(
     val glassesOn: Boolean = false,
     /** Power path quick estimate (phone estimate, approximate); null = not run. */
     val quick: com.drishtisaathi.engine.QuickEstimate? = null,
+    val aiInterview: com.drishtisaathi.aivoice.AiInterviewRecord? = null,
 )
 
 /**

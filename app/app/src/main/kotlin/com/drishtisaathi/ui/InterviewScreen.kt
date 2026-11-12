@@ -53,6 +53,8 @@ fun InterviewScreen(
     onOldNumbersYes: () -> Unit,
     onBack: () -> Unit,
     voice: VoiceController? = null,
+    /** Shown under the first question before anything is answered (the AI voice interview option). */
+    startExtra: (@Composable () -> Unit)? = null,
 ) {
     val l = state.lang
     val q = state.currentQuestion ?: return
@@ -85,6 +87,7 @@ fun InterviewScreen(
                     BigButton(S.no[l], { onAnswer(q.id) { a -> a.copy(knownRx = null) } }, selected = answeredNo)
                 }
             }
+            if (startExtra != null && idx == 0 && state.answered.isEmpty()) startExtra()
         }
     }
 }

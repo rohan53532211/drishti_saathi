@@ -125,6 +125,18 @@ object PdfContent {
         out += Block.Heading(S.profile[l])
         state.visibleQuestions.forEach { q -> out += Block.Bullet("${q.text[l]}  →  ${answerText(q, state, ctx)[l]}") }
 
+        // AI voice interview transcript: shop copy only (never the customer copy, never sent to the optometrist)
+        state.aiInterview?.let { rec ->
+            val V = com.drishtisaathi.i18n.SAiVoice
+            out += Block.Heading(V.transcriptTitle[l])
+            rec.turns.forEach { t ->
+                out += Block.Para(V.transcriptQ.format(t.n, t.question)[l], bold = true)
+                out += Block.Bullet(V.transcriptA.format(t.answer ?: V.transcriptNoAnswer[l])[l])
+            }
+            if (rec.fellBack) out += Block.Para(V.transcriptFellBack[l], tone = Tone.ROUTINE)
+            out += Block.Para(V.transcriptNote[l], tone = Tone.MUTED)
+        }
+
         state.verification.verifiedAt?.let {
             val v = state.verification
             out += Block.Heading(S.verification[l])

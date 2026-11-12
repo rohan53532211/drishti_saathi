@@ -125,7 +125,8 @@ def test_delete_removes_profile_and_review(client):
 
 def test_token_is_enforced_when_set(tmp_path):
     c = TestClient(create_app(str(tmp_path / "t.db"), token="s3cret"))
-    assert c.get("/health").json() == {"ok": True, "tokenRequired": True, "tokenOk": False}
+    h = c.get("/health").json()
+    assert (h["ok"], h["tokenRequired"], h["tokenOk"]) == (True, True, False)
     assert c.get("/health", headers={"X-Bridge-Token": "s3cret"}).json()["tokenOk"] is True
     assert send(c).status_code == 401
     assert c.get("/profiles", headers={"X-Bridge-Token": "wrong"}).status_code == 401

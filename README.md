@@ -17,7 +17,7 @@ The app:
 
 **Privacy:** everything stays on the phone.
 - Camera frames are processed in memory and never saved.
-- Nothing is uploaded without spoken and tapped consent, and uploads never include the customer's name or photo. The only upload is the optional Remote Optometrist Bridge, and the server rejects names, photos and contact fields too.
+- Nothing is uploaded without spoken and tapped consent, and uploads never include the customer's name or photo. There are two optional uploads, each with its own consent screen. The Remote Optometrist Bridge sends the profile; its server rejects names, photos and contact fields too. The Voice interview (AI) sends the customer's spoken answers to the shop's backend, which transcribes them with Sarvam AI. The Sarvam key stays on the backend; the transcript stays in the shop (staff view and shop PDF).
 - Any session can be deleted.
 - Stored sessions are encrypted (SQLCipher, with the key protected by the Android Keystore), and backups are turned off.
 
@@ -30,7 +30,7 @@ The app:
 | `app/engine` | Pure Kotlin engine: priors, far-point protocol, Bayesian band, referral rules, frame ranking. No Android dependencies. |
 | `app/app` | Android app (Kotlin, Jetpack Compose, minSdk 26): interview, voice, camera (MediaPipe face landmarker), screen tests, try-on, Room storage, PDFs |
 | `app/app/src/main/assets/rules.json` | Every threshold and clinical constant (strictly parsed) |
-| `backend/` | Remote Optometrist Bridge: FastAPI + SQLite service and the optometrist web page. See `backend/README.md`. |
+| `backend/` | Remote Optometrist Bridge (FastAPI + SQLite, optometrist web page) and the Sarvam AI voice interview (`/anamnesis/*`). See `backend/README.md`. |
 | `tools/` | Python scripts: ANSUR II priors analysis, far-point simulation, frame cut-outs for try-on, bundled font build (`build_fonts.py`) |
 
 ## Build

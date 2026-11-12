@@ -23,6 +23,13 @@ import com.drishtisaathi.engine.vision.DeviceFit
 import com.drishtisaathi.engine.DrishtiEngine
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.KnownRx
+import com.drishtisaathi.aivoice.AiAnamnesisApi
+import com.drishtisaathi.aivoice.AiAnamnesisClient
+import com.drishtisaathi.aivoice.AiInterviewController
+import com.drishtisaathi.aivoice.AiInterviewRecord
+import com.drishtisaathi.aivoice.AiLanguage
+import com.drishtisaathi.aivoice.AiProfileMapper
+import com.drishtisaathi.aivoice.AiUiState
 import com.drishtisaathi.bridge.BridgeClient
 import com.drishtisaathi.bridge.BridgeConfig
 import com.drishtisaathi.bridge.BridgeConsent
@@ -101,6 +108,8 @@ data class UiState(
     val remote: RemoteReviewEntity? = null,
     val bridgeBusy: Boolean = false,
     val bridgeError: Txt? = null,
+    /** AI voice interview transcript for this session (staff and shop PDF only); null = not used. */
+    val aiInterview: com.drishtisaathi.aivoice.AiInterviewRecord? = null,
 ) {
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
     val currentQuestion: Question? get() = visibleQuestions.getOrNull(questionIndex)
@@ -233,6 +242,55 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { BridgeClient(bridgeSettings.config.value.copy(url = r.backendUrl), timeoutMs = 5_000).delete(r.remoteId) }
         }
         remoteDao.delete(sessionId)
+    }
+
+    // ---- AI voice interview (Sarvam via the backend) ------------------------------------------
+
+    private var ai: AiInterviewController? = null
+    private var aiConsentAt: Long = 0
+    private val _aiState = MutableStateFlow(AiUiState())
+    val aiState: StateFlow<AiUiState> = _aiState.asStateFlow()
+    private var aiCollect: Job? = null
+
+    /** The AI option is offered only when staff set a server address. */
+    val aiAvailable: Boolean get() = bridgeSettings.config.value.isValid
+
+    /** Customer agreed to send their voice: starts the backend interview (questions in [language]). */
+    fun startAiInterview(language: AiLanguage, api: AiAnamnesisApi = AiAnamnesisClient(bridgeSettings.config.value)) {
+        aiConsentAt = System.currentTimeMillis()
+        setLang(language.appLang)
+        val c = AiInterviewController(api, language)
+        ai = c
+        aiCollect?.cancel()
+        aiCollect = viewModelScope.launch { c.state.collect { _aiState.value = it } }
+        viewModelScope.launch(Dispatchers.IO) { c.start() }
+    }
+
+    fun aiAnswer(wav: ByteArray) { val c = ai ?: return; viewModelScope.launch(Dispatchers.IO) { c.answer(wav) } }
+    fun aiRetry() { val c = ai ?: return; viewModelScope.launch(Dispatchers.IO) { c.retry() } }
+    fun aiMicFailed() { ai?.micFailed() }
+
+    /**
+     * Ends the AI interview and puts its answers into the standard interview. [fellBack]: the backend failed, so the
+     * answers received so far are used without calling it again. [onDone] gets true when every question is answered.
+     */
+    fun finishAiInterview(fellBack: Boolean, onDone: (allAnswered: Boolean) -> Unit) = viewModelScope.launch {
+        val c = ai ?: return@launch onDone(false)
+        val profile = withContext(Dispatchers.IO) { if (fellBack) c.profileSoFar() else c.finish() }
+        ai = null
+        aiCollect?.cancel()
+        _aiState.value = AiUiState()
+        val record = AiInterviewRecord(c.language.code, aiConsentAt, profile.transcript, fellBack)
+        var all = false
+        _state.update { s ->
+            val m = AiProfileMapper.map(s.answers, profile, s.answered)
+            val visible = Questions.visible(m.answers)
+            val next = visible.indexOfFirst { it.id !in m.answered }
+            all = next < 0
+            s.copy(answers = m.answers, answered = m.answered, questionIndex = if (next < 0) 0 else next,
+                editingFromConfirm = false, aiInterview = record, result = null)
+        }
+        onDone(all)
     }
 
     /** The pending save; delete waits for it so a fast "Delete" never leaves a row behind. */
@@ -399,7 +457,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 finalAdd = s.verification.finalAdd.ifBlank { null },
                 pdMeterMm = s.verification.pdMeterMm,
                 verifiedAt = s.verification.verifiedAt,
-                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo, glassesOn = s.glassesOn, quick = quickFor(s))),
+                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo, glassesOn = s.glassesOn, quick = quickFor(s), aiInterview = s.aiInterview)),
             )
             if (current == null) {
                 val id = dao.insert(entity)
@@ -476,6 +534,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 demo = m.demo,
                 glassesOn = m.glassesOn,
                 quick = m.quick,
+                aiInterview = m.aiInterview,
                 remote = remote,
                 bridgeError = null,
                 verification = Verification(
