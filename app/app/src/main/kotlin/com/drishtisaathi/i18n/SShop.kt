@@ -63,6 +63,12 @@ object SShop {
         "एक बार और करते हैं, धीरे-धीरे। फिर से पास से शुरू करें।",
     )
     val distanceCm = tx("%d cm", "%d cm")
+    val notCaught = tx("Distance not caught. Keep your face in view and tap again.", "दूरी नहीं पकड़ी गई। चेहरा कैमरे के सामने रखें और फिर से दबाएँ।")
+    val measuring = tx("Measuring distance", "दूरी नापी जा रही है")
+    val noFaceDot = tx("Face not found", "चेहरा नहीं दिख रहा")
+    val typeDistance = tx("Staff: type the distance from a tape", "स्टाफ़: फ़ीते से नापी दूरी लिखें")
+    val distanceCmLabel = tx("Distance in cm", "दूरी cm में")
+    val useDistance = tx("Use", "यह दूरी लें")
     val stillSharp = tx("Still sharp at arm's length", "हाथ भर दूरी पर भी साफ़")
     val noShortSight = tx("No short-sight found at arm's length", "हाथ भर दूरी तक कम दूर-नज़र नहीं मिली")
     val dialInstruction = tx(

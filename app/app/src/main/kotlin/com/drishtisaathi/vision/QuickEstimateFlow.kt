@@ -43,6 +43,13 @@ import com.drishtisaathi.engine.anamnesis.QuickPlan
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.i18n.SShop
+import com.drishtisaathi.engine.Confidence
+import com.drishtisaathi.engine.config.CameraConfig
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.graphics.Color
 import com.drishtisaathi.engine.MeasuredEye
 import com.drishtisaathi.engine.VisionTests
 import androidx.compose.foundation.layout.Row
@@ -280,7 +287,8 @@ fun QuickEstimateFlow(
                     speak = env.onInstruction,
                 )
                 step is QuickStep.Power -> key(step) {
-                    QuickPowerScreen(env, step.eye, reading, est, target, voice, stepHeader(step), onSkip = { next() }) { eye ->
+                    QuickPowerScreen(env, step.eye, reading, est, target, voice, stepHeader(step), distance is FakeDistanceProvider,
+                        onSkip = { next() }) { eye ->
                         if (step.eye == TestEye.RIGHT) right = eye else left = eye
                         phase = QPhase.RESULT
                     }
@@ -360,35 +368,79 @@ private fun BlurKeyword(voice: VoiceController?, onBlur: () -> Unit) {
 }
 
 /**
+ * Valid distance readings of the last [keepMs] (face found). BLUR uses the median of the last [useMs], so the tap
+ * never waits for a fresh frame; null when nothing valid was seen in [keepMs].
+ */
+class DistanceBuffer(private val keepMs: Long = 1_500, private val useMs: Long = 1_000) {
+    private val items = ArrayDeque<Pair<Long, Double>>()
+
+    fun add(r: DistanceReading?) {
+        if (r == null || !r.faceVisible || !(r.distanceMm > 0)) return
+        if (items.lastOrNull()?.first == r.timestampMs) return
+        items.addLast(r.timestampMs to r.distanceMm)
+        trim(r.timestampMs)
+    }
+
+    private fun trim(nowMs: Long) {
+        while (items.isNotEmpty() && nowMs - items.first().first > keepMs) items.removeFirst()
+    }
+
+    /** Distance at the moment of the tap: median of the last [useMs] (else of the last [keepMs]); null if none. */
+    fun atTap(nowMs: Long): Double? {
+        trim(nowMs)
+        val recent = items.filter { nowMs - it.first <= useMs }.ifEmpty { items.toList() }
+        return if (recent.isEmpty()) null else median(recent.map { it.second })
+    }
+
+    /** Green dot: a valid reading within [freshMs]. */
+    fun live(nowMs: Long, freshMs: Long = 500): Boolean = items.lastOrNull()?.let { nowMs - it.first <= freshMs } == true
+}
+
+/**
  * Power check for one eye: white background, distance-locked letters, only the live distance on screen. Start close,
- * move away, BLUR (or "dhundhla") freezes the reading; one automatic repeat when it looks invalid, then the median.
+ * move away, BLUR (or "dhundhla") freezes the reading. BLUR is always enabled: the distance is the median of the
+ * readings of the last second; with none in 1.5 s it asks to tap again, and staff can type the distance from a tape.
+ * One automatic repeat when the reading looks invalid, then the median.
  */
 @Composable
 private fun QuickPowerScreen(
     env: TestEnv, eye: TestEye, reading: DistanceReading?, est: QuickEstimator, target: QuickTarget,
-    voice: VoiceController?, header: Txt, onSkip: () -> Unit, onFrozen: (QuickEye) -> Unit,
+    voice: VoiceController?, header: Txt, simulated: Boolean, onSkip: () -> Unit, onFrozen: (QuickEye) -> Unit,
 ) {
     val rules = env.rules
     val cfg = env.cfg
+    val l = env.lang
     var proc by remember { mutableStateOf(QuickFarProcedure()) }
-    LaunchedEffect(reading) { proc = proc.onReading(reading, rules, System.currentTimeMillis()) }
+    val buffer = remember { DistanceBuffer() }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(reading) {
+        buffer.add(reading)
+        proc = proc.onReading(reading, rules, System.currentTimeMillis())
+    }
+    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); kotlinx.coroutines.delay(250) } }
+    val live = if (simulated) reading?.faceVisible == true else buffer.live(now)
     val status = DistanceGate.check(reading, null, null)
-    val ok = status == DistanceStatus.OK
     val bg = rgbColor(if (target == QuickTarget.WHITE) cfg.farPointWhiteRgb else cfg.farPointBlueRgb)
     val rnd = remember { Random(System.nanoTime()) }
     val dirs = remember { List(cfg.farPointLetterCount) { EDirection.random(rnd) } }
+    var notCaught by remember { mutableStateOf(false) }
+    var typing by remember { mutableStateOf(false) }
+    var typed by remember { mutableStateOf("") }
 
-    val blurNow: () -> Unit = {
-        val r = reading
-        if (ok && r != null && proc.canBlur(r, rules)) {
-            val e = proc.blur(r, est, target)
-            val first = proc.first
-            when {
-                first != null -> onFrozen(QuickFarProcedure.median(first, e, est, target))
-                proc.looksInvalid(r.distanceMm, System.currentTimeMillis()) -> proc = proc.repeatWith(e)
-                else -> onFrozen(e)
-            }
+    fun freeze(mm: Double, t: Long) {
+        notCaught = false
+        val e = proc.blur(DistanceReading(mm, Confidence.MEDIUM, timestampMs = t), est, target)
+        val first = proc.first
+        when {
+            first != null -> onFrozen(QuickFarProcedure.median(first, e, est, target))
+            proc.looksInvalid(mm, t) -> proc = proc.repeatWith(e)
+            else -> onFrozen(e)
         }
+    }
+    val blurNow: () -> Unit = {
+        val t = System.currentTimeMillis()
+        val mm = if (simulated) reading?.takeIf { it.faceVisible }?.distanceMm else buffer.atTap(t)
+        if (mm == null) notCaught = true else freeze(mm, t)
     }
     BlurKeyword(voice, blurNow)
 
@@ -410,10 +462,30 @@ private fun QuickPowerScreen(
             }
         },
         controls = {
-            if (!proc.seenClose) Text(SShop.powerStartClose[env.lang], style = MaterialTheme.typography.bodyMedium)
-            BigButton(SAnamnesis.quickBlur[env.lang], enabled = ok && proc.canBlur(reading, rules), selected = true, onClick = blurNow)
-            BigButton(SShop.stillSharp[env.lang], enabled = ok && proc.canStillClear(reading, rules),
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(14.dp).background(if (live) Color(0xFF2E7D32) else Color(0xFF9E9E9E), CircleShape))
+                Text((if (live) SShop.measuring else SShop.noFaceDot)[l], style = MaterialTheme.typography.bodyMedium)
+            }
+            if (notCaught) Text(SShop.notCaught[l], color = Color(0xFFB26A00), style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold)
+            BigButton(SAnamnesis.quickBlur[l], selected = true, onClick = blurNow)
+            BigButton(SShop.stillSharp[l], enabled = reading?.let { it.faceVisible && it.distanceMm >= rules.farPoint.selfHeldReachM * 1000.0 } == true,
                 onClick = { onFrozen(proc.stillClear(target)) })
+            if (!typing) {
+                TextButton(onClick = { typing = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SShop.typeDistance[l]) }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        typed, { typed = it.filter(Char::isDigit).take(3) }, Modifier.weight(1f), singleLine = true,
+                        label = { Text(SShop.distanceCmLabel[l]) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    )
+                    val cm = typed.toIntOrNull()?.takeIf { it in 10..100 }
+                    // Typed from a tape: used as it is (no automatic repeat).
+                    BigButton(SShop.useDistance[l], enabled = cm != null, modifier = Modifier.weight(1f),
+                        onClick = { cm?.let { onFrozen(proc.blur(DistanceReading(it * 10.0, Confidence.MEDIUM), est, target)) } })
+                }
+            }
         },
     )
 }
@@ -483,8 +555,23 @@ fun CameraQuickEstimateFlow(
         return
     }
     CameraPermissionGate(lang, onSkip = { if (allowDemoWithoutCamera) demo = true else onSkip() }, autoRequest = true) {
-        val tracker = rememberFaceTracker(rules.camera)
-        val provider = remember(tracker) { CameraDistanceProvider(tracker, calibration, rules.camera, controlsTracker = false) }
+        val relaxed = remember(rules) { powerCheckCamera(rules.camera) }
+        val tracker = rememberFaceTracker(relaxed)
+        val provider = remember(tracker) { CameraDistanceProvider(tracker, calibration, relaxed, controlsTracker = false) }
         QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction)
     }
 }
+
+/**
+ * Camera settings for the eye check: the face is still tracked with one eye covered by the palm and while the
+ * phone moves (lower detection / presence / tracking thresholds), head yaw and roll up to 10°, no sharpness gate.
+ * The distance uses one visible iris when the other is covered, with the card-calibrated iris size or PD when known.
+ */
+fun powerCheckCamera(c: CameraConfig): CameraConfig = c.copy(
+    minFaceDetectionConfidence = minOf(c.minFaceDetectionConfidence, 0.3),
+    minFacePresenceConfidence = minOf(c.minFacePresenceConfidence, 0.3),
+    minTrackingConfidence = minOf(c.minTrackingConfidence, 0.3),
+    maxAbsYawDeg = maxOf(c.maxAbsYawDeg, 10.0),
+    maxAbsRollDeg = maxOf(c.maxAbsRollDeg, 10.0),
+    minLaplacianVariance = 0.0,
+)

@@ -142,3 +142,30 @@ class LetterChartLimitsTest {
         assertTrue(n <= 12)
     }
 }
+
+/** Power check BLUR: always enabled, distance from the readings of the last second, relaxed camera settings. */
+class BlurTapTest {
+    private fun r(mm: Double, t: Long, face: Boolean = true) = DistanceReading(mm, Confidence.HIGH, face, timestampMs = t)
+
+    @Test fun `tap uses the median of the last second`() {
+        val b = DistanceBuffer()
+        b.add(r(200.0, 0)); b.add(r(260.0, 900)); b.add(r(280.0, 1_200)); b.add(r(300.0, 1_500))
+        assertEquals(280.0, b.atTap(1_600)!!, 1e-9)     // 0 ms and 900 ms… only 900+ are within 1 s of 1600
+        assertTrue(b.live(1_600))
+    }
+
+    @Test fun `face-lost frames are ignored and nothing in 1_5 s means not caught`() {
+        val b = DistanceBuffer()
+        b.add(r(300.0, 0)); b.add(r(999.0, 500, face = false))
+        assertEquals(300.0, b.atTap(1_400)!!, 1e-9)     // older than 1 s but within 1.5 s
+        assertNull(b.atTap(1_600))
+        assertFalse(b.live(1_600))
+    }
+
+    @Test fun `eye check camera tolerates a covered eye, head turn up to 10 degrees and motion blur`() {
+        val c = powerCheckCamera(RulesConfig.parse(File("src/main/assets/rules.json").readText()).camera)
+        assertTrue(c.maxAbsYawDeg >= 10.0 && c.maxAbsRollDeg >= 10.0)
+        assertEquals(0.0, c.minLaplacianVariance, 0.0)
+        assertTrue(c.minFacePresenceConfidence <= 0.3 && c.minFaceDetectionConfidence <= 0.3)
+    }
+}
