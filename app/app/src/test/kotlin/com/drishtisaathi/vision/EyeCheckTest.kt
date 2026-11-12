@@ -89,16 +89,17 @@ class EyeCheckTest {
         assertTrue(s.pick(Lang.HI, rnd) in s.hi)
     }
 
-    @Test fun `power is shown as a range - 30 cm gives -3_25 to -3_75 D`() {
-        val r = PowerRange.far(300.0)
-        assertEquals(-3.50, r.centreD, 1e-9); assertEquals(-3.25, r.fromD, 1e-9); assertEquals(-3.75, r.toD, 1e-9)
+    @Test fun `power is shown as a range - 30 cm gives centre -3_25, range -3_00 to -3_50 D`() {
+        val r = PowerRange.far(300.0)                       // -3.33 -> nearest 0.25 = -3.25
+        assertEquals(-3.25, r.centreD, 1e-9); assertEquals(-3.00, r.fromD, 1e-9); assertEquals(-3.50, r.toD, 1e-9)
+        assertEquals(-3.50, PowerRange.far(290.0).centreD, 1e-9)   // -3.45 -> -3.50 (nearest, not always down)
         val r40 = PowerRange.far(400.0)                     // exactly -2.50
         assertEquals(-2.25, r40.fromD, 1e-9); assertEquals(-2.75, r40.toD, 1e-9)
         val eye = PowerRange.farEye(300.0)
-        assertEquals(-3.50, eye.seD!!, 1e-9)                // the centre feeds lens and frame suggestions
+        assertEquals(-3.25, eye.seD!!, 1e-9)                // the centre feeds lens and frame suggestions
         assertEquals(30.0, eye.blurAtCm!!, 0.0)
         val text = quickEyeText(eye).en
-        assertTrue(text, "between −3.25 and −3.75 D" in text)
+        assertTrue(text, "between −3.00 and −3.50 D" in text)
         val add = PowerRange.add(1.75)
         assertEquals(1.50, add.fromD, 1e-9); assertEquals(2.00, add.toD, 1e-9)
         assertTrue("+1.50 to +2.00" in nearResultText(40.0, 1.75, null, false).en)
@@ -112,7 +113,7 @@ class EyeCheckTest {
         assertEquals(ReferralLevel.URGENT, result.assessment.referral.level)
         val state = UiState(answers = red, quick = q, result = result)
         val lines = PowerPathText.quickLines(state).map { it.en }
-        assertTrue(lines.toString(), lines.any { "−3.25 and −3.75" in it } && lines.any { "−2.25 and −2.75" in it })
+        assertTrue(lines.toString(), lines.any { "−3.00 and −3.50" in it } && lines.any { "−2.25 and −2.75" in it })
         val texts = paras(PdfContent.shopCopy(state, rules, ctx, Lang.EN))
         assertTrue(texts.indexOf(SShop.urgentTop.en) in 0..3)   // at the top
         assertFalse(SShop.phoneCheckNote.en in texts)

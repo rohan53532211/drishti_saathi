@@ -11,7 +11,6 @@ import com.drishtisaathi.i18n.Lang
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -89,8 +88,7 @@ data class ReadingSentences(val en: List<String>, val hi: List<String>) {
 
 /**
  * Powers are shown as a range, never as one exact number: centre ± [HALF_D] (0.25 D).
- * Far: centre = −1/d (m), the 0.25 D step reached by rounding the size up (a blur point lies at or beyond the far
- * point, so the step taken is the stronger one): 30 cm → −3.33 → centre −3.50 → "−3.25 to −3.75 D".
+ * Far: centre = −1/d (m) rounded to the nearest 0.25 D: 30 cm → −3.33 → centre −3.25 → "−3.00 to −3.50 D".
  */
 object PowerRange {
     const val STEP_D = 0.25
@@ -103,7 +101,7 @@ object PowerRange {
     /** Far range from the distance (mm) where the letters can no longer be read. */
     fun far(blurMm: Double): Range {
         val d = 1000.0 / blurMm
-        val centre = -ceil(d / STEP_D - 1e-9) * STEP_D
+        val centre = -(d / STEP_D).roundToInt() * STEP_D
         return around(centre)
     }
 
