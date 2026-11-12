@@ -104,6 +104,8 @@ internal fun TestLayout(
     background: Color = Color.White,
     subtitle: Txt? = null,
     holdAtMm: Double? = null,
+    /** Show the live distance large (quick estimate), without the repeat counter. */
+    bigDistance: Boolean = false,
     target: @Composable BoxScope.() -> Unit,
     controls: @Composable ColumnScope.() -> Unit,
 ) {
@@ -122,7 +124,8 @@ internal fun TestLayout(
         Text(instruction[l], color = fg, style = MaterialTheme.typography.bodyLarge)
         val dist = reading?.let { SVision.distanceNow.format((it.distanceMm / 10.0).roundToInt())[l] } ?: SVision.distanceUnknown[l]
         val hold = holdAtMm?.let { "  ·  " + SVision.holdAt.format((it / 10.0).roundToInt())[l] } ?: ""
-        Text(
+        if (bigDistance) Text(dist + hold, color = fg, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+        else Text(
             dist + hold + "  ·  " + SVision.repeatOf.format(repeatIndex + 1, repeats)[l],
             color = fg, style = MaterialTheme.typography.bodyMedium,
         )

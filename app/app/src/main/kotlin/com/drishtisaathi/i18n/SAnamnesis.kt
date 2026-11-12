@@ -99,6 +99,7 @@ object SAnamnesis {
         "Both eyes open. Start at arm's length and slowly bring the phone closer. When the small letters blur, tap Blur or say \"dhundhla\".",
         "दोनों आँखें खुली रखें। हाथ भर दूरी से शुरू करें और फ़ोन धीरे-धीरे पास लाएँ। जैसे ही छोटे अक्षर धुंधले हों, \"धुंधला\" दबाएँ या \"धुंधला\" बोलें।",
     )
+    val quickGlassesOff = tx("Take off your glasses.", "चश्मा उतार दें।")
     val quickBringClose = tx("Bring the phone close until the letters are clear.", "फ़ोन पास लाएँ, जब तक अक्षर साफ़ न दिखें।")
     val quickMoveAway = tx("Now slowly move it away.", "अब धीरे-धीरे दूर ले जाएँ।")
     val quickStartFar = tx("Hold the phone at arm's length.", "फ़ोन हाथ भर दूर रखें।")

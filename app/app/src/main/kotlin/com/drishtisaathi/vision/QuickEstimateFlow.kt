@@ -68,6 +68,10 @@ data class QuickFarProcedure(val seenClose: Boolean = false) {
     fun liveSeD(r: DistanceReading?, est: QuickEstimator): Double? =
         r?.takeIf { seenClose && it.faceVisible && it.distanceMm > 0 }?.let { est.liveSeD(it.distanceMm / 1000.0) }
 
+    /** The same line for display from the first reading on (Blur still waits until the phone has been close). */
+    fun previewSeD(r: DistanceReading?, est: QuickEstimator): Double? =
+        r?.takeIf { it.faceVisible && it.distanceMm > 0 }?.let { est.liveSeD(it.distanceMm / 1000.0) }
+
     fun canBlur(r: DistanceReading?, rules: RulesConfig): Boolean =
         seenClose && r != null && r.faceVisible && r.distanceMm >= rules.visionTests.farPointMinMm
 
@@ -118,6 +122,8 @@ fun QuickEstimateFlow(
     modifier: Modifier = Modifier,
     voice: VoiceController? = null,
     onInstruction: (Txt) -> Unit = {},
+    /** Power path: no intro screens, the measurement runs at once (glasses off and the eye to cover are spoken). */
+    autoStart: Boolean = false,
 ) {
     DisposableEffect(distance) {
         distance.start()
@@ -134,7 +140,7 @@ fun QuickEstimateFlow(
 
     val steps = remember(plan) { stepsFor(plan) }
     var index by remember { mutableIntStateOf(0) }
-    var phase by remember { mutableStateOf(QPhase.INTRO) }
+    var phase by remember { mutableStateOf(if (autoStart) QPhase.RUN else QPhase.INTRO) }
     var right by remember { mutableStateOf<QuickEye?>(null) }
     var left by remember { mutableStateOf<QuickEye?>(null) }
     var nearCm by remember { mutableStateOf<Double?>(null) }
@@ -142,7 +148,7 @@ fun QuickEstimateFlow(
     var nearDone by remember { mutableStateOf(false) }
     val step = steps[index.coerceAtMost(steps.lastIndex)]
 
-    fun next() { index = (index + 1).coerceAtMost(steps.lastIndex); phase = QPhase.INTRO }
+    fun next() { index = (index + 1).coerceAtMost(steps.lastIndex); phase = if (autoStart) QPhase.RUN else QPhase.INTRO }
     fun result() = QuickEstimate(right, left, addD, nearCm, possibleLongSight = plan.possibleLongSight, primary = primary)
 
     Column(modifier.fillMaxSize()) {
@@ -181,7 +187,7 @@ fun QuickEstimateFlow(
                     speak = env.onInstruction,
                 )
                 step is QuickStep.Far -> key(step) {
-                    QuickFarScreen(env, step.eye, reading, est, target, voice, onSkip = { next() }) { eye ->
+                    QuickFarScreen(env, step.eye, reading, est, target, voice, onSkip = { next() }, spokenSetup = autoStart) { eye ->
                         if (step.eye == TestEye.RIGHT) right = eye else left = eye
                         phase = QPhase.RESULT
                     }
@@ -234,7 +240,7 @@ private fun BlurKeyword(voice: VoiceController?, onBlur: () -> Unit) {
 @Composable
 private fun QuickFarScreen(
     env: TestEnv, eye: TestEye, reading: DistanceReading?, est: QuickEstimator, target: QuickTarget,
-    voice: VoiceController?, onSkip: () -> Unit, onFrozen: (QuickEye) -> Unit,
+    voice: VoiceController?, onSkip: () -> Unit, spokenSetup: Boolean = false, onFrozen: (QuickEye) -> Unit,
 ) {
     val rules = env.rules
     val cfg = env.cfg
@@ -245,7 +251,7 @@ private fun QuickFarScreen(
     val bg = rgbColor(if (target == QuickTarget.WHITE) cfg.farPointWhiteRgb else cfg.farPointBlueRgb)
     val rnd = remember { Random(System.nanoTime()) }
     val dirs = remember { List(cfg.farPointLetterCount) { EDirection.random(rnd) } }
-    val live = proc.liveSeD(reading, est)
+    val live = proc.previewSeD(reading, est)
 
     val blurNow: () -> Unit = {
         val r = reading
@@ -253,9 +259,15 @@ private fun QuickFarScreen(
     }
     BlurKeyword(voice, blurNow)
 
+    // With no intro screen, the first instruction also says which eye to cover and to take the glasses off.
+    val step = if (proc.seenClose) SAnamnesis.quickMoveAway else SAnamnesis.quickBringClose
+    val cover = if (eye == TestEye.RIGHT) SVision.coverLeft else SVision.coverRight
+    val instruction = if (spokenSetup && !proc.seenClose)
+        Txt("${cover.en} ${SAnamnesis.quickGlassesOff.en} ${step.en}", "${cover.hi} ${SAnamnesis.quickGlassesOff.hi} ${step.hi}")
+    else step
     TestLayout(
-        env, SAnamnesis.quickTitle, eye, if (proc.seenClose) SAnamnesis.quickMoveAway else SAnamnesis.quickBringClose,
-        reading, status, 0, 1, onSkip, background = bg,
+        env, SAnamnesis.quickTitle, eye, instruction,
+        reading, status, 0, 1, onSkip, background = bg, bigDistance = true,
         target = {
             Canvas(Modifier.fillMaxSize()) {
                 val d = reading?.distanceMm ?: return@Canvas
@@ -268,7 +280,7 @@ private fun QuickFarScreen(
         controls = {
             Text(
                 live?.let { SAnamnesis.quickLive.format(fmtD(it))[env.lang] } ?: " ",
-                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )
             BigButton(SAnamnesis.quickBlur[env.lang], enabled = ok && proc.canBlur(reading, rules), selected = true, onClick = blurNow)
@@ -300,7 +312,7 @@ private fun QuickNearScreen(
     TestLayout(
         env, SAnamnesis.quickNearTitle, TestEye.BOTH, if (proc.seenFar) SAnamnesis.quickMoveIn else SAnamnesis.quickStartFar,
         reading, status, 0, 1, onSkip,
-        holdAtMm = if (proc.seenFar) null else proc.startMinMm,
+        holdAtMm = if (proc.seenFar) null else proc.startMinMm, bigDistance = true,
         target = {
             Canvas(Modifier.fillMaxSize()) {
                 val h = Sizing.mmToPx(cfg.nearPointLetterHeightMm, env.scale).toFloat().coerceAtLeast(3f)
@@ -335,16 +347,18 @@ fun CameraQuickEstimateFlow(
     voice: VoiceController? = null,
     onInstruction: (Txt) -> Unit = {},
     allowDemoWithoutCamera: Boolean = false,
+    /** Power path: ask for the camera at once and start measuring without intro screens. */
+    autoStart: Boolean = false,
 ) {
     var demo by remember { mutableStateOf(false) }
     if (demo) {
         val fake = remember { FakeDistanceProvider() }
-        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction)
+        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction, autoStart)
         return
     }
-    CameraPermissionGate(lang, onSkip = { if (allowDemoWithoutCamera) demo = true else onSkip() }) {
+    CameraPermissionGate(lang, onSkip = { if (allowDemoWithoutCamera) demo = true else onSkip() }, autoRequest = autoStart) {
         val tracker = rememberFaceTracker(rules.camera)
         val provider = remember(tracker) { CameraDistanceProvider(tracker, calibration, rules.camera, controlsTracker = false) }
-        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction)
+        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, onSkip, modifier, voice, onInstruction, autoStart)
     }
 }

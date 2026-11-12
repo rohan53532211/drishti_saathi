@@ -226,6 +226,7 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
     - Check the quick far point against the full test on a few myopes.
     - Check that "dhundhla" is recognised while the phone moves, and that the TTS instruction does not trigger it.
     - The `functionalProfile` hours are starting guesses.
+    - Fixed after the 12 Nov phone test: "Not sure" / "No" now opens the camera measurement straight away (no glasses-off screen, no intro or Start button; the camera permission dialog appears by itself the first time). Glasses off and which eye to cover are spoken on the measuring screen. The distance is shown large, and the live line shows from the first reading (Blur still waits until the phone has been close). The staff Camera check also shows the live line.
 
 13. Remote Optometrist Bridge is a demo setup:
     - one shared token, no per-optometrist login, no audit log

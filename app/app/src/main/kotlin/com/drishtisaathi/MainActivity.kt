@@ -131,13 +131,20 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         nav.popBackStack(Routes.INTERVIEW, inclusive = false)
         if (powerToConfirm) { powerToConfirm = false; toConfirm() }
     }
-    /** Runs the quick estimate (glasses off first), or stores the no-test outcome and returns at once. */
+    /**
+     * Runs the quick estimate, or stores the no-test outcome and returns at once. As the power source ([primary]) it
+     * opens straight on the camera: glasses off is spoken on that screen. The staff comparison keeps the glasses step.
+     */
     fun startQuick(primary: Boolean) {
         val plan = vm.quickPlan()
-        if (!plan.runsAnything) {
-            vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
-            finishPowerPath()
-        } else nav.navigate(Routes.powerGlassesOff(primary))
+        when {
+            !plan.runsAnything -> {
+                vm.setQuick(if (primary && plan.possibleLongSight) QuickEstimate(possibleLongSight = true) else null)
+                finishPowerPath()
+            }
+            primary -> { vm.setGlassesOn(false); nav.navigate(Routes.quick(true)) }
+            else -> nav.navigate(Routes.powerGlassesOff(false))
+        }
     }
 
     /** Runs the engine with everything gathered so far; any referral is shown before the summary. */
@@ -280,6 +287,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     voice = voice,
                     onInstruction = { voice.instructionSpeaker.speak(it, l) },
                     allowDemoWithoutCamera = state.staffMode,
+                    autoStart = primary,
                 )
             }
         }
@@ -457,7 +465,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.CAMERA_DEBUG) {
             val l = state.lang
             StepFrame(l, vm::setLang, SFlow.cameraCheck[l], onBack = { nav.popBackStack() }) {
-                CameraDebugScreen(l, vm.rules.camera, vm.calibration, onSkip = { nav.popBackStack() }, modifier = Modifier.fillMaxSize())
+                CameraDebugScreen(l, vm.rules.camera, vm.calibration, onSkip = { nav.popBackStack() }, modifier = Modifier.fillMaxSize(),
+                    liveSeD = { m -> vm.quickEstimator.liveSeD(m) })
             }
         }
         composable(Routes.DEMO) {
