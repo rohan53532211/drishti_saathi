@@ -70,18 +70,26 @@ object S3D {
     )
     val avatarAgree = tx("Yes, make it", "हाँ, बनाएँ")
     val avatarNo = tx("No, thanks", "नहीं, धन्यवाद")
-    val avatarCapture = tx("Look straight at the camera and hold still", "सीधे कैमरे की ओर देखें और स्थिर रहें")
-    val avatarTakeFront = tx("Take front photo", "सामने से फ़ोटो लें")
+    val stepFront = tx("Look straight at the camera and hold still", "सीधे कैमरे की ओर देखें और स्थिर रहें")
+    val stepLeft = tx("Slowly turn your head to your left and hold", "धीरे से सिर अपनी बाईं ओर घुमाएँ और रुकें")
+    val stepRight = tx("Now turn your head to your right and hold", "अब सिर अपनी दाईं ओर घुमाएँ और रुकें")
     val avatarHold = tx("Hold still…", "स्थिर रहें…")
-    val avatarTurnFace = tx("Please face the camera straight", "कृपया चेहरा सीधे कैमरे की ओर रखें")
+    val turnMore = tx("Turn a little more", "थोड़ा और घुमाएँ")
+    val turnLess = tx("Turn back a little", "थोड़ा वापस घुमाएँ")
+    val moreLight = tx("More light on your face, please", "चेहरे पर थोड़ी और रोशनी चाहिए")
+    val photoFront = tx("Front", "सामने")
+    val photoLeft = tx("Left", "बाएँ")
+    val photoRight = tx("Right", "दाएँ")
+    val makeAvatar = tx("Make my 3D face", "मेरा 3D चेहरा बनाएँ")
     val avatarMaking = tx("Making your 3D preview…", "आपका 3D प्रीव्यू बन रहा है…")
     val avatarFailed = tx("Could not make the 3D preview. Try again in better light.", "3D प्रीव्यू नहीं बना। अच्छी रोशनी में फिर से कोशिश करें।")
     val avatarLabel = tx("Simplified 3D preview, not a scan", "सरल 3D प्रीव्यू, स्कैन नहीं")
-    val avatarHint = tx("Drag to turn (±60°) · pinch to zoom", "घुमाने के लिए खींचें (±60°) · ज़ूम के लिए दो उँगलियाँ")
-    val compare = tx("Compare two frames", "दो फ़्रेम की तुलना करें")
+    val avatarHint = tx("Drag to turn (±90°) · pinch to zoom", "घुमाने के लिए खींचें (±90°) · ज़ूम के लिए दो उँगलियाँ")
+    val compare = tx("Compare", "तुलना करें")
+    val compareOff = tx("One frame", "एक फ़्रेम")
     val pickSecond = tx("Pick a second frame to compare", "तुलना के लिए दूसरा फ़्रेम चुनें")
     val favourites = tx("Saved frames (this session)", "सेव किए फ़्रेम (इस सेशन में)")
-    val deleteAvatar = tx("Delete my 3D face", "मेरा 3D चेहरा मिटाएँ")
+    val deleteAvatar = tx("Delete 3D face", "3D चेहरा मिटाएँ")
     val retake = tx("Retake", "फिर से लें")
 
     // shape / rim / colour / material / band labels (catalogue values are English ids); built once
@@ -130,7 +138,7 @@ object S3D {
         sizesMeasured, estimated, sizeLine, materialLine, colourLine, tryLive, tryAvatar, loading, downloadFailed,
         favourite, favourited, liveTitle, fitText, fitGood, fitSlightlyNarrow, fitSlightlyWide, fitTooNarrow, fitTooWide,
         scaleCard, scaleFace, scaleDefault, alignCheck, switchedTo2d, avatarTitle, avatarConsentTitle, avatarConsentBody, avatarAgree,
-        avatarNo, avatarCapture, avatarTakeFront, avatarHold, avatarTurnFace, avatarMaking, avatarFailed, avatarLabel,
-        avatarHint, compare, pickSecond, favourites, deleteAvatar, retake,
+        avatarNo, stepFront, stepLeft, stepRight, avatarHold, turnMore, turnLess, moreLight, photoFront, photoLeft,
+        photoRight, makeAvatar, avatarMaking, avatarFailed, avatarLabel, avatarHint, compare, compareOff, pickSecond, favourites, deleteAvatar, retake,
     )
 }

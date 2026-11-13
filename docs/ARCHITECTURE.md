@@ -74,37 +74,47 @@ APK assets/frames3d (30 frames)      phone downloads on demand → LRU disk cach
   - The other sorts are by price.
 - **Viewer:** a Filament perspective view. Drag turns the frame 360°, pinch zooms. It shows sizes with an "estimated" or "measured" label, and material and colour marked "estimated".
 
-## 4. Live 3D try-on
+## 4. Live 3D try-on (canonical face space)
 
-- **Placement** (`engine/tryon3d/Fit3D`, pure Kotlin, unit-tested):
-  - The bridge's nose rest sits on landmark 6, the nose bridge, 1.5 mm lower.
-  - Yaw and pitch come from the facial transformation matrix. Roll comes from the pupils.
-  - Scale in view px per mm comes from the PD, corrected for yaw. In order of preference: card-calibrated PD, then face width, then the 63 mm default. The source is shown on screen; the last two are labelled "approximate".
-  - The camera is orthographic in view pixels (weak perspective, like the 2D try-on). The model is placed in the un-mirrored image, and the whole TextureView is mirrored to match the front preview, so triangle winding never flips.
-- **Temple bend** (MEGANE idea, simplified): splay = atan((head width / 2 − 2 mm − hinge x) / 98 mm), clamped to −6…+18°. Head width is the distance between landmarks 234 and 454. This is a fixed bend from the head width, not a live per-frame bend.
-- **Occluder:** an invisible ellipsoid head proxy (writes depth only, drawn first) hides the temples behind the head.
-- **Smoothing:** one-euro filters on position, scale, angles and head width. They restart when the face is lost.
-- **Fit text:** "Frame 132 mm, face about 136 mm (good width)".
-- **Fallback to 2D** (`Render3DFallback`), with no error dialog, when:
-  - Filament cannot load;
-  - a GLB fails;
-  - the phone renders fewer than 15 fps over 3 s, after a 1.5 s grace period.
+The method follows MediaPipe's face_effect / face geometry sample. Code: `engine/tryon3d/GlassesFit.kt`, pure Kotlin and unit-tested.
+
+- **Placement, done once per frame model** (`GlassesFit.place`), in MediaPipe's canonical face space (cm; +x is the subject's left, +y up, +z out of the face):
+  - The bridge sits `tryOn.bridgeForwardMm` (11 mm) in front of the nasion (landmark 168).
+  - The pupils sit at `tryOn.pupilHeightRatio` (55%) of the lens height, measured from the lens bottom; `tryOn.verticalOffsetMm` shifts the whole frame.
+  - Each temple swings, tilts and stretches (×0.85–1.3) so its knee reaches the ear point. The ear point is `earBehindNasionMm` (95 mm) behind the nasion and `earBelowPupilMm` (5 mm) below the pupils, at landmark 234 or 454 width.
+  - Scale: frame mm → face units × canonical PD / measured PD. Without a measured PD the canonical PD (63.6 mm) is used, and the screen says "approximate".
+- **Pose, every frame** (`FacePose.solve`):
+  - Rotation comes from the facial transformation matrix (either memory layout, orthonormalised).
+  - Translation is solved with the real Camera2 focal length, so the canonical nasion lands exactly on landmark 168 and the canonical pupils span the observed iris distance (a few exact-perspective iterations). This makes placement independent of the field of view MediaPipe assumes internally.
+- **Projection:** built from the camera intrinsics (`ViewIntrinsics.projection`), mapping camera space straight onto the FILL_CENTER preview pixels.
+- **Mirroring:** the renderer draws the un-mirrored image and the whole view is mirrored like the preview, so glasses turn with the head and triangle winding never flips.
+- **Occlusion:** an invisible head (`HeadOccluder`): the canonical face mesh moved rigidly by the pose (pushed back 3 mm), a head ellipsoid and two ear blocks. It writes depth only and is drawn first.
+- **Smoothing:** one-euro filters on translation and on the rotation quaternion.
+- **Device checks → 3D try-on alignment check:**
+  - green dots: detected pupils and nasion;
+  - magenta circles: the frame's lens centres and pupil point;
+  - yaw, pitch and roll readout.
+- **Fallback to 2D** (`Render3DFallback`), with no error dialog, when Filament cannot load, a GLB fails, or the phone draws fewer than 15 fps over 3 s.
 
 ## 5. Simplified face avatar (phone only)
 
 - **Consent first:** "A 3D preview of your face is made on this phone only and deleted with the session."
-- **Capture:** the front view only, with the head within ±10° yaw and ±12° pitch and a spoken prompt. The tracker's `grabFrame()` returns the analysed image and its landmarks from the *same* frame, so the texture lines up.
-- **Geometry** (`AvatarMesh`):
-  - MediaPipe's 468 points on the canonical face-mesh topology (898 triangles, Apache-2.0, `assets/face_mesh_triangles.json`), scaled to mm with the PD.
-  - The origin is the nose bridge, matching the frame anchors.
-  - A skin-coloured shell is stitched to the face outline (36 points): a strip to an ellipse, then a half ellipsoid to the back. This lets the avatar turn ±60°.
-  - Labelled "Simplified 3D preview, not a scan".
-- **Texture:** the front photo, cropped to the face, projected through the landmark UVs. Side-view blending is not done (future work).
-- **Rendering:** the avatar is written to an in-memory GLB by `GlbWriter`, so Filament needs no precompiled materials.
-- **Viewer:** turn ±60°, pinch zoom, any catalogue frame on it with the same anchors as live try-on, side-by-side compare of two frames, and session favourites.
+- **Guided capture** (`AvatarCaptureGate`):
+  - Steps: FRONT (|yaw| < 5°), TURN LEFT (yaw 30–40°), TURN RIGHT (yaw −30 to −40°), with |pitch| < 12°.
+  - Each photo is taken automatically after the pose is held for 0.5 s, with the face fully in the picture and enough light.
+  - On screen: a guide arrow, a live yaw bar and a hold ring. The prompt is spoken once per step, and each photo has its own Retake.
+- **Geometry** (`AvatarBuilder`):
+  - Each view's landmarks are brought into canonical face space with that view's pose: pixel rays cut at the posed canonical depth.
+  - The views are averaged per vertex, weighted by view (front ×2) and by how squarely each view sees the point.
+  - A smooth head shell (skin, with a hair-coloured cap) is stitched to the face outline. Simple ear placeholders are added.
+- **Texture:** baked at 512² by projective texturing from the 3 photos. Each texel blends the views by facing^4 (front ×2), so each triangle takes the view that faces it best and the seams blend.
+- **Viewer:**
+  - The 3D view takes 60% of the height, with labels below it. Drag turns ±90°, pinch zooms.
+  - Frame carousel underneath. Glasses use the same `GlassesFit.place` as live try-on, with the avatar's own anchors.
+  - Compare shows two side-by-side views that turn together. Session favourites.
 - **Privacy:**
-  - Photo and landmarks are stored only in `filesDir/avatar`, encrypted with AES-GCM under an Android Keystore key.
-  - They are deleted on a new session, on consent, on "Delete my 3D face", and at app start.
+  - The 3 photos and their landmarks are stored only in `filesDir/avatar`, AES-GCM encrypted under an Android Keystore key.
+  - They are deleted on a new session, on consent, on "Delete 3D face", and at app start.
   - The mesh and texture exist only in memory.
   - A unit test checks that the bridge, PDF and database code never touch the avatar.
 
@@ -127,6 +137,6 @@ APK assets/frames3d (30 frames)      phone downloads on demand → LRU disk cach
 - **Sizes:** all Kaggle frame sizes are estimated (135 mm front); the true size of each product is unknown. Material and colour tags are guesses and are labelled "estimated". Prices are placeholders.
 - **Frame shape:** fronts are flat extrusions, with no wrap or bevel. Temples are straight bars with a fixed bend. Nose pads are not modelled.
 - **Cut-outs:** some products are rejected, including clear frames whose lens edge cannot be found, and shadow tabs. Silver rims can still show a faint shadow edge.
-- **Avatar:** front view only. No hair, ears or real back of the head (the shell is an ellipsoid). The scale is only as good as the PD.
-- **Live try-on:** weak perspective, an ellipsoid occluder, and the temple bend fixed from the head width rather than live per-frame bending. Not checked on many phones yet.
+- **Avatar:** three photos, but no hair shape or real ears (cap and placeholders), and the back of the head is an ellipsoid. Depth comes from the canonical face, adjusted by the side views. The scale is only as good as the PD.
+- **Live try-on:** the occluder is the canonical face moved rigidly (not rebuilt from the live landmarks each frame). The temple bend comes from fixed ear points, not from detecting the real ears.
 - **APK:** +8.4 MB over the 2D-only debug build (55.4 → 63.8 MB like for like): Filament and gltfio native code 5.6 MB (arm64-v8a and armeabi-v7a), the 30 bundled frames 2.4 MB, code 0.4 MB.

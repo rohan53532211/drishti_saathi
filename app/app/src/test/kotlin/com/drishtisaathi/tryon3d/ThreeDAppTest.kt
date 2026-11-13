@@ -56,6 +56,18 @@ class ThreeDAppTest {
         assertTrue("bundle ${total / 1e6} MB", total < 5_000_000)
     }
 
+    @Test fun `live try-on and avatar share one canonical-space placement module`() {
+        val dir = File("src/main/kotlin/com/drishtisaathi/tryon3d")
+        for (name in listOf("LiveTryOn3DScreen.kt", "AvatarScreens.kt")) {
+            val t = File(dir, name).readText()
+            assertTrue("$name must place glasses with GlassesFit.place", t.contains("GlassesFit.place("))
+            assertFalse("$name has its own temple maths", t.contains("templeTransforms") || t.contains("templeSplay"))
+        }
+        // the viewer gives the 3D view a real height (the old zero-height bug) and keeps the labels out of it
+        val avatar = File(dir, "AvatarScreens.kt").readText()
+        assertTrue(avatar.contains("fillMaxHeight(0.6f)"))
+    }
+
     @Test fun `avatar data never reaches the bridge, the PDFs or the session database`() {
         val src = File("src/main/kotlin/com/drishtisaathi")
         val outward = listOf("bridge", "pdf", "data").flatMap { File(src, it).walkTopDown().filter { f -> f.extension == "kt" }.toList() }

@@ -117,84 +117,6 @@ class TryOn3DTest {
 
     // ---------------- fit maths ----------------
 
-    @Test fun `PD scaling - view px per mm from the pupil distance, corrected for yaw`() {
-        assertEquals(4.0, Fit3D.pxPerMmFromPd(252.0, 63.0, 0.0), 1e-9)
-        // turned 30°: the pupils look closer; the head-on equivalent is restored
-        val seen = 252.0 * kotlin.math.cos(Math.toRadians(30.0))
-        assertEquals(4.0, Fit3D.pxPerMmFromPd(seen, 63.0, Math.toRadians(30.0)), 1e-9)
-        assertEquals(140.0, Fit3D.headWidthMm(560.0, 4.0, 0.0), 1e-9)
-    }
-
-    @Test fun `measure - synthetic face gives the right scale, head width and source`() {
-        val face = SyntheticFace.frame(SyntheticFace.Spec(pdMm = 63.0, faceWidthMm = 140.0, mmPerPx = 0.25))
-        val toView = { x: Double, y: Double -> x * face.imageWidthPx to y * face.imageHeightPx }
-        val (card, src) = Fit3D.measure(face, toView, pdMm = 63.0)!!
-        assertEquals(Scale3DSource.CARD_PD, src)
-        assertEquals(4.0, card.pxPerMm, 1e-3)
-        assertEquals(140.0, card.headWidthMm, 0.5)
-        val (dflt, src2) = Fit3D.measure(face, toView)!!
-        assertEquals(Scale3DSource.DEFAULT_PD, src2)
-        assertEquals(4.0, dflt.pxPerMm, 1e-3)          // default PD is 63 too
-        val (_, src3) = Fit3D.measure(face, toView, faceWidthMm = 140.0)!!
-        assertEquals(Scale3DSource.FACE_WIDTH, src3)
-        assertNull(Fit3D.measure(null, toView))
-    }
-
-    @Test fun `temple bend - splay reaches the head side and is clamped`() {
-        val cfg = TryOn3DConfig()
-        // head 140 mm, hinge at 65.5: ear at 68 → atan(2.5 / 98)
-        assertEquals(Math.toDegrees(atan2(2.5, 98.0)), Fit3D.templeSplayDeg(65.5, 140.0, cfg), 1e-9)
-        assertTrue(Fit3D.templeSplayDeg(65.5, 160.0, cfg) > Fit3D.templeSplayDeg(65.5, 140.0, cfg))
-        assertTrue(Fit3D.templeSplayDeg(65.5, 120.0, cfg) < 0)               // narrow head: temples bend in
-        assertEquals(cfg.maxSplayDeg, Fit3D.templeSplayDeg(65.5, 400.0, cfg), 0.0)
-        assertEquals(cfg.minSplayDeg, Fit3D.templeSplayDeg(65.5, 20.0, cfg), 0.0)
-        // the right temple's tip moves to +X, the left one's to −X, both stay hinged
-        val (tr, tl) = Fit3D.templeTransforms(a1, 10.0)
-        val endR = Mat4.apply(tr, 0.0, 0.0, 100.0)
-        val endL = Mat4.apply(tl, 0.0, 0.0, 100.0)
-        assertEquals(65.5 + 100 * kotlin.math.sin(Math.toRadians(10.0)), endR[0], 1e-4)
-        assertEquals(-endR[0], endL[0], 1e-4)
-        assertEquals(listOf(65.5, -4.0, 4.0), Mat4.apply(tr, 0.0, 0.0, 0.0).map { (it * 1e4).toLong() / 1e4 })
-    }
-
-    @Test fun `model matrix - nose rest lands on the nose point, lenses straddle it at PD scale`() {
-        val p = PoseParams(anchorX = 360.0, anchorY = -400.0, pxPerMm = 4.0, yaw = 0.0, pitch = 0.0, roll = 0.0, headWidthMm = 140.0)
-        val cfg = TryOn3DConfig(bridgeDropMm = 0.0)
-        val pose = Fit3D.pose(p, a1, Scale3DSource.CARD_PD, cfg)
-        val nose = Mat4.apply(pose.model, 0.0, -3.0, 0.0)
-        assertEquals(360.0, nose[0], 1e-4); assertEquals(-400.0, nose[1], 1e-4)
-        // un-mirrored image: the wearer's right lens is on the image left
-        val r = Mat4.apply(pose.model, 34.0, -12.0, 0.0)
-        val l = Mat4.apply(pose.model, -34.0, -12.0, 0.0)
-        assertTrue(r[0] < l[0])
-        assertEquals(68 * 4.0, l[0] - r[0], 1e-3)
-        assertEquals(-400.0 - 9 * 4.0, r[1], 1e-3)
-        // the temples point away from the viewer (into the screen)
-        assertTrue(Mat4.apply(pose.model, 65.5, -4.0, 100.0)[2] < Mat4.apply(pose.model, 65.5, -4.0, 4.0)[2])
-        // with a bridge drop the frame sits lower
-        val dropped = Fit3D.pose(p, a1, Scale3DSource.CARD_PD, TryOn3DConfig(bridgeDropMm = 2.0))
-        assertEquals(-400.0 - 8.0, Mat4.apply(dropped.model, 0.0, -3.0, 0.0)[1], 1e-4)
-        // a proper rotation (determinant > 0) keeps back-face culling right
-        val m = pose.model
-        val det = m[0] * (m[5] * m[10] - m[9] * m[6]) - m[4] * (m[1] * m[10] - m[9] * m[2]) + m[8] * (m[1] * m[6] - m[5] * m[2])
-        assertTrue(det > 0)
-    }
-
-    @Test fun `model matrix follows yaw from the transformation matrix and roll from the pupils`() {
-        val p0 = PoseParams(0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 140.0)
-        val turned = Fit3D.pose(p0.copy(yaw = Math.toRadians(30.0)), a1, Scale3DSource.CARD_PD)
-        val flat = Fit3D.pose(p0, a1, Scale3DSource.CARD_PD)
-        fun width(m: FloatArray) = abs(Mat4.apply(m, 34.0, -12.0, 0.0)[0] - Mat4.apply(m, -34.0, -12.0, 0.0)[0])
-        assertEquals(width(flat.model) * kotlin.math.cos(Math.toRadians(30.0)), width(turned.model), 1e-3)
-        val rolled = Fit3D.pose(p0.copy(roll = Math.toRadians(10.0)), a1, Scale3DSource.CARD_PD)
-        val r = Mat4.apply(rolled.model, 34.0, -12.0, 0.0)
-        val l = Mat4.apply(rolled.model, -34.0, -12.0, 0.0)
-        assertEquals(10.0, Math.toDegrees(atan2(l[1] - r[1], l[0] - r[0])), 1e-3)
-        // yaw read back from a MediaPipe-style matrix
-        val (yaw, _) = TryOnPlacement.yawPitch(TryOnPlacement.rotationMatrix(20.0, 0.0))
-        assertEquals(20.0, Math.toDegrees(yaw), 1e-4)
-    }
-
     @Test fun `fit verdict text thresholds`() {
         assertEquals(FitWord.GOOD, Fit3D.fitVerdict(132.0, 136.0))
         assertEquals(FitWord.SLIGHTLY_NARROW, Fit3D.fitVerdict(128.0, 136.0))
@@ -217,16 +139,6 @@ class TryOn3DTest {
         g.filter(0.0, t)
         repeat(60) { t += 33; out = g.filter(100.0, t) }
         assertTrue(out > 99.0 && out <= 100.0)
-    }
-
-    @Test fun `pose smoother restarts after the face is lost`() {
-        val s = PoseSmoother()
-        val a = PoseParams(0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 140.0)
-        s.update(a, 0)
-        val moved = s.update(a.copy(anchorX = 100.0), 33)!!
-        assertTrue(moved.anchorX in 1.0..99.0)
-        assertNull(s.update(null, 66))
-        assertEquals(100.0, s.update(a.copy(anchorX = 100.0), 1000)!!.anchorX, 1e-9)
     }
 
     // ---------------- cache and fallback ----------------
@@ -313,22 +225,6 @@ class TryOn3DTest {
         assertTrue(checked > 100)
     }
 
-    private fun avatarLandmarks(): List<Landmark> {
-        // canonical-ish face: points on an ellipsoid cap, iris 63 mm apart at 4 px/mm in a 640×480 image
-        val pts = MutableList(478) { Landmark(0.5f, 0.5f, 0f) }
-        val ovalSet = AvatarMesh.FACE_OVAL.toSet()
-        AvatarMesh.FACE_OVAL.forEachIndexed { k, i ->
-            val a = 2 * Math.PI * k / AvatarMesh.FACE_OVAL.size
-            pts[i] = Landmark((0.5 + 0.11 * kotlin.math.sin(a)).toFloat(), (0.45 - 0.2 * kotlin.math.cos(a)).toFloat(), 0.06f)
-        }
-        for (i in 0 until 468) if (i !in ovalSet) pts[i] = Landmark(0.5f + ((i % 7) - 3) * 0.01f, 0.45f + ((i % 5) - 2) * 0.02f, -0.02f)
-        pts[234] = Landmark(0.39f, 0.45f, 0.06f); pts[454] = Landmark(0.61f, 0.45f, 0.06f)
-        pts[6] = Landmark(0.5f, 0.42f, -0.03f)
-        pts[468] = Landmark((0.5 - 126.0 / 640).toFloat(), 0.42f, 0f)
-        pts[473] = Landmark((0.5 + 126.0 / 640).toFloat(), 0.42f, 0f)
-        return pts
-    }
-
     private val triangles: IntArray by lazy {
         Json.parseToJsonElement(TestAssets.text("face_mesh_triangles.json")).jsonObject["triangles"]!!.jsonArray
             .map { it.jsonPrimitive.content.toInt() }.toIntArray()
@@ -337,37 +233,5 @@ class TryOn3DTest {
     @Test fun `face mesh topology asset - 898 triangles on 468 points`() {
         assertEquals(898 * 3, triangles.size)
         assertTrue(triangles.all { it in 0 until 468 })
-    }
-
-    @Test fun `avatar - mm scale from the PD, nose at the origin, wearer's right on +X, closed shell`() {
-        val g = AvatarMesh.geometry(avatarLandmarks(), 640, 480, triangles, pdMm = 63.0)
-        assertEquals(4.0, g.pxPerMm, 1e-3)
-        assertFalse(g.approximate)
-        assertEquals(0f, g.positions[3 * 6], 1e-6f); assertEquals(0f, g.positions[3 * 6 + 1], 1e-6f)
-        // landmark 234 is on the image left = the wearer's right = +X
-        assertTrue(g.positions[3 * 234] > 0)
-        assertEquals(0.22 * 640 / 4.0, g.faceWidthMm, 0.1)
-        // every shell triangle uses shell vertices; the shell meets the face outline
-        val nShell = g.shellPositions.size / 3
-        assertTrue(g.shellIndices.all { it in 0 until nShell })
-        assertEquals(AvatarMesh.FACE_OVAL.size * (AvatarMesh.SHELL_RINGS + 1) + 1, nShell)
-        assertEquals(g.positions[3 * 10], g.shellPositions[0], 1e-6f)
-        // the shell reaches behind the face
-        val maxZ = (0 until nShell).maxOf { g.shellPositions[3 * it + 2] }
-        assertTrue(maxZ > (0 until 468).maxOf { g.positions[3 * it + 2] })
-        // without a PD it is labelled approximate
-        assertTrue(AvatarMesh.geometry(avatarLandmarks(), 640, 480, triangles, pdMm = null).approximate)
-        val glb = AvatarMesh.glb(g, byteArrayOf(-1, -40, -1), intArrayOf(200, 160, 140))
-        val j = Json.parseToJsonElement(GlbWriter.jsonChunk(glb)).jsonObject
-        assertEquals(listOf("avatar_face", "avatar_shell"), j["nodes"]!!.jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content })
-    }
-
-    @Test fun `avatar and live try-on use the same frame anchors`() {
-        // the avatar origin is the nose point; the frame's nose rest maps to the anchor in live try-on
-        val p = PoseParams(10.0, 20.0, 2.0, 0.0, 0.0, 0.0, 140.0)
-        val m = Fit3D.pose(p, a1, Scale3DSource.CARD_PD, TryOn3DConfig(bridgeDropMm = 0.0)).model
-        val n = Mat4.apply(m, a1.anchors.noseRestMm[0], a1.anchors.noseRestMm[1], a1.anchors.noseRestMm[2])
-        assertEquals(10.0, n[0], 1e-4); assertEquals(20.0, n[1], 1e-4)
-        assertEquals(0.0, hypot(n[0] - 10.0, n[1] - 20.0), 1e-4)
     }
 }

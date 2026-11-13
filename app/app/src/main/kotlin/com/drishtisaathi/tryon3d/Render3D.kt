@@ -213,6 +213,12 @@ class Render3D(private val transparent: Boolean = true) {
         camera.lookAt(0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0)
     }
 
+    /** Perspective camera at [eye] looking at [target] (y up); units of the scene. */
+    fun perspectiveLookAt(eye: DoubleArray, target: DoubleArray, fovDeg: Double = 30.0, near: Double = 5.0, far: Double = 500.0) {
+        camera.setProjection(fovDeg, width.toDouble() / height, near, far, Camera.Fov.VERTICAL)
+        camera.lookAt(eye[0], eye[1], eye[2], target[0], target[1], target[2], 0.0, 1.0, 0.0)
+    }
+
     /** Perspective camera looking at the origin from [distanceMm] along −Z (the front of a frame or avatar). */
     fun perspectiveFront(distanceMm: Double, fovDeg: Double = 30.0) {
         camera.setProjection(fovDeg, width.toDouble() / height, 10.0, 5000.0, Camera.Fov.VERTICAL)

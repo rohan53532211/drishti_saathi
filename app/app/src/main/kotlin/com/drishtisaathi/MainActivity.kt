@@ -588,8 +588,11 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 com.drishtisaathi.tryon3d.AvatarCaptureScreen(
                     l, vm::setLang, tracker,
                     cameraPreview = { CameraPreview(tracker, Modifier.fillMaxSize()) },
-                    speak = { voice.instructionSpeaker.speak(com.drishtisaathi.i18n.S3D.avatarCapture, l) },
-                    pdMm = state.face?.pdMm?.value, store = vm.avatarStore,
+                    speak = { t -> voice.instructionSpeaker.speak(t, l) },
+                    pdMm = state.face?.pdMm?.value,
+                    minBrightness = vm.rules.camera.minMeanBrightness, maxBrightness = vm.rules.camera.maxMeanBrightness,
+                    defaultFocalFraction = vm.rules.tryOn.defaultFocalLengthFraction,
+                    store = vm.avatarStore,
                     onDone = { nav.navigate(Routes.avatar(id)) { popUpTo(Routes.AVATAR_CAPTURE) { inclusive = true } } },
                     onBack = { nav.popBackStack() },
                 )
@@ -605,6 +608,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             }
             com.drishtisaathi.tryon3d.AvatarViewerScreen(
                 state.lang, vm::setLang, vm.avatarStore, picks, start, vm::glb3D, vm::thumb3D, favs, vm::toggleFavourite3D,
+                config = vm.rules.tryOn,
                 onRetake = { vm.avatarStore.clear(); nav.navigate(Routes.avatarCapture(start)) { popUpTo(Routes.AVATAR) { inclusive = true } } },
                 onDelete = { vm.clearAvatar(); nav.popBackStack() },
                 onBack = { nav.popBackStack() },
