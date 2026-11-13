@@ -75,6 +75,8 @@ class MediaPipeFaceTracker(
     context: Context,
     private val config: CameraConfig,
     private val enablePhoto: Boolean = false,
+    /** 3D avatar: full-quality 4:3 colour photos of at least [AVATAR_PHOTO_SHORT_PX] px on the short side. */
+    private val avatarPhoto: Boolean = false,
 ) : AnalysedFaceTracker, LifecycleOwner {
 
     private val appContext = context.applicationContext
@@ -142,10 +144,13 @@ class MediaPipeFaceTracker(
                 analysis.setAnalyzer(exec) { analyze(it) }
                 analysisUseCase = analysis
                 val useCases = mutableListOf<UseCase>(preview, analysis)
-                if (enablePhoto) {
+                if (enablePhoto || avatarPhoto) {
                     captureUseCase = ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                        .setResolutionSelector(selector16x9(config.photoWidthPx, config.photoHeightPx))
+                        .setCaptureMode(if (avatarPhoto) ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY else ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setResolutionSelector(
+                            if (avatarPhoto) selector4x3(AVATAR_PHOTO_SHORT_PX * 4 / 3, AVATAR_PHOTO_SHORT_PX)
+                            else selector16x9(config.photoWidthPx, config.photoHeightPx),
+                        )
                         .build()
                         .also { useCases += it }
                 }
@@ -330,6 +335,9 @@ class MediaPipeFaceTracker(
         }
     }
 
+    /** Focal length in pixels for an upright image of [w]×[h] from this camera (Camera2 when known). */
+    fun focalPxFor(w: Int, h: Int): Double = focalPx(w, h)
+
     private fun focalPx(w: Int, h: Int): Double {
         focalCache?.let { (cw, ch, f) -> if (cw == w && ch == h) return f }
         val li = lensInfo
@@ -378,6 +386,14 @@ class MediaPipeFaceTracker(
     companion object {
         private const val TAG = "FaceTracker"
         const val MODEL_ASSET = "face_landmarker.task"
+
+        /** Short side of the avatar photos (1920 px wide when held upright). */
+        const val AVATAR_PHOTO_SHORT_PX = 1920
+
+        internal fun selector4x3(w: Int, h: Int): ResolutionSelector = ResolutionSelector.Builder()
+            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+            .setResolutionStrategy(ResolutionStrategy(Size(w, h), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
+            .build()
 
         internal fun selector16x9(w: Int, h: Int): ResolutionSelector = ResolutionSelector.Builder()
             .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)

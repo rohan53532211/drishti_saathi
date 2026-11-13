@@ -5,6 +5,7 @@ import android.view.Choreographer
 import android.view.Surface
 import android.view.TextureView
 import com.google.android.filament.Camera
+import com.google.android.filament.ColorGrading
 import com.google.android.filament.Engine
 import com.google.android.filament.EntityManager
 import com.google.android.filament.Filament
@@ -13,6 +14,7 @@ import com.google.android.filament.LightManager
 import com.google.android.filament.Renderer
 import com.google.android.filament.Scene
 import com.google.android.filament.SwapChain
+import com.google.android.filament.ToneMapper
 import com.google.android.filament.View
 import com.google.android.filament.Viewport
 import com.google.android.filament.android.UiHelper
@@ -44,6 +46,8 @@ class Render3D(private val transparent: Boolean = true) {
     private val assetLoader = AssetLoader(engine, materialProvider, EntityManager.get())
     private val resourceLoader = ResourceLoader(engine)
     private val sun = EntityManager.get().create()
+    private val fill = EntityManager.get().create()
+    private val colorGrading: ColorGrading = ColorGrading.Builder().toneMapper(ToneMapper.PBRNeutralToneMapper()).build(engine)
     private val assets = LinkedHashMap<String, FilamentAsset>()
     private var running = false
     private var destroyed = false
@@ -82,15 +86,24 @@ class Render3D(private val transparent: Boolean = true) {
         }
         view.setShadowingEnabled(true)
         view.setShadowType(View.ShadowType.PCF)
-        // one environment light (flat ambient, no image file needed) + one soft sun from above-front
-        scene.indirectLight = IndirectLight.Builder().irradiance(1, floatArrayOf(1f, 1f, 1f)).intensity(32_000f).build(engine)
+        // true colours: neutral tone mapping (no washed-out skin), 4× MSAA against jagged edges
+        view.colorGrading = colorGrading
+        view.multiSampleAntiAliasingOptions = View.MultiSampleAntiAliasingOptions().apply { enabled = true; sampleCount = 4 }
+        // soft lighting: flat ambient + a soft key light (casts the frame's shadow on the face) + a fill from the other side
+        scene.indirectLight = IndirectLight.Builder().irradiance(1, floatArrayOf(1f, 1f, 1f)).intensity(18_000f).build(engine)
         LightManager.Builder(LightManager.Type.DIRECTIONAL)
-            .color(1f, 0.98f, 0.95f).intensity(70_000f)
-            .direction(0.25f, -0.7f, -0.65f)
+            .color(1f, 0.98f, 0.95f).intensity(38_000f)
+            .direction(0.35f, -0.55f, -0.75f)
             .castShadows(true)
-            .shadowOptions(LightManager.ShadowOptions().apply { mapSize = 1024; shadowBulbRadius = 0.04f })
+            .shadowOptions(LightManager.ShadowOptions().apply { mapSize = 2048; shadowBulbRadius = 0.06f })
             .build(engine, sun)
+        LightManager.Builder(LightManager.Type.DIRECTIONAL)
+            .color(0.95f, 0.97f, 1f).intensity(14_000f)
+            .direction(-0.6f, -0.2f, -0.75f)
+            .castShadows(false)
+            .build(engine, fill)
         scene.addEntity(sun)
+        scene.addEntity(fill)
         camera.setExposure(16f, 1f / 125f, 100f)
         uiHelper.isOpaque = !transparent
         uiHelper.renderCallback = object : UiHelper.RendererCallback {
@@ -236,10 +249,12 @@ class Render3D(private val transparent: Boolean = true) {
         materialProvider.destroyMaterials()
         materialProvider.destroy()
         engine.destroyEntity(sun)
+        engine.destroyEntity(fill)
         scene.indirectLight?.let { engine.destroyIndirectLight(it) }
         swapChain?.let { engine.destroySwapChain(it) }
         engine.destroyRenderer(renderer)
         engine.destroyView(view)
+        engine.destroyColorGrading(colorGrading)
         engine.destroyScene(scene)
         engine.destroyCameraComponent(cameraEntity)
         EntityManager.get().destroy(cameraEntity)

@@ -30,6 +30,10 @@ class AvatarStore(context: Context) {
         val imageH: Int,
         val matrix: FloatArray?,
         val focalPx: Double,
+        /** [jpeg] is a face crop of the photo: its top-left in full-photo px and crop px per photo px. */
+        val cropX: Double = 0.0,
+        val cropY: Double = 0.0,
+        val cropScale: Double = 1.0,
     )
 
     class Avatar(val views: List<View>, val pdMm: Double?)
@@ -48,6 +52,7 @@ class AvatarStore(context: Context) {
                 o.writeInt(v.step.ordinal)
                 o.writeInt(v.imageW); o.writeInt(v.imageH)
                 o.writeDouble(v.focalPx)
+                o.writeDouble(v.cropX); o.writeDouble(v.cropY); o.writeDouble(v.cropScale)
                 o.writeBoolean(v.matrix != null)
                 v.matrix?.forEach { o.writeFloat(it) }
                 o.writeInt(v.landmarks.size)
@@ -77,10 +82,11 @@ class AvatarStore(context: Context) {
                 val step = AvatarStep.entries[i.readInt()]
                 val w = i.readInt(); val h = i.readInt()
                 val f = i.readDouble()
+                val cx = i.readDouble(); val cy = i.readDouble(); val cs = i.readDouble()
                 val m = if (i.readBoolean()) FloatArray(16) { i.readFloat() } else null
                 val lm = List(i.readInt()) { Landmark(i.readFloat(), i.readFloat(), i.readFloat()) }
                 val jpeg = ByteArray(i.readInt()).also { i.readFully(it) }
-                View(step, jpeg, lm, w, h, m, f)
+                View(step, jpeg, lm, w, h, m, f, cx, cy, cs)
             }
             Avatar(views, pd)
         }
@@ -109,6 +115,6 @@ class AvatarStore(context: Context) {
 
     companion object {
         private const val ALIAS = "drishti_avatar"
-        private const val VERSION = 2
+        private const val VERSION = 3
     }
 }

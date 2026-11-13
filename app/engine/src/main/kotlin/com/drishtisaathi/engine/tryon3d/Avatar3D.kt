@@ -83,23 +83,33 @@ class AvatarView(
     fun face() = FaceFrame(landmarks, imageW, imageH, transformMatrix, focalPx)
 }
 
-/** Packed ARGB pixels (Bitmap.getPixels layout). */
-class Pixels(val w: Int, val h: Int, val argb: IntArray) {
-    /** Bilinear sample; null outside the image. */
-    fun sample(x: Double, y: Double): IntArray? {
-        if (x < 0 || y < 0 || x > w - 1 || y > h - 1) return null
+/**
+ * Packed ARGB pixels (Bitmap.getPixels layout) of a crop of a photo: the crop's top-left is at ([offsetX], [offsetY])
+ * in full-photo pixels and [scale] crop pixels per full-photo pixel.
+ */
+class Pixels(val w: Int, val h: Int, val argb: IntArray, val offsetX: Double = 0.0, val offsetY: Double = 0.0, val scale: Double = 1.0) {
+    /** Bilinear sample in crop pixels into [out] (r, g, b 0..255); false outside the crop. */
+    fun sampleInto(x: Double, y: Double, out: DoubleArray): Boolean {
+        if (x < 0 || y < 0 || x > w - 1 || y > h - 1) return false
         val x0 = floor(x).toInt().coerceAtMost(w - 2).coerceAtLeast(0)
         val y0 = floor(y).toInt().coerceAtMost(h - 2).coerceAtLeast(0)
         val fx = x - x0; val fy = y - y0
-        val out = IntArray(3)
+        val c00 = argb[y0 * w + x0]; val c10 = argb[y0 * w + x0 + 1]; val c01 = argb[(y0 + 1) * w + x0]; val c11 = argb[(y0 + 1) * w + x0 + 1]
         for (k in 0 until 3) {
             val sh = 16 - 8 * k
-            fun c(xx: Int, yy: Int) = (argb[yy * w + xx] shr sh) and 255
-            val top = c(x0, y0) * (1 - fx) + c(x0 + 1, y0) * fx
-            val bot = c(x0, y0 + 1) * (1 - fx) + c(x0 + 1, y0 + 1) * fx
-            out[k] = (top * (1 - fy) + bot * fy).toInt()
+            val top = ((c00 shr sh) and 255) * (1 - fx) + ((c10 shr sh) and 255) * fx
+            val bot = ((c01 shr sh) and 255) * (1 - fx) + ((c11 shr sh) and 255) * fx
+            out[k] = top * (1 - fy) + bot * fy
         }
-        return out
+        return true
+    }
+
+    /** Sample at a point given in FULL-photo pixels. */
+    fun sampleFull(xFull: Double, yFull: Double, out: DoubleArray): Boolean = sampleInto((xFull - offsetX) * scale, (yFull - offsetY) * scale, out)
+
+    fun sample(x: Double, y: Double): IntArray? {
+        val o = DoubleArray(3)
+        return if (sampleInto(x, y, o)) IntArray(3) { o[it].toInt() } else null
     }
 }
 
@@ -127,7 +137,11 @@ class AvatarModel(
  * smoothly at the seams; a smooth head shell, a hair cap and simple ears. A preview, not a scan.
  */
 object AvatarBuilder {
-    const val TEX = 512
+    /** Colour atlas size (texels per side). */
+    const val TEX = 2048
+    /** A view never contributes to points it sees at more than this angle (no smeared, back-facing texture or geometry). */
+    const val MAX_VIEW_ANGLE_DEG = 75.0
+    private val COS_CUT = cos(MAX_VIEW_ANGLE_DEG * PI / 180)
     val FACE_OVAL = intArrayOf(
         10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377,
         152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
@@ -216,60 +230,115 @@ object AvatarBuilder {
             val n = v(canonN, i); val p = v(canonical, i)
             var sw = 0.0; var acc = V3(0.0, 0.0, 0.0)
             for (k in per.indices) {
-                val w = baseW[k] * max(0.05, dot(n, norm(cams[k] - p)))
+                val c = dot(n, norm(cams[k] - p))
+                if (c < COS_CUT) continue
+                val w = baseW[k] * c
                 acc += v(per[k], i) * w; sw += w
             }
-            val r = acc * (1 / sw)
+            val r = if (sw > 0) acc * (1 / sw) else v(per[usable.indexOfFirst { views[it].step == AvatarStep.FRONT }.coerceAtLeast(0)], i)
             verts[3 * i] = r.x.toFloat(); verts[3 * i + 1] = r.y.toFloat(); verts[3 * i + 2] = r.z.toFloat()
         }
         val anchors = FaceAnchors.fromVertices(verts)
         val uvs = uvLayout(canonical)
         val camsAvatar = cams
         val best = bestViews(verts, triangles, camsAvatar, baseW)
-        val tex = bake(verts, triangles, uvs, usable.map { views[it] }, usable.map { photos[it] }, camsAvatar, baseW, skinRgb)
+        val gains = colourGains(verts, canonN, usable.map { views[it] }, usable.map { photos[it] }, camsAvatar)
+        val tex = bake(verts, triangles, uvs, usable.map { views[it] }, usable.map { photos[it] }, camsAvatar, baseW, skinRgb, gains)
         val shell = shell(verts, anchors)
         val ears = ears(anchors)
         return AvatarModel(verts, uvs, triangles.copyOf(), tex, shell.first, shell.second, shell.third, ears.first, ears.second, anchors, best)
     }
 
-    /** Texture bake in UV space: every texel is a blend of the photos, weighted by how squarely each view sees it. */
+    /** Cheek and forehead points used to match white balance and exposure between the photos. */
+    val SKIN_POINTS = intArrayOf(50, 280, 101, 330, 151, 205, 425, 118, 347, 36, 266)
+
+    /**
+     * Per-view colour gains (r, g, b) that make each side photo's skin match the front photo's skin on the points both
+     * see well: a light white-balance / exposure match. The front view keeps gain 1. Clamped to 0.75–1.33.
+     */
+    fun colourGains(verts: FloatArray, normals: FloatArray, views: List<AvatarView>, photos: List<Pixels>, cams: List<V3>): List<DoubleArray> {
+        val fi = views.indexOfFirst { it.step == AvatarStep.FRONT }
+        val o = DoubleArray(3)
+        fun mean(k: Int, pts: List<Int>): DoubleArray? {
+            val acc = DoubleArray(3); var n = 0
+            for (i in pts) {
+                val lm = views[k].landmarks[i]
+                if (photos[k].sampleFull(lm.x * views[k].imageW.toDouble(), lm.y * views[k].imageH.toDouble(), o)) { for (c in 0 until 3) acc[c] += o[c]; n++ }
+            }
+            return if (n == 0) null else DoubleArray(3) { acc[it] / n }
+        }
+        return views.indices.map { k ->
+            if (k == fi || fi < 0) return@map doubleArrayOf(1.0, 1.0, 1.0)
+            // skin points both the front and this view see within 45°
+            val both = SKIN_POINTS.filter { i ->
+                val p = v(verts, i); val n = v(normals, i)
+                dot(n, norm(cams[k] - p)) > 0.7 && dot(n, norm(cams[fi] - p)) > 0.7
+            }
+            val a = mean(fi, both); val b = mean(k, both)
+            if (a == null || b == null) doubleArrayOf(1.0, 1.0, 1.0)
+            else DoubleArray(3) { c -> (a[c] / max(b[c], 1.0)).coerceIn(0.75, 1.33) }
+        }
+    }
+
+    /**
+     * Texture bake in UV space ([TEX]² sRGB colour atlas): every texel is a blend of the photos, weighted by how squarely
+     * each view sees it (facing^4, front ×2); views beyond [MAX_VIEW_ANGLE_DEG] are skipped; side photos get their
+     * colour gains. Texels no view sees keep the skin colour (never grey or white).
+     */
     fun bake(
         verts: FloatArray, triangles: IntArray, uvs: FloatArray, views: List<AvatarView>, photos: List<Pixels>,
-        cams: List<V3>, baseW: List<Double>, skinRgb: IntArray,
+        cams: List<V3>, baseW: List<Double>, skinRgb: IntArray, gains: List<DoubleArray> = views.map { doubleArrayOf(1.0, 1.0, 1.0) },
+        size: Int = TEX,
     ): IntArray {
         val skin = (0xFF shl 24) or (skinRgb[0] shl 16) or (skinRgb[1] shl 8) or skinRgb[2]
-        val tex = IntArray(TEX * TEX) { skin }
-        val normals = GlbWriter.vertexNormals(verts, triangles)
+        val tex = IntArray(size * size) { skin }
+        val nrm = GlbWriter.vertexNormals(verts, triangles)
+        val nv = views.size
+        val camX = DoubleArray(nv) { cams[it].x }; val camY = DoubleArray(nv) { cams[it].y }; val camZ = DoubleArray(nv) { cams[it].z }
+        val px = DoubleArray(3)
+        val wv = DoubleArray(nv)
         for (t in 0 until triangles.size / 3) {
             val ia = triangles[3 * t]; val ib = triangles[3 * t + 1]; val ic = triangles[3 * t + 2]
-            val ax = uvs[2 * ia] * TEX; val ay = uvs[2 * ia + 1] * TEX
-            val bx = uvs[2 * ib] * TEX; val by = uvs[2 * ib + 1] * TEX
-            val cx = uvs[2 * ic] * TEX; val cy = uvs[2 * ic + 1] * TEX
+            val ax = uvs[2 * ia] * size; val ay = uvs[2 * ia + 1] * size
+            val bx = uvs[2 * ib] * size; val by = uvs[2 * ib + 1] * size
+            val cx = uvs[2 * ic] * size; val cy = uvs[2 * ic + 1] * size
             val den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
             if (abs(den) < 1e-9) continue
-            val x0 = floor(min(ax, min(bx, cx))).toInt().coerceIn(0, TEX - 1); val x1 = floor(max(ax, max(bx, cx))).toInt().coerceIn(0, TEX - 1)
-            val y0 = floor(min(ay, min(by, cy))).toInt().coerceIn(0, TEX - 1); val y1 = floor(max(ay, max(by, cy))).toInt().coerceIn(0, TEX - 1)
-            val pa = v(verts, ia); val pb = v(verts, ib); val pc = v(verts, ic)
-            val na = v(normals, ia); val nb = v(normals, ib); val nc = v(normals, ic)
+            val x0 = floor(min(ax, min(bx, cx))).toInt().coerceIn(0, size - 1); val x1 = floor(max(ax, max(bx, cx))).toInt().coerceIn(0, size - 1)
+            val y0 = floor(min(ay, min(by, cy))).toInt().coerceIn(0, size - 1); val y1 = floor(max(ay, max(by, cy))).toInt().coerceIn(0, size - 1)
             for (y in y0..y1) for (x in x0..x1) {
-                val px = x + 0.5f; val py = y + 0.5f
-                val l0 = ((by - cy) * (px - cx) + (cx - bx) * (py - cy)) / den
-                val l1 = ((cy - ay) * (px - cx) + (ax - cx) * (py - cy)) / den
+                val qx = x + 0.5f; val qy = y + 0.5f
+                val l0 = ((by - cy) * (qx - cx) + (cx - bx) * (qy - cy)) / den
+                val l1 = ((cy - ay) * (qx - cx) + (ax - cx) * (qy - cy)) / den
                 val l2 = 1 - l0 - l1
                 if (l0 < -0.02f || l1 < -0.02f || l2 < -0.02f) continue
-                val p = pa * l0.toDouble() + pb * l1.toDouble() + pc * l2.toDouble()
-                val n = norm(na * l0.toDouble() + nb * l1.toDouble() + nc * l2.toDouble())
+                // point and smooth normal on the surface
+                val p0 = l0 * verts[3 * ia] + l1 * verts[3 * ib] + l2 * verts[3 * ic]
+                val p1 = l0 * verts[3 * ia + 1] + l1 * verts[3 * ib + 1] + l2 * verts[3 * ic + 1]
+                val p2 = l0 * verts[3 * ia + 2] + l1 * verts[3 * ib + 2] + l2 * verts[3 * ic + 2]
+                var n0 = (l0 * nrm[3 * ia] + l1 * nrm[3 * ib] + l2 * nrm[3 * ic]).toDouble()
+                var n1 = (l0 * nrm[3 * ia + 1] + l1 * nrm[3 * ib + 1] + l2 * nrm[3 * ic + 1]).toDouble()
+                var n2 = (l0 * nrm[3 * ia + 2] + l1 * nrm[3 * ib + 2] + l2 * nrm[3 * ic + 2]).toDouble()
+                val nl = sqrt(n0 * n0 + n1 * n1 + n2 * n2).takeIf { it > 1e-9 } ?: continue
+                n0 /= nl; n1 /= nl; n2 /= nl
                 var r = 0.0; var g = 0.0; var b = 0.0; var sw = 0.0
-                for (k in views.indices) {
-                    val w = baseW[k] * max(0.0, dot(n, norm(cams[k] - p))).pow(FACING_POWER)
-                    if (w < 1e-4) continue
+                for (k in 0 until nv) {
+                    val dx = camX[k] - p0; val dy = camY[k] - p1; val dz = camZ[k] - p2
+                    val dl = sqrt(dx * dx + dy * dy + dz * dz)
+                    val c = (n0 * dx + n1 * dy + n2 * dz) / dl
+                    if (c < COS_CUT) { wv[k] = 0.0; continue }
+                    val w = baseW[k] * c.pow(FACING_POWER)
                     val lm = views[k].landmarks
                     val sx = (lm[ia].x * l0 + lm[ib].x * l1 + lm[ic].x * l2) * views[k].imageW.toDouble()
                     val sy = (lm[ia].y * l0 + lm[ib].y * l1 + lm[ic].y * l2) * views[k].imageH.toDouble()
-                    val c = photos[k].sample(sx * photos[k].w / views[k].imageW, sy * photos[k].h / views[k].imageH) ?: continue
-                    r += c[0] * w; g += c[1] * w; b += c[2] * w; sw += w
+                    if (!photos[k].sampleFull(sx, sy, px)) continue
+                    val gk = gains[k]
+                    r += px[0] * gk[0] * w; g += px[1] * gk[1] * w; b += px[2] * gk[2] * w; sw += w
                 }
-                if (sw > 0) tex[y * TEX + x] = (0xFF shl 24) or ((r / sw).toInt() shl 16) or ((g / sw).toInt() shl 8) or (b / sw).toInt()
+                if (sw > 0) {
+                    val ri = (r / sw).toInt().coerceIn(0, 255); val gi = (g / sw).toInt().coerceIn(0, 255); val bi = (b / sw).toInt().coerceIn(0, 255)
+                    tex[y * size + x] = (0xFF shl 24) or (ri shl 16) or (gi shl 8) or bi
+                }
             }
         }
         return tex
@@ -352,9 +421,9 @@ object AvatarBuilder {
     fun glb(m: AvatarModel, textureJpeg: ByteArray, skinRgb: IntArray, hairRgb: IntArray): ByteArray {
         val g = GlbWriter()
         fun lin(rgb: IntArray) = floatArrayOf(srgbToLinear(rgb[0] / 255f), srgbToLinear(rgb[1] / 255f), srgbToLinear(rgb[2] / 255f), 1f)
-        val img = g.addImage(textureJpeg, "image/jpeg")
-        val faceMat = g.addMaterial(GlbWriter.Material("avatar_face", image = img, roughness = 0.75f))
-        val skinMat = g.addMaterial(GlbWriter.Material("avatar_skin", baseColor = lin(skinRgb), roughness = 0.85f))
+        val img = g.addImage(textureJpeg, "image/jpeg", srgb = true)
+        val faceMat = g.addMaterial(GlbWriter.Material("avatar_face", image = img, roughness = 0.92f))
+        val skinMat = g.addMaterial(GlbWriter.Material("avatar_skin", baseColor = lin(skinRgb), roughness = 0.92f))
         val hairMat = g.addMaterial(GlbWriter.Material("avatar_hair", baseColor = lin(hairRgb), roughness = 0.95f))
         g.addMesh("avatar_face", m.faceVertices, m.faceTriangles, faceMat, GlbWriter.vertexNormals(m.faceVertices, m.faceTriangles), m.faceUvs)
         if (m.skinTriangles.isNotEmpty()) g.addMesh("avatar_shell", m.shellVertices, m.skinTriangles, skinMat, GlbWriter.vertexNormals(m.shellVertices, m.skinTriangles))
@@ -365,20 +434,35 @@ object AvatarBuilder {
 
     fun srgbToLinear(c: Float): Float = if (c <= 0.04045f) c / 12.92f else ((c + 0.055) / 1.055).pow(2.4).toFloat()
 
-    /** Median colour of 5×5 patches around normalised points (skin on the cheeks, hair above the forehead). */
-    fun medianColour(px: Pixels, points: List<Pair<Double, Double>>): IntArray {
+    /** Median colour of 5×5 patches around normalised photo points (skin on the cheeks, hair above the forehead). */
+    fun medianColour(px: Pixels, imageW: Int, imageH: Int, points: List<Pair<Double, Double>>): IntArray {
         val s = ArrayList<IntArray>()
+        val o = DoubleArray(3)
         for ((x, y) in points) {
-            val cx = (x * px.w).toInt(); val cy = (y * px.h).toInt()
+            val cx = (x * imageW - px.offsetX) * px.scale; val cy = (y * imageH - px.offsetY) * px.scale
             for (dx in -2..2) for (dy in -2..2) {
-                val xx = (cx + dx).coerceIn(0, px.w - 1); val yy = (cy + dy).coerceIn(0, px.h - 1)
-                val c = px.argb[yy * px.w + xx]
-                s += intArrayOf((c shr 16) and 255, (c shr 8) and 255, c and 255)
+                if (px.sampleInto(cx + dx, cy + dy, o)) s += intArrayOf(o[0].toInt(), o[1].toInt(), o[2].toInt())
             }
         }
         if (s.isEmpty()) return intArrayOf(200, 160, 140)
         return IntArray(3) { k -> s.map { it[k] }.sorted()[s.size / 2] }
     }
+
+    /**
+     * Mean chroma (max − min of r, g, b, 0..255) over a grid of samples: about 0 for a greyscale (luminance-only)
+     * picture, typically 15+ for a colour photo of a face. The capture refuses photos below [MIN_CHROMA].
+     */
+    fun chroma(px: Pixels, step: Int = 7): Double {
+        var sum = 0.0; var n = 0
+        for (y in 0 until px.h step step) for (x in 0 until px.w step step) {
+            val c = px.argb[y * px.w + x]
+            val r = (c shr 16) and 255; val g = (c shr 8) and 255; val b = c and 255
+            sum += maxOf(r, g, b) - minOf(r, g, b); n++
+        }
+        return if (n == 0) 0.0 else sum / n
+    }
+
+    const val MIN_CHROMA = 4.0
 
     /** Skin sample points (cheeks, forehead) and hair points (above the forehead) of a front view. */
     fun skinPoints(lm: List<Landmark>) = intArrayOf(50, 280, 101, 330, 151, 205, 425).map { lm[it].x.toDouble() to lm[it].y.toDouble() }

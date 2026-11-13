@@ -43,7 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -57,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.drishtisaathi.camera.MediaPipeFaceTracker
+import com.drishtisaathi.camera.StillFaceLandmarker
 import com.drishtisaathi.engine.config.TryOnConfig
 import com.drishtisaathi.engine.face.FaceFrame
 import com.drishtisaathi.engine.tryon3d.AvatarBuilder
@@ -132,14 +135,39 @@ private class Shot(val view: AvatarStore.View, val thumb: ImageBitmap)
 fun faceInFrame(f: FaceFrame, margin: Float = 0.02f): Boolean =
     f.landmarks.size >= 468 && f.landmarks.take(468).all { it.x in margin..(1 - margin) && it.y in margin..(1 - margin) }
 
+/**
+ * A shot from one full-resolution colour photo: cropped to the head (face box + 35% around it, so ears and hair are
+ * kept), at most [MAX_CROP_PX] on the long side, JPEG 92. The landmarks stay in full-photo coordinates.
+ */
 private fun shotFrom(step: AvatarStep, bmp: Bitmap, f: FaceFrame, defaultFocalFraction: Double): Shot {
-    val scale = minOf(1f, 640f / maxOf(bmp.width, bmp.height))
-    val img = if (scale < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true) else bmp
-    val jpeg = ByteArrayOutputStream().also { img.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
+    val lm = f.landmarks.take(468)
+    val x0 = lm.minOf { it.x } * bmp.width; val x1 = lm.maxOf { it.x } * bmp.width
+    val y0 = lm.minOf { it.y } * bmp.height; val y1 = lm.maxOf { it.y } * bmp.height
+    val mx = (x1 - x0) * 0.35f; val my = (y1 - y0) * 0.35f
+    val cx0 = (x0 - mx).toInt().coerceIn(0, bmp.width - 1); val cy0 = (y0 - my).toInt().coerceIn(0, bmp.height - 1)
+    val cx1 = (x1 + mx).toInt().coerceIn(cx0 + 1, bmp.width); val cy1 = (y1 + my).toInt().coerceIn(cy0 + 1, bmp.height)
+    val crop = Bitmap.createBitmap(bmp, cx0, cy0, cx1 - cx0, cy1 - cy0)
+    val sc = minOf(1f, MAX_CROP_PX.toFloat() / maxOf(crop.width, crop.height))
+    val img = if (sc < 1f) Bitmap.createScaledBitmap(crop, (crop.width * sc).toInt(), (crop.height * sc).toInt(), true).also { crop.recycle() } else crop
+    val jpeg = ByteArrayOutputStream().also { img.compress(Bitmap.CompressFormat.JPEG, 92, it) }.toByteArray()
     val th = Bitmap.createScaledBitmap(img, 96, (96f * img.height / img.width).toInt().coerceAtLeast(1), true)
-    if (img !== bmp) img.recycle()
+    img.recycle()
     val focal = f.focalLengthPx ?: (defaultFocalFraction * maxOf(f.imageWidthPx, f.imageHeightPx))
-    return Shot(AvatarStore.View(step, jpeg, f.landmarks, f.imageWidthPx, f.imageHeightPx, f.transformMatrix, focal), th.asImageBitmap())
+    return Shot(
+        AvatarStore.View(step, jpeg, f.landmarks, f.imageWidthPx, f.imageHeightPx, f.transformMatrix, focal, cx0.toDouble(), cy0.toDouble(), sc.toDouble()),
+        th.asImageBitmap(),
+    )
+}
+
+private const val MAX_CROP_PX = 1800
+
+/** ARGB pixels of a bitmap (for the colour check). */
+private fun pixelsOf(b: Bitmap, step: Int = 1): Pixels {
+    val w = b.width / step; val h = b.height / step
+    val small = if (step > 1) Bitmap.createScaledBitmap(b, w, h, false) else b
+    val px = IntArray(w * h).also { small.getPixels(it, 0, w, 0, 0, w, h) }
+    if (small !== b) small.recycle()
+    return Pixels(w, h, px)
 }
 
 /**
@@ -174,6 +202,9 @@ fun AvatarCaptureScreen(
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val still = remember { lazy { StillFaceLandmarker(context) } }
+    DisposableEffect(Unit) { onDispose { if (still.isInitialized()) runCatching { still.value.close() } } }
 
     LaunchedEffect(step) { step?.let { speak(stepPrompt(it)) } }
     LaunchedEffect(step) {
@@ -190,17 +221,23 @@ fun AvatarCaptureScreen(
             val st = gate.update(s, ang?.first, ang?.second, quality, a?.timestampMs ?: 0L)
             gs = st
             if (st.ready) {
-                val (bmp, fr) = tracker.grabFrame()
-                val ang2 = AvatarCaptureGate.angles(fr)
-                if (ang2 != null && gate.poseOk(s, ang2.first, ang2.second) && faceInFrame(fr)) {
-                    val shot = withContext(Dispatchers.Default) { shotFrom(s, bmp, fr, defaultFocalFraction) }
-                    bmp.recycle()
+                // a full-resolution colour photo from ImageCapture; the landmarks come from that same photo
+                val shot = runCatching {
+                    val bmp = tracker.takePhoto()
+                    try {
+                        withContext(Dispatchers.Default) {
+                            val fr = still.value.detect(bmp, tracker.focalPxFor(bmp.width, bmp.height))
+                            val ang2 = AvatarCaptureGate.angles(fr)
+                            val colour = AvatarBuilder.chroma(pixelsOf(bmp, 8)) >= AvatarBuilder.MIN_CHROMA
+                            if (fr != null && ang2 != null && gate.poseOk(s, ang2.first, ang2.second) && faceInFrame(fr) && colour)
+                                shotFrom(s, bmp, fr, defaultFocalFraction) else null
+                        }
+                    } finally { bmp.recycle() }
+                }.getOrNull()
+                if (shot != null) {
                     shots[s] = shot
                     step = AvatarStep.entries.firstOrNull { it !in shots }
-                } else {
-                    bmp.recycle()
-                    gate.reset()
-                }
+                } else gate.reset()
             }
         }
     }
@@ -304,6 +341,38 @@ private fun YawIndicator(yawDeg: Double?, targetDeg: Double, ok: Boolean, held: 
     }
 }
 
+/** Icon above a short one-line label; the whole cell is the button. */
+@Composable
+private fun IconAction(label: String, colour: Color, icon: DrawScope.(Color) -> Unit, modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Canvas(Modifier.size(24.dp)) { icon(colour) }
+        Text(label, color = colour, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+private fun drawCompareIcon(d: DrawScope, c: Color) = with(d) {
+    val w = size.width; val h = size.height; val st = Stroke(w * 0.09f)
+    drawRoundRect(c, Offset(w * 0.04f, h * 0.2f), androidx.compose.ui.geometry.Size(w * 0.4f, h * 0.6f), CornerRadius(w * 0.08f), style = st)
+    drawRoundRect(c, Offset(w * 0.56f, h * 0.2f), androidx.compose.ui.geometry.Size(w * 0.4f, h * 0.6f), CornerRadius(w * 0.08f), style = st)
+}
+
+private fun drawRetakeIcon(d: DrawScope, c: Color) = with(d) {
+    val w = size.width; val st = Stroke(w * 0.1f)
+    drawArc(c, 40f, 290f, false, Offset(w * 0.15f, w * 0.15f), androidx.compose.ui.geometry.Size(w * 0.7f, w * 0.7f), style = st)
+    val head = Path().apply { moveTo(w * 0.95f, w * 0.38f); lineTo(w * 0.62f, w * 0.38f); lineTo(w * 0.86f, w * 0.1f); close() }
+    drawPath(head, c)
+}
+
+private fun drawDeleteIcon(d: DrawScope, c: Color) = with(d) {
+    val w = size.width; val st = Stroke(w * 0.09f)
+    drawLine(c, Offset(w * 0.15f, w * 0.25f), Offset(w * 0.85f, w * 0.25f), strokeWidth = w * 0.1f)
+    drawLine(c, Offset(w * 0.4f, w * 0.12f), Offset(w * 0.6f, w * 0.12f), strokeWidth = w * 0.1f)
+    drawRoundRect(c, Offset(w * 0.25f, w * 0.32f), androidx.compose.ui.geometry.Size(w * 0.5f, w * 0.58f), CornerRadius(w * 0.06f), style = st)
+}
+
 /** The avatar built from the stored photos (in memory only) and its face anchors. */
 class BuiltAvatar(val glb: ByteArray, val anchors: FaceAnchors, val pdMm: Double?)
 
@@ -314,11 +383,12 @@ fun buildAvatar(context: Context, store: AvatarStore): BuiltAvatar? = runCatchin
     val photos = a.views.map { v ->
         val b = BitmapFactory.decodeByteArray(v.jpeg, 0, v.jpeg.size)
         val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
-        Pixels(b.width, b.height, px).also { b.recycle() }
+        Pixels(b.width, b.height, px, v.cropX, v.cropY, v.cropScale).also { b.recycle() }
     }
     val fi = a.views.indexOfFirst { it.step == AvatarStep.FRONT }.takeIf { it >= 0 } ?: return null
-    val skin = AvatarBuilder.medianColour(photos[fi], AvatarBuilder.skinPoints(a.views[fi].landmarks))
-    val hair = AvatarBuilder.medianColour(photos[fi], AvatarBuilder.hairPoints(a.views[fi].landmarks))
+    val fv = a.views[fi]
+    val skin = AvatarBuilder.medianColour(photos[fi], fv.imageW, fv.imageH, AvatarBuilder.skinPoints(fv.landmarks))
+    val hair = AvatarBuilder.medianColour(photos[fi], fv.imageW, fv.imageH, AvatarBuilder.hairPoints(fv.landmarks))
     val model = AvatarBuilder.build(views, photos, FaceMeshAsset.vertices(context), FaceMeshAsset.triangles(context), skin) ?: return null
     val tex = Bitmap.createBitmap(model.texture, AvatarBuilder.TEX, AvatarBuilder.TEX, Bitmap.Config.ARGB_8888)
     val jpeg = ByteArrayOutputStream().also { tex.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
@@ -447,17 +517,10 @@ fun AvatarViewerScreen(
                 }
                 if (favourites.isNotEmpty()) Text(S3D.favourites[l] + ": " + frames.filter { it.id in favourites }.joinToString { it.name },
                     Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
-                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
-                    for ((label, action, colour) in listOf(
-                        Triple(if (comparing) S3D.compareOff[l] else S3D.compare[l], { comparing = !comparing }, Teal),
-                        Triple(S3D.retake[l], onRetake, Teal),
-                        Triple(S3D.deleteAvatar[l], onDelete, Color(0xFFB00020)),
-                    )) {
-                        TextButton(action, Modifier.weight(1f)) {
-                            Text(label, color = colour, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)) {
+                    IconAction(if (comparing) S3D.compareOff[l] else S3D.compare[l], Teal, ::drawCompareIcon, Modifier.weight(1f)) { comparing = !comparing }
+                    IconAction(S3D.retake[l], Teal, ::drawRetakeIcon, Modifier.weight(1f), onRetake)
+                    IconAction(S3D.deleteShort[l], Color(0xFFB00020), ::drawDeleteIcon, Modifier.weight(1f), onDelete)
                 }
             }
         }

@@ -584,7 +584,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             val l = state.lang
             val id = entry.arguments?.getString("frame")
             CameraPermissionGate(l, onSkip = { nav.popBackStack() }) {
-                val tracker = rememberFaceTracker(vm.rules.camera)
+                val tracker = rememberFaceTracker(vm.rules.camera, avatarPhoto = true)
                 com.drishtisaathi.tryon3d.AvatarCaptureScreen(
                     l, vm::setLang, tracker,
                     cameraPreview = { CameraPreview(tracker, Modifier.fillMaxSize()) },

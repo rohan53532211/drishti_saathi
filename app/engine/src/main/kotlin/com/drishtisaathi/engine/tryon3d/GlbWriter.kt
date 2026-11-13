@@ -62,11 +62,18 @@ class GlbWriter {
         return accessors.size - 1
     }
 
-    fun addImage(bytes: ByteArray, mimeType: String = "image/jpeg"): Int {
+    /**
+     * Adds an image (and its texture). [srgb] marks a colour texture: glTF reads baseColor textures as sRGB-encoded
+     * (Filament loads them as SRGB8_A8); the flag is also written into the texture's extras for checking.
+     */
+    fun addImage(bytes: ByteArray, mimeType: String = "image/jpeg", srgb: Boolean = false): Int {
         val v = view(bytes, null)
         images += buildJsonObject { put("bufferView", v); put("mimeType", mimeType) }
+        srgbImages += srgb
         return images.size - 1
     }
+
+    private val srgbImages = mutableListOf<Boolean>()
 
     fun addMaterial(m: Material): Int {
         materials += buildJsonObject {
@@ -128,7 +135,12 @@ class GlbWriter {
             if (images.isNotEmpty()) {
                 put("images", JsonArray(images))
                 put("samplers", buildJsonArray { add(buildJsonObject { put("magFilter", 9729); put("minFilter", 9987) }) })
-                put("textures", JsonArray(images.indices.map { buildJsonObject { put("source", it); put("sampler", 0) } }))
+                put("textures", JsonArray(images.indices.map {
+                    buildJsonObject {
+                        put("source", it); put("sampler", 0)
+                        if (srgbImages[it]) put("extras", buildJsonObject { put("colorSpace", "srgb") })
+                    }
+                }))
             }
         }.toString().toByteArray(Charsets.UTF_8)
         val jsonPad = (4 - json.size % 4) % 4
