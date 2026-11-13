@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from . import anamnesis
+from . import anamnesis, catalog as catalog_mod
 from .sarvam import SarvamClient
 
 try:  # backend/.env holds SARVAM_API_KEY (never committed); real environment variables win
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 
 def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
-               sarvam: Optional[SarvamClient] = None) -> FastAPI:
+               sarvam: Optional[SarvamClient] = None, catalog_dir: Optional[str] = None) -> FastAPI:
     db_file = db_path or os.environ.get("BRIDGE_DB", str(Path(__file__).resolve().parent.parent / "bridge.db"))
     api_token = token if token is not None else os.environ.get("BRIDGE_TOKEN") or None
 
@@ -242,6 +242,7 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
             return review_of(con, pid)
 
     app.include_router(anamnesis.router(voice, check_token))
+    app.include_router(catalog_mod.router(catalog_mod.Catalog(catalog_dir), check_token))
     return app
 
 

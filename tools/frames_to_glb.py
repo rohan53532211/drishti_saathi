@@ -210,6 +210,72 @@ def analyse_front(path, opaque=False):
         closed = clean_mask(fg & ~strip, close_used)
         outer, lens, mids, box = parts_of(closed)
     ox, oy, ow, oh = box
+    if not opaque:
+        # Clean the bottom edge: grey floor shadow glued under a silver or clear rim is a flat band that sticks
+        # out below the curved lens bottom. Below each lens, neutral light pixels further than the side-rim
+        # thickness from the lens edge are removed (black and coloured rims are never touched).
+        trim = np.zeros((h, w), bool)
+        tips = np.zeros((h, w), bool)
+        neutral_light = (chroma < SHADOW_MAX_CHROMA) & ((bg.mean() - a.mean(2)) < SHADOW_MAX_DARKNESS)
+        for side, hull in lens.items():
+            fill = np.zeros((h, w), np.uint8)
+            cv2.fillPoly(fill, [hull.astype(np.int32)], 1)
+            cy = int(hull[:, 1].mean())
+            side_rim = (run_len(closed, cy, int(hull[:, 0].min()) - 1, 0, -1) if side == 'L'
+                        else run_len(closed, cy, int(hull[:, 0].max()) + 1, 0, 1))
+            allow = 1.3 * max(side_rim, 2) + 1
+            x0, x1 = int(hull[:, 0].min()), int(hull[:, 0].max())
+            for x in range(x0, x1 + 1):
+                lb = np.flatnonzero(fill[:, x])
+                if len(lb):
+                    trim[int(lb[-1] + 1 + allow):, x] = True
+            # the band also sticks out sideways past the lens: below the lens centre, outside the lens columns
+            ext = np.zeros((h, w), bool)
+            ext[int(hull[:, 1].max() - allow):, max(0, x0 - 60):x0] = True
+            ext[int(hull[:, 1].max() - allow):, x1 + 1:min(w, x1 + 61)] = True
+            trim |= ext & ~(cv2.dilate(fill, np.ones((3, 3), np.uint8), iterations=int(allow) + 1).astype(bool))
+            # thick rims: thin shadow tips poking out at the bottom corners are removed by an opening
+            r = int(0.35 * side_rim)
+            if r >= 2:
+                k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+                opened = cv2.morphologyEx(closed.astype(np.uint8), cv2.MORPH_OPEN, k).astype(bool)
+                zone = np.zeros((h, w), bool)
+                zone[int(hull[:, 1].mean()):, max(0, x0 - 80):min(w, x1 + 80)] = True
+                tips |= zone & closed & ~opened
+        for t in (trim, tips):
+            t &= neutral_light & closed
+            if t.any():
+                try:     # if a trim opens a rim, it is skipped (the shadow check below decides)
+                    c2 = clean_mask(closed & ~t, 1)
+                    outer, lens, mids, box = parts_of(c2)
+                    closed = c2
+                except Reject:
+                    outer, lens, mids, box = parts_of(closed)
+        ox, oy, ow, oh = box
+        # a floor shadow the colour test could not strip (grey shadow under a silver or clear rim) lies flat,
+        # while the lens bottom curves up: the material under the lens gets much thicker than the rim.
+        for side, hull in lens.items():
+            fill = np.zeros((h, w), np.uint8)
+            cv2.fillPoly(fill, [hull.astype(np.int32)], 1)
+            x0, x1 = int(hull[:, 0].min()), int(hull[:, 0].max())
+            thick = []
+            for x in range(int(x0 + 0.15 * (x1 - x0)), int(x1 - 0.15 * (x1 - x0)), 3):
+                lb = np.flatnonzero(fill[:, x])
+                if len(lb):
+                    thick.append(run_len(closed, lb[-1] + 1, x, 1, 0, skip_max=3))
+            # a flat shadow tab left under the rim shows as a sudden step in the bottom edge
+            bottoms = []
+            for x in range(int(x0 + 0.05 * (x1 - x0)), int(x1 - 0.05 * (x1 - x0))):
+                col = np.flatnonzero(closed[int(hull[:, 1].mean()):, x])
+                bottoms.append(col[-1] if len(col) else np.nan)
+            b = np.asarray(bottoms, float)
+            d = np.abs(np.diff(b))
+            lim = max(4.0, 0.3 * rim)
+            for i in range(6, len(d) - 6):      # an isolated jump with a flat edge on both sides
+                if d[i] > lim and np.nanmedian(d[i - 6:i]) <= 1 and np.nanmedian(d[i + 1:i + 7]) <= 1:
+                    raise Reject(f'floor shadow tab under the bottom rim (step {d[i]:.0f} px)')
+            if thick and max(thick) > 2.0 * rim + 4:
+                raise Reject(f'floor shadow under the bottom rim ({max(thick)} px vs rim {rim:.0f} px)')
     L, R = poly_of(lens['L']), poly_of(lens['R'])
     lw = (L.bounds[2] - L.bounds[0] + R.bounds[2] - R.bounds[0]) / 2
     lh = (L.bounds[3] - L.bounds[1] + R.bounds[3] - R.bounds[1]) / 2
@@ -328,12 +394,12 @@ def extrude(poly_mm, depth, z0):
     return trimesh.util.concatenate(ms)
 
 
-def bar(p0, p1, wx, wy):
-    """A box from p0 to p1 (both in the YZ plane, x = 0) with cross-section wx (X) by wy."""
+def bar(p0, p1, wx, wy, round_=False):
+    """A box (or a round rod of diameter wx) from p0 to p1 (both in the YZ plane, x = 0)."""
     p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
     d = p1 - p0
     L = np.linalg.norm(d)
-    b = trimesh.creation.box([wx, wy, L])
+    b = trimesh.creation.cylinder(radius=wx / 2, height=L, sections=10) if round_ else trimesh.creation.box([wx, wy, L])
     ang = math.atan2(-d[1], d[2])                 # rotate +Z towards d (about X)
     T = trimesh.transformations.rotation_matrix(ang, [1, 0, 0])
     T[:3, 3] = (p0 + p1) / 2
@@ -341,13 +407,15 @@ def bar(p0, p1, wx, wy):
     return b
 
 
-def temple_mesh(length, wx, wy):
+def temple_mesh(length, wx, wy, round_=False):
     """Temple in hinge coordinates: straight back along +Z, then a fixed ear bend downwards."""
     straight = length - EAR_BEND_MM
     a = math.radians(EAR_BEND_DEG)
     end = [0, -EAR_BEND_MM * math.sin(a), straight + EAR_BEND_MM * math.cos(a)]
-    return trimesh.util.concatenate([bar([0, 0, 0], [0, 0, straight], wx, wy),
-                                     bar([0, 0, straight], end, wx, wy)]), end
+    parts = [bar([0, 0, 0], [0, 0, straight], wx, wy, round_), bar([0, 0, straight], end, wx, wy, round_)]
+    if round_:   # a ball at the knee so the round rod has no gap
+        parts.append(trimesh.creation.icosphere(1, radius=wx / 2).apply_translation([0, 0, straight]))
+    return trimesh.util.concatenate(parts), end
 
 
 def material(rgba, texture=None, blend=False, metal=0.0, rough=0.5):
@@ -411,10 +479,14 @@ def build(sku, front_path, side_path, category):
     bridge_y = (y0 + y1) / 2
     org = (mid, bridge_y)
 
-    outer = poly_of(cv2.approxPolyDP(f['outer'].astype(np.float32).reshape(-1, 1, 2), 0.6, True)[:, 0, :])
+    o = f['outer']
+    k = 5                                     # circular moving average removes the pixel staircase
+    o = np.stack([np.convolve(np.concatenate([o[-k:, i], o[:, i], o[:k, i]]), np.ones(2 * k + 1) / (2 * k + 1), 'valid')
+                  for i in (0, 1)], 1)
+    outer = poly_of(cv2.approxPolyDP(o.astype(np.float32).reshape(-1, 1, 2), 0.8, True)[:, 0, :])
     holes = [poly_of(hh) for hh in f['lens'].values()] + [poly_of(m) for m in f['mids'] if len(m) >= 3]
     front_px = outer.difference(unary_union(holes)).buffer(0)
-    front_px = front_px.simplify(0.6)
+    front_px = front_px.simplify(0.8)
     front_mm = to_mm(front_px, *org, s)
     front = extrude(front_mm, FRONT_DEPTH_MM, 0.0)
     # planar UV from the photo
@@ -449,6 +521,24 @@ def build(sku, front_path, side_path, category):
         [*[int(c * 0.85) for c in rgb_med], 255], metal=0.6 if is_metal else 0.0))
     scene.add_geometry(front, node_name='frame_front', geom_name='frame_front')
     scene.add_geometry(edge, node_name='frame_edge', geom_name='frame_edge')
+    # contact shadow (MEGANE idea, simplified): a soft dark copy of the front on the skin just behind it,
+    # a little lower (light from above). The app hides it in the frame viewer, where there is no face.
+    sh_mask = (closed | (f['lensMask'] if f['opaque'] else np.zeros_like(closed))).astype(np.float32)
+    sh = cv2.GaussianBlur(sh_mask, (0, 0), max(1.0, 1.8 / s))[max(0, ty0):ty0 + th, max(0, tx0):tx0 + tw]
+    sh_img = Image.fromarray(np.dstack([np.zeros(sh.shape + (3,), np.uint8), np.clip(sh * 120, 0, 255).astype(np.uint8)]), 'RGBA')
+    sh_img = sh_img.resize((256, max(1, round(sh_img.height * 256 / sh_img.width))), Image.LANCZOS)
+    buf = io.BytesIO()
+    sh_img.save(buf, 'PNG', optimize=True)
+    buf.seek(0)
+    sh_png = Image.open(buf)
+    qx = [(-(tx0 + tw) + org[0]) * s, (-tx0 + org[0]) * s]          # mm x of texture right / left edge
+    qy = [-(ty0 + th - org[1]) * s - 2.5, -(ty0 - org[1]) * s - 2.5]  # mm y of bottom / top, shifted down
+    zq = FRONT_DEPTH_MM + 8.0
+    quad = trimesh.Trimesh(vertices=[[qx[0], qy[0], zq], [qx[1], qy[0], zq], [qx[1], qy[1], zq], [qx[0], qy[1], zq]],
+                           faces=[[0, 2, 1], [0, 3, 2]], process=False)
+    quad.visual = trimesh.visual.TextureVisuals(uv=planar_uv(np.array(quad.vertices) + [0, 2.5, 0]),
+                                                material=material([0, 0, 0, 255], sh_png, blend=True, rough=1.0))
+    scene.add_geometry(quad, node_name='contact_shadow', geom_name='contact_shadow')
     # lenses
     if category == 'sunglasses':
         lens_rgb = np.median(f['a'][f['lensMask']], 0)
@@ -470,8 +560,8 @@ def build(sku, front_path, side_path, category):
         lens_info[name] = [round(c.x, 2), round(c.y, 2)]
     # temples, hinged at the outer edges, slightly below the lens tops
     tcol = side_colour(side_path) or rgb_med
-    wx, wy = (2.2, 4.0) if not is_metal else (1.3, 2.2)
-    temple, end = temple_mesh(TEMPLE_MM, wx, wy)
+    wx, wy = (2.0, 2.0) if is_metal else (3.0, 4.5)     # metal: 2 mm round rod; acetate: 3 wide x 4.5 tall
+    temple, end = temple_mesh(TEMPLE_MM, wx, wy, round_=is_metal)
     fx0, fy0, fx1, fy1 = front_mm.bounds
     lens_top = max(to_mm(poly_of(hh), *org, s).bounds[3] for hh in f['lens'].values())
     hinge_y = lens_top - 0.25 * f['lensH'] * s
@@ -516,7 +606,7 @@ def parametric_glb(a_mm=52, dbl_mm=18, temple_mm=140, b_mm=None, rgb=(30, 30, 30
         lm = extrude(affinity.translate(l.buffer(0.4), 0, -off), LENS_DEPTH_MM, 1.4)
         lm.visual = trimesh.visual.TextureVisuals(material=material([225, 235, 245, 40], blend=True, rough=0.05))
         scene.add_geometry(lm, node_name=name, geom_name=name)
-    t, _ = temple_mesh(temple_mm, 2.2, 4.0)
+    t, _ = temple_mesh(temple_mm, 3.0, 4.5)
     x0, _, x1, _ = front2d.bounds
     for name, x in (('temple_R', x1 - 1.6), ('temple_L', x0 + 1.6)):
         tt = t.copy()

@@ -28,9 +28,10 @@ def parts(path):
             if getattr(mat, 'baseColorFactor', None) is not None:
                 rgba = np.array(mat.baseColorFactor, float)
             if getattr(mat, 'baseColorTexture', None) is not None and getattr(m.visual, 'uv', None) is not None:
-                tex = np.asarray(mat.baseColorTexture.convert('RGB')).astype(float)
+                tex = np.asarray(mat.baseColorTexture.convert('RGBA')).astype(float)
                 uv = np.asarray(m.visual.uv)
-        out.append(dict(name=node, v=v, f=m.faces, tex=tex, uv=uv, rgba=rgba, blend=rgba[3] < 250))
+        blend = rgba[3] < 250 or getattr(mat, 'alphaMode', None) == 'BLEND'
+        out.append(dict(name=node, v=v, f=m.faces, tex=tex, uv=uv, rgba=rgba, blend=blend))
     return out
 
 
@@ -43,7 +44,8 @@ def render(ps, yaw_deg):
     cx, cy = (sx.max() + sx.min()) / 2, (sy.max() + sy.min()) / 2
     img = np.full((VH, VW, 3), 236.0)
     zb = np.full((VH, VW), np.inf)
-    order = sorted(ps, key=lambda p: p['blend'])
+    # opaque first, then see-through parts far to near
+    order = sorted(ps, key=lambda p: (p['blend'], -float((R @ p['v'].T)[2].mean())))
     for p in order:
         v = (R @ p['v'].T).T
         X = (-v[:, 0] - cx) / span + VW / 2
@@ -83,14 +85,18 @@ def render(ps, yaw_deg):
                 th, tw, _ = p['tex'].shape
                 tx = np.clip((u * (tw - 1)).astype(int), 0, tw - 1)
                 ty = np.clip(((1 - vv) * (th - 1)).astype(int), 0, th - 1)
-                col = p['tex'][ty, tx] * (p['rgba'][:3] / 255.0)
+                texel = p['tex'][ty, tx]
+                col = texel[..., :3] * (p['rgba'][:3] / 255.0)
+                ta = texel[..., 3] / 255.0
             else:
                 col = np.broadcast_to(p['rgba'][:3], gx.shape + (3,))
+                ta = np.ones(gx.shape)
             col = col * shade
             tgt = img[y0:y1 + 1, x0:x1 + 1]
             if p['blend']:
-                al = p['rgba'][3] / 255.0
-                tgt[vis] = tgt[vis] * (1 - al) + col[vis] * al + 40 * al   # a little gloss
+                al = (p['rgba'][3] / 255.0 * ta)[vis][:, None]
+                gloss = 0 if p['name'] == 'contact_shadow' else 40
+                tgt[vis] = tgt[vis] * (1 - al) + col[vis] * shade * al + gloss * al
             else:
                 tgt[vis] = col[vis]
                 sub[vis] = z[vis]

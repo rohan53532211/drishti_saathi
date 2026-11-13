@@ -14,6 +14,7 @@ camerax = "1.5.3"
 mediapipe = "0.10.26.1"
 opencv = "4.12.0"
 sqlcipher = "4.6.1"
+filament = "1.74.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -38,6 +39,8 @@ camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax"
 mediapipe-tasks-vision = { module = "com.google.mediapipe:tasks-vision", version.ref = "mediapipe" }
 opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
 sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
+filament-android = { module = "com.google.android.filament:filament-android", version.ref = "filament" }
+gltfio-android = { module = "com.google.android.filament:gltfio-android", version.ref = "filament" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

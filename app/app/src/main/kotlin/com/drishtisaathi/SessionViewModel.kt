@@ -142,6 +142,48 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         // Camera code (distance, head pose) uses the engine's maths from here on.
         EngineBridge.rules = rules
     }
+
+    // ---- 3D catalogue, live 3D try-on and the face avatar --------------------------------------
+
+    val catalog3d by lazy { com.drishtisaathi.tryon3d.CatalogRepository(getApplication()) }
+    /** The avatar photo + landmarks for this session only (encrypted, deleted with the session). */
+    val avatarStore by lazy { com.drishtisaathi.tryon3d.AvatarStore(getApplication()) }
+    private val _frames3d = MutableStateFlow<Pair<List<com.drishtisaathi.engine.tryon3d.Frame3D>, Boolean>>(emptyList<com.drishtisaathi.engine.tryon3d.Frame3D>() to false)
+    /** (frames, from the server too) */
+    val frames3d: StateFlow<Pair<List<com.drishtisaathi.engine.tryon3d.Frame3D>, Boolean>> = _frames3d.asStateFlow()
+    private val _favourites3d = MutableStateFlow<Set<String>>(emptySet())
+    val favourites3d: StateFlow<Set<String>> = _favourites3d.asStateFlow()
+
+    fun loadCatalog3D() {
+        if (_frames3d.value.first.isEmpty()) _frames3d.value = catalog3d.bundled to false
+        viewModelScope.launch { _frames3d.value = catalog3d.all(bridgeSettings.config.value) }
+    }
+
+    fun toggleFavourite3D(id: String) = _favourites3d.update { if (id in it) it - id else it + id }
+
+    /** Catalogue ids best first, by the same ranking as the results (face width, budget, style, lens thickness). */
+    fun recommended3D(frames: List<com.drishtisaathi.engine.tryon3d.Frame3D>): List<String> {
+        val s = _state.value
+        val r = s.result ?: return emptyList()
+        return runCatching {
+            engine.rankFrames(frames.map(com.drishtisaathi.engine.tryon3d.Catalog3D::toEngineFrame), s.answers, r.assessment, s.face)
+                .map { it.frame.id }
+        }.getOrDefault(emptyList())
+    }
+
+    suspend fun glb3D(f: com.drishtisaathi.engine.tryon3d.Frame3D): ByteArray = catalog3d.glb(f, bridgeSettings.config.value)
+    suspend fun thumb3D(f: com.drishtisaathi.engine.tryon3d.Frame3D): android.graphics.Bitmap? = catalog3d.thumb(f, bridgeSettings.config.value)
+
+    /** Deletes the avatar and the session's favourites (new customer, consent, or "Delete my 3D face"). */
+    fun clearAvatar() {
+        avatarStore.clear()
+        _favourites3d.value = emptySet()
+    }
+
+    init {
+        // An avatar never outlives its session: anything left from a previous run is deleted at start.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { avatarStore.clear() } }
+    }
     val choiceContext: ChoiceContext by lazy {
         ChoiceContext(rules.frameScoring.budgetMaxPriceInrLow, rules.frameScoring.budgetMaxPriceInrMid)
     }
@@ -340,12 +382,14 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** Fresh session; keeps the language. Forgets the previous customer's iris calibration. */
     fun startNew() {
         calibration.clearCustomer()
+        clearAvatar()
         _state.update { UiState(lang = it.lang) }
     }
 
     /** Customer tapped "I agree": a fresh session starts with the consent time recorded. */
     fun giveConsent() {
         calibration.clearCustomer()
+        clearAvatar()
         _state.update { UiState(lang = it.lang, consentAt = System.currentTimeMillis()) }
     }
 

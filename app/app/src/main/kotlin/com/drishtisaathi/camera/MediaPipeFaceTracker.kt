@@ -215,6 +215,18 @@ class MediaPipeFaceTracker(
         })
     }
 
+    @Volatile private var grab: ((Bitmap, FaceFrame) -> Unit)? = null
+
+    /**
+     * 3D avatar (after its own consent screen): the next analysed frame that has a face, as an upright, not mirrored
+     * copy of the image plus its landmarks, so photo and mesh line up exactly. The caller owns the bitmap; it is
+     * kept only in app-private encrypted storage for this session (see tryon3d/AvatarStore).
+     */
+    suspend fun grabFrame(): Pair<Bitmap, FaceFrame> = suspendCancellableCoroutine { cont ->
+        grab = { bmp, frame -> if (cont.isActive) cont.resume(bmp to frame) else bmp.recycle() }
+        cont.invokeOnCancellation { grab = null }
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Analysis thread
     // ---------------------------------------------------------------------------------------------
@@ -296,6 +308,15 @@ class MediaPipeFaceTracker(
         }
         _analysis.value = FrameAnalysis(frame, stats, fps, frame.timestampMs)
         _frames.value = frame
+        grab?.let { g ->
+            grab = null
+            try {
+                g(BitmapExtractor.extract(input).copy(Bitmap.Config.ARGB_8888, false), frame)
+            } catch (e: Exception) {
+                Log.w(TAG, "Frame grab failed", e)
+                grab = g // try again on the next frame
+            }
+        }
     }
 
     private fun updateFps(now: Long) {
