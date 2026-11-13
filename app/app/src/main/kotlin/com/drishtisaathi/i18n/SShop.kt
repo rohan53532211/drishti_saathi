@@ -77,6 +77,7 @@ object SShop {
     val farCheck = tx("Far reading check", "दूर पढ़ने की जाँच")
     val readingCheck = tx("Near reading check", "पास पढ़ने की जाँच")
     val cantRead = tx("Can't read clearly", "साफ़ नहीं पढ़ पा रहे")
+    val newLetters = tx("New letters (say \"badlo\")", "नए अक्षर (बोलें \"बदलो\")")
     val farInstruction = tx(
         "Start close. Move the phone slowly away. Tap 'Can't read clearly' when you can no longer read the letters.",
         "पास से शुरू करें। फ़ोन धीरे-धीरे दूर ले जाएँ। जब अक्षर पढ़ न पाएँ, तो 'साफ़ नहीं पढ़ पा रहे' दबाएँ।",

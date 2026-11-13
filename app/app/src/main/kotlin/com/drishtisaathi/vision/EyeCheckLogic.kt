@@ -38,23 +38,21 @@ data class EyeCheckPlan(val near: Boolean, val add: Boolean) {
 const val SLOAN_LETTERS = "CDHKNORSVZ"
 
 /**
- * The far check's letters: 5 random Sloan letters (no letter twice), replaced by a NEW set every time the measured
- * distance has changed by [STEP_MM] (3 cm) since the last set, so a remembered row cannot be "read" further away.
+ * The far check's letters: 5 random Sloan letters (no letter twice). They stay the same while the phone moves; a
+ * new set only when the customer or staff asks for one ("New letters" or saying "badlo"). Size rules are unchanged.
  */
-data class LetterSet(val letters: String, val anchorMm: Double?) {
-    /** The set for [distanceMm]: unchanged within 3 cm of the anchor, otherwise a fresh one anchored there. */
-    fun update(distanceMm: Double?, rnd: Random): LetterSet = when {
-        distanceMm == null || distanceMm <= 0 -> this
-        anchorMm == null -> copy(anchorMm = distanceMm)
-        abs(distanceMm - anchorMm) >= STEP_MM - 1e-9 -> LetterSet(fresh(rnd, letters), distanceMm)
-        else -> this
-    }
+data class LetterSet(val letters: String) {
+    /** A distance reading never changes the letters. */
+    @Suppress("UNUSED_PARAMETER")
+    fun update(distanceMm: Double?, rnd: Random): LetterSet = this
+
+    /** "New letters": a fresh random set, never the same row as now. */
+    fun next(rnd: Random): LetterSet = LetterSet(fresh(rnd, letters))
 
     companion object {
-        const val STEP_MM = 30.0
         const val COUNT = 5
 
-        fun start(rnd: Random) = LetterSet(fresh(rnd, ""), null)
+        fun start(rnd: Random) = LetterSet(fresh(rnd, ""))
 
         /** 5 different letters, never the same row as [previous]. */
         fun fresh(rnd: Random, previous: String): String {

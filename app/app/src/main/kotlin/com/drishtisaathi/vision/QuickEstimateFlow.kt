@@ -67,6 +67,8 @@ import androidx.compose.foundation.layout.wrapContentSize
 import kotlin.random.Random
 
 /** Words that count as "Blur" when said during the quick estimate (Hindi, Hinglish, English). */
+/** "New letters" by voice in the far check. */
+val NEW_LETTERS_KEYWORDS = listOf("बदलो", "बदल दो", "badlo", "badal do", "badalo", "new letters", "change letters")
 val BLUR_KEYWORDS = listOf("धुंधला", "धुंधली", "धुंधले", "धुंधला है", "dhundhla", "dhundla", "dhundli", "blur", "blurry", "blurred")
 
 /**
@@ -196,8 +198,8 @@ internal fun eyeCheckResult(right: QuickEye?, left: QuickEye?, near: NearCheck.R
 
 /**
  * The eye check (compulsory, about 2 minutes), one test style only: reading. Per eye, glasses off and the other eye
- * covered: random Sloan letters at 20/20 size, kept the same angular size at every distance and replaced by a new
- * set every 3 cm; start close, move away, "Can't read clearly" (or "dhundhla") freezes the distance → a power range.
+ * covered: random Sloan letters at 20/20 size, kept the same angular size at every distance (a new set only on
+ * "New letters"); start close, move away, "Can't read clearly" (or "dhundhla") freezes the distance → a power range.
  * Then, when planned, a new random sentence in small print with both eyes: hold far, move closer → near point.
  * Each step has a header, a Skip button, a short result and "Do it again".
  */
@@ -325,10 +327,12 @@ private fun QuickInfo(
 
 /** Starts keyword listening while this screen is shown, if the mic is on. */
 @Composable
-private fun BlurKeyword(voice: VoiceController?, onBlur: () -> Unit) {
+private fun BlurKeyword(voice: VoiceController?, onBlur: () -> Unit, onNewLetters: (() -> Unit)? = null) {
     val blur by rememberUpdatedState(onBlur)
-    DisposableEffect(voice) {
-        voice?.listenForKeyword(BLUR_KEYWORDS) { blur() }
+    val fresh by rememberUpdatedState(onNewLetters)
+    DisposableEffect(voice, onNewLetters != null) {
+        val extra = if (onNewLetters != null) listOf(NEW_LETTERS_KEYWORDS to { fresh?.invoke(); Unit }) else emptyList()
+        voice?.listenForKeyword(BLUR_KEYWORDS, extra = extra) { blur() }
         onDispose { voice?.stopKeyword() }
     }
 }
@@ -377,6 +381,8 @@ private fun ReadScreen(
     /** Far check: a 2-line instruction (full text behind "How to") and the target in its own fixed panel. */
     shortInstruction: Txt? = null,
     debugLine: String? = null,
+    /** Far check: "New letters" (also by voice, "badlo"). */
+    onNewLetters: (() -> Unit)? = null,
     onTap: (mm: Double, atMs: Long, typed: Boolean) -> Unit,
     target: @Composable BoxScope.() -> Unit,
 ) {
@@ -396,7 +402,7 @@ private fun ReadScreen(
         val mm = if (simulated) reading?.takeIf { it.faceVisible }?.distanceMm else buffer.atTap(t)
         if (mm == null) notCaught = true else { notCaught = false; onTap(mm, t, false) }
     }
-    BlurKeyword(voice, tapNow)
+    BlurKeyword(voice, tapNow, onNewLetters)
 
     val controls: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -407,6 +413,7 @@ private fun ReadScreen(
                 fontWeight = FontWeight.Bold)
             BigButton(SShop.cantRead[l], selected = true, onClick = tapNow)
             second?.let { (label, action) -> BigButton(label[l], enabled = action != null, onClick = { action?.invoke() }) }
+            onNewLetters?.let { BigButton(SShop.newLetters[l], onClick = it) }
             if (!typing) {
                 TextButton(onClick = { typing = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SShop.typeDistance[l]) }
             } else {
@@ -493,7 +500,8 @@ private fun letterFontSize(env: TestEnv, mm: Double, logMar: Double, minPx: Floa
 const val FAR_LETTER_LOGMAR = 0.0
 
 /**
- * Far reading check for one eye: 5 random Sloan letters at 20/20 size, a new set every 3 cm. Start close, move away,
+ * Far reading check for one eye: 5 random Sloan letters at 20/20 size; they stay the same while the phone moves, a
+ * new set only on "New letters" (or "badlo"). Start close, move away,
  * "Can't read clearly" freezes the distance → a power range. One automatic repeat when the tap looks invalid (too
  * close, or too soon after being close), then the mean of the two. A distance typed from a tape is used as it is.
  */
@@ -513,7 +521,6 @@ private fun FarLetterScreen(
     var firstMm by remember { mutableStateOf<Double?>(null) }
     LaunchedEffect(reading) {
         proc = proc.onReading(reading, rules, System.currentTimeMillis())
-        letters = letters.update(reading?.takeIf { it.faceVisible }?.distanceMm, rnd)
     }
 
     // Spoken once per attempt: glasses off, which eye to cover, and how to move the phone.
@@ -531,6 +538,7 @@ private fun FarLetterScreen(
     ReadScreen(
         env, eye, reading, voice, header, instruction, simulated, onSkip,
         shortInstruction = short, debugLine = debugLine,
+        onNewLetters = { letters = letters.next(rnd) },
         second = SShop.stillReadableReach to (if (atReach(reading, rules)) ({ onFrozen(QuickEye(null, null, QuickTarget.WHITE, noMyopiaAtReach = true)) }) else null),
         onTap = { mm, t, typed ->
             val first = firstMm

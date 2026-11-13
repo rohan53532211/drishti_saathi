@@ -107,8 +107,9 @@ class HeadTemplateTest {
         assertTrue("face ${face.size} " + face.groupingBy { Integer.toHexString(texAt(it)) }.eachCount().entries.sortedByDescending { it.value }.take(6),
             face.count { near(texAt(it), 0x3C8CDC) } > face.size * 0.8)
         val scalp = (0 until template.vertexCount).filter { template.region[it] == HeadTemplate.SCALP }
-        // texels at scalp vertices: hair colour (or blended at the hairline), never grey
-        assertTrue("scalp " + scalp.groupingBy { Integer.toHexString(texAt(it)) }.eachCount().entries.sortedByDescending { it.value }.take(4), scalp.count { near(texAt(it), 0x1E140F) } > scalp.size * 0.6)
+        // no segmentation mask: every pixel may colour the scalp too (with a mask only hair pixels may: HeadAvatarTest)
+        assertTrue("scalp " + scalp.groupingBy { Integer.toHexString(texAt(it)) }.eachCount().entries.sortedByDescending { it.value }.take(4),
+            scalp.none { val c = texAt(it); val r = (c shr 16) and 255; val g = (c shr 8) and 255; val b = c and 255; maxOf(r, g, b) - minOf(r, g, b) < 10 })
         // back of the neck (no photo sees it): skin
         val back = (0 until template.vertexCount).filter { template.region[it] == HeadTemplate.SKIN && m.faceVertices[3 * it + 2] < -7f }
         assertTrue(back.isNotEmpty())

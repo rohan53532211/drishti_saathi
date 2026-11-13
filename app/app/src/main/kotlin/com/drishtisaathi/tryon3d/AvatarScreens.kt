@@ -146,16 +146,18 @@ fun faceInFrame(f: FaceFrame, margin: Float = 0.02f): Boolean =
     f.landmarks.size >= 468 && f.landmarks.take(468).all { it.x in margin..(1 - margin) && it.y in margin..(1 - margin) }
 
 /**
- * A shot from one full-resolution colour photo: cropped to the head (face box + 35% around it, so ears and hair are
- * kept), at most [MAX_CROP_PX] on the long side, JPEG 92. The landmarks stay in full-photo coordinates.
+ * A shot from one full-resolution colour photo: cropped to the head (face box + 80% at the sides, 90% above for hair,
+ * 70% below for the neck),
+ * at most [MAX_CROP_PX] on the long side, JPEG 92. The landmarks stay in full-photo coordinates.
  */
 private fun shotFrom(step: AvatarStep, bmp: Bitmap, f: FaceFrame, defaultFocalFraction: Double): Shot {
     val lm = f.landmarks.take(468)
     val x0 = lm.minOf { it.x } * bmp.width; val x1 = lm.maxOf { it.x } * bmp.width
     val y0 = lm.minOf { it.y } * bmp.height; val y1 = lm.maxOf { it.y } * bmp.height
-    val mx = (x1 - x0) * 0.35f; val my = (y1 - y0) * 0.35f
-    val cx0 = (x0 - mx).toInt().coerceIn(0, bmp.width - 1); val cy0 = (y0 - my).toInt().coerceIn(0, bmp.height - 1)
-    val cx1 = (x1 + mx).toInt().coerceIn(cx0 + 1, bmp.width); val cy1 = (y1 + my).toInt().coerceIn(cy0 + 1, bmp.height)
+    // room for big hair at the sides and on top, and the neck down to the collar
+    val mx = (x1 - x0) * 0.8f; val myTop = (y1 - y0) * 0.9f; val myBottom = (y1 - y0) * 0.7f
+    val cx0 = (x0 - mx).toInt().coerceIn(0, bmp.width - 1); val cy0 = (y0 - myTop).toInt().coerceIn(0, bmp.height - 1)
+    val cx1 = (x1 + mx).toInt().coerceIn(cx0 + 1, bmp.width); val cy1 = (y1 + myBottom).toInt().coerceIn(cy0 + 1, bmp.height)
     val crop = Bitmap.createBitmap(bmp, cx0, cy0, cx1 - cx0, cy1 - cy0)
     val sc = minOf(1f, MAX_CROP_PX.toFloat() / maxOf(crop.width, crop.height))
     val img = if (sc < 1f) Bitmap.createScaledBitmap(crop, (crop.width * sc).toInt(), (crop.height * sc).toInt(), true).also { crop.recycle() } else crop
@@ -169,7 +171,7 @@ private fun shotFrom(step: AvatarStep, bmp: Bitmap, f: FaceFrame, defaultFocalFr
     )
 }
 
-private const val MAX_CROP_PX = 1800
+private const val MAX_CROP_PX = 2000
 
 /** ARGB pixels of a bitmap (for the colour check). */
 private fun pixelsOf(b: Bitmap, step: Int = 1): Pixels {
@@ -390,18 +392,26 @@ class BuiltAvatar(val glb: ByteArray, val anchors: FaceAnchors, val pdMm: Double
 fun buildAvatar(context: Context, store: AvatarStore): BuiltAvatar? = runCatching {
     val a = store.load() ?: return null
     val views = a.views.map { AvatarView(it.step, it.landmarks, it.imageW, it.imageH, it.matrix, it.focalPx) }
-    val photos = a.views.map { v ->
-        val b = BitmapFactory.decodeByteArray(v.jpeg, 0, v.jpeg.size)
-        val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
-        Pixels(b.width, b.height, px, v.cropX, v.cropY, v.cropScale).also { b.recycle() }
+    // each photo with its segmentation (hair / face-skin / body-skin / background / clothes), on the phone only
+    val segmenter = runCatching { com.drishtisaathi.camera.PhotoSegmenter(context) }.getOrNull()
+    val photos = try {
+        a.views.map { v ->
+            val b = BitmapFactory.decodeByteArray(v.jpeg, 0, v.jpeg.size)
+            val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+            val seg = segmenter?.classes(b)
+            Pixels(b.width, b.height, px, v.cropX, v.cropY, v.cropScale, seg?.first, seg?.second ?: 0, seg?.third ?: 0).also { b.recycle() }
+        }
+    } finally {
+        segmenter?.close()
     }
     val fi = a.views.indexOfFirst { it.step == AvatarStep.FRONT }.takeIf { it >= 0 } ?: return null
     val fv = a.views[fi]
     val skin = AvatarBuilder.medianColour(photos[fi], fv.imageW, fv.imageH, AvatarBuilder.skinPoints(fv.landmarks))
-    // hair colour from above the forehead in the front and the side photos
-    val hair = AvatarBuilder.medianColour(a.views.indices.map { k ->
-        Triple(photos[k], a.views[k].imageW to a.views[k].imageH, AvatarBuilder.hairPoints(a.views[k].landmarks))
-    })
+    // hair colour: the hair pixels of all three photos (segmentation), else above the forehead in each photo
+    val hair = AvatarBuilder.classMedian(photos, com.drishtisaathi.engine.tryon3d.SegClass.HAIR_BITS)
+        ?: AvatarBuilder.medianColour(a.views.indices.map { k ->
+            Triple(photos[k], a.views[k].imageW to a.views[k].imageH, AvatarBuilder.hairPoints(a.views[k].landmarks))
+        })
     val canonical = FaceMeshAsset.vertices(context)
     val tris = FaceMeshAsset.triangles(context)
     // the real head shape from the template; the face-only avatar if the template cannot be used

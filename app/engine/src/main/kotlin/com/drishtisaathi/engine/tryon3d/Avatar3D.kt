@@ -87,7 +87,63 @@ class AvatarView(
  * Packed ARGB pixels (Bitmap.getPixels layout) of a crop of a photo: the crop's top-left is at ([offsetX], [offsetY])
  * in full-photo pixels and [scale] crop pixels per full-photo pixel.
  */
-class Pixels(val w: Int, val h: Int, val argb: IntArray, val offsetX: Double = 0.0, val offsetY: Double = 0.0, val scale: Double = 1.0) {
+class Pixels(
+    val w: Int, val h: Int, val argb: IntArray, val offsetX: Double = 0.0, val offsetY: Double = 0.0, val scale: Double = 1.0,
+    /** Segmentation classes ([SegClass]) over the same crop, [clsW]×[clsH] (any resolution); null = no mask. */
+    val cls: ByteArray? = null, val clsW: Int = 0, val clsH: Int = 0,
+) {
+    val hasClasses get() = cls != null && clsW > 0 && clsH > 0
+
+    private fun gx(xFull: Double) = ((xFull - offsetX) * scale * clsW / w)
+    private fun gy(yFull: Double) = ((yFull - offsetY) * scale * clsH / h)
+
+    /** Class at a full-photo point; −1 outside the crop, or when there is no mask. */
+    fun classAtFull(xFull: Double, yFull: Double): Int {
+        val m = cls ?: return -1
+        val x = floor(gx(xFull)).toInt(); val y = floor(gy(yFull)).toInt()
+        if (x < 0 || y < 0 || x >= clsW || y >= clsH) return -1
+        return m[y * clsW + x].toInt() and 0xFF
+    }
+
+    /**
+     * Share of the 3×3 class pixels around a full-photo point that are in [bits] (0..1): 1 everywhere without a mask,
+     * 0 outside the crop. Used as a blend weight, so view seams at class edges are feathered.
+     */
+    fun classFractionFull(xFull: Double, yFull: Double, bits: Int): Double {
+        val m = cls ?: return 1.0
+        val x = floor(gx(xFull)).toInt(); val y = floor(gy(yFull)).toInt()
+        if (x < 0 || y < 0 || x >= clsW || y >= clsH) return 0.0
+        var ok = 0; var all = 0
+        for (oy in -1..1) for (ox in -1..1) {
+            val xx = x + ox; val yy = y + oy
+            if (xx < 0 || yy < 0 || xx >= clsW || yy >= clsH) continue
+            all++
+            if (SegClass.allowed(m[yy * clsW + xx].toInt() and 0xFF, bits)) ok++
+        }
+        return if (all == 0) 0.0 else ok.toDouble() / all
+    }
+
+    /**
+     * The horizontal run of skin pixels through a full-photo point (searching ±3 class pixels for skin): its width in
+     * full-photo pixels and the median colour along it. Null without a mask or when there is no skin there.
+     */
+    fun skinRunFull(xFull: Double, yFull: Double): Pair<Double, IntArray>? {
+        val m = cls ?: return null
+        val y = floor(gy(yFull)).toInt(); var x = floor(gx(xFull)).toInt()
+        if (y < 0 || y >= clsH) return null
+        fun skin(xx: Int) = xx in 0 until clsW && SegClass.allowed(m[y * clsW + xx].toInt() and 0xFF, SegClass.SKIN_BITS)
+        if (!skin(x)) x = (-3..3).map { x + it }.firstOrNull { skin(it) } ?: return null
+        var l = x; var r = x
+        while (skin(l - 1)) l--
+        while (skin(r + 1)) r++
+        if (r - l < 2) return null
+        val widthFull = (r - l + 1).toDouble() * w / clsW / scale
+        val cy = (y + 0.5) * h / clsH
+        val cols = (l..r).mapNotNull { xx -> sample((xx + 0.5) * w / clsW, cy) }
+        if (cols.isEmpty()) return null
+        return widthFull to IntArray(3) { k -> cols.map { it[k] }.sorted()[cols.size / 2] }
+    }
+
     /** Bilinear sample in crop pixels into [out] (r, g, b 0..255); false outside the crop. */
     fun sampleInto(x: Double, y: Double, out: DoubleArray): Boolean {
         if (x < 0 || y < 0 || x > w - 1 || y > h - 1) return false
@@ -128,6 +184,8 @@ class AvatarModel(
     val anchors: FaceAnchors,
     /** Which view textured each face triangle best (index into the views). */
     val bestView: IntArray,
+    /** Template head: seam duplicates → one vertex, so normals match across the UV seam. */
+    val weld: IntArray? = null,
 )
 
 /**
@@ -279,7 +337,21 @@ object AvatarBuilder {
     fun buildHead(
         views: List<AvatarView>, photos: List<Pixels>, canonical: FloatArray, triangles: IntArray, template: HeadTemplate,
         skinRgb: IntArray, hairRgb: IntArray,
-    ): AvatarModel? {
+    ): AvatarModel? = buildHeadDetailed(views, photos, canonical, triangles, template, skinRgb, hairRgb)?.model
+
+    class HeadBuild(val model: AvatarModel, val bake: HeadBake.Result, val hairOffsets: FloatArray, val folds: Int, val neck: NeckFit.Size)
+
+    /**
+     * Real head shape: the [template] (MakeHuman CC0 head) deformed so its face region sits on the averaged landmarks
+     * ([HeadDeform]); folds left by the deformation are relaxed; the neck takes its width / depth from the body-skin
+     * silhouette; the scalp is pushed out to the hair outline of the photos ([HairShell]). Texture from [HeadBake]:
+     * class-gated, depth-tested, feathered, inpainted. With no segmentation masks everything still works (no hair
+     * volume, no neck fit, every pixel allowed).
+     */
+    fun buildHeadDetailed(
+        views: List<AvatarView>, photos: List<Pixels>, canonical: FloatArray, triangles: IntArray, template: HeadTemplate,
+        skinRgb: IntArray, hairRgb: IntArray,
+    ): HeadBuild? {
         val f = fuse(views, photos, canonical, triangles) ?: return null
         val uv = f.usable.map { views[it] }
         val ph = f.usable.map { photos[it] }
@@ -298,25 +370,59 @@ object AvatarBuilder {
         }
         val d = HeadDeform.deform(template, canonical, f.verts, extra)
         val n = template.vertexCount
-        val imagePts = (0 until nv).map { k ->
-            val v = uv[k]
-            FloatArray(2 * n).also { out ->
-                for (i in 0 until n) {
-                    project(f.poses[k], v.focalPx, v.imageW, v.imageH, d.vertices[3 * i].toDouble(), d.vertices[3 * i + 1].toDouble(), d.vertices[3 * i + 2].toDouble(), tmp)
-                    out[2 * i] = (tmp[0] + d.extra[i][2 * k]).toFloat()
-                    out[2 * i + 1] = (tmp[1] + d.extra[i][2 * k + 1]).toFloat()
-                }
+        val weld = template.weld
+        val vtx = d.vertices.copyOf()
+        HeadMesh.copyWelded(vtx, weld)
+        // folds (e.g. a long jaw pressed into the neck) are relaxed away from the face
+        val folds = HeadMesh.unfold(template.vertices, vtx, template.triangles, weld, { template.region[it] != HeadTemplate.FACE })
+        // the neck from the body-skin silhouette (front: width, sides: depth)
+        val chinY = f.verts[3 * 152 + 1].toDouble()
+        val neckIds = (0 until n).filter { template.region[it] == HeadTemplate.NECK }
+        val level = chinY - 3.5
+        val ring = neckIds.filter { abs(vtx[3 * it + 1] - level) < 0.6 }
+        var neckSize = NeckFit.Size(null, null, null)
+        if (ring.size >= 6) {
+            val xs = ring.map { vtx[3 * it].toDouble() }; val zs = ring.map { vtx[3 * it + 2].toDouble() }
+            val centre = V3((xs.max() + xs.min()) / 2, level, (zs.max() + zs.min()) / 2)
+            neckSize = NeckFit.measure(V3(centre.x, centre.y, zs.max()), uv, f.poses, ph, f.cams)
+            val weight = FloatArray(n) { i ->
+                if (template.region[i] != HeadTemplate.NECK) 0f
+                else ((chinY - 1.0 - vtx[3 * i + 1]) / 3.0).coerceIn(0.0, 1.0).toFloat()
             }
+            NeckFit.apply(vtx, weight, centre, neckSize, xs.max() - xs.min(), zs.max() - zs.min())
         }
-        val hair = FloatArray(n) { if (template.region[it] == HeadTemplate.SCALP) 1f else 0f }
+        // hair volume up to the hair outline in the photos; kept flat where the temples pass
+        val hair = HairShell.hairness(template.region, template.triangles, weld)
+        val protect = HairShell.templeProtect(vtx, listOf(d.earRestR, d.earRestL))
+        val off = HairShell.offsets(vtx, template.triangles, weld, hair, uv, f.poses, ph, f.cams, protect)
+        HairShell.displace(vtx, template.triangles, weld, off)
+        HeadMesh.copyWelded(vtx, weld)
+        // every vertex into every photo (plus the face correction), and its depth for the visibility test
+        val imagePts = ArrayList<FloatArray>(); val depths = ArrayList<FloatArray>()
+        for (k in 0 until nv) {
+            val v = uv[k]
+            val ip = FloatArray(2 * n); val dp = FloatArray(n)
+            for (i in 0 until n) {
+                val x = vtx[3 * i].toDouble(); val y = vtx[3 * i + 1].toDouble(); val z = vtx[3 * i + 2].toDouble()
+                project(f.poses[k], v.focalPx, v.imageW, v.imageH, x, y, z, tmp)
+                ip[2 * i] = (tmp[0] + d.extra[i][2 * k]).toFloat()
+                ip[2 * i + 1] = (tmp[1] + d.extra[i][2 * k + 1]).toFloat()
+                dp[i] = (-Mat4.apply(f.poses[k], x, y, z)[2]).toFloat()
+            }
+            imagePts += ip; depths += dp
+        }
+        val neckW = FloatArray(n) { if (template.region[it] == HeadTemplate.NECK) 1f else 0f }
+        val cosCut = FloatArray(n) { if (template.region[it] == HeadTemplate.FACE) COS_CUT.toFloat() else COS_CUT_OFF_FACE }
         val canonN = GlbWriter.vertexNormals(canonical, triangles)
         val gains = colourGains(f.verts, canonN, uv, ph, f.cams)
-        val tex = bake(d.vertices, template.triangles, template.uvs, uv, ph, f.cams, f.baseW, skinRgb, gains, imagePts = imagePts, hairMask = hair, hairRgb = hairRgb,
-            cosCut = FloatArray(n) { if (template.region[it] == HeadTemplate.FACE) COS_CUT.toFloat() else COS_CUT_OFF_FACE })
+        val bake = HeadBake.bake(vtx, template.triangles, template.uvs, weld, uv, ph, f.cams, f.baseW, imagePts, depths,
+            hair, neckW, cosCut, skinRgb, neckSize.rgb ?: skinRgb, hairRgb, gains)
+        // temples rest on the ear roots (ears are not moved by the hair: the band around the temples is protected)
         val anchors = FaceAnchors.fromVertices(f.verts).copy(earRestR = d.earRestR, earRestL = d.earRestL)
-        val best = bestViews(d.vertices, template.triangles, f.cams, f.baseW)
-        return AvatarModel(d.vertices, template.uvs, template.triangles.copyOf(), tex, FloatArray(0), IntArray(0), IntArray(0),
-            FloatArray(0), IntArray(0), anchors, best)
+        val best = bestViews(vtx, template.triangles, f.cams, f.baseW)
+        val model = AvatarModel(vtx, template.uvs, template.triangles.copyOf(), bake.texture, FloatArray(0), IntArray(0), IntArray(0),
+            FloatArray(0), IntArray(0), anchors, best, weld)
+        return HeadBuild(model, bake, off, folds, neckSize)
     }
 
     /** Cheek and forehead points used to match white balance and exposure between the photos. */
@@ -333,7 +439,9 @@ object AvatarBuilder {
             val acc = DoubleArray(3); var n = 0
             for (i in pts) {
                 val lm = views[k].landmarks[i]
-                if (photos[k].sampleFull(lm.x * views[k].imageW.toDouble(), lm.y * views[k].imageH.toDouble(), o)) { for (c in 0 until 3) acc[c] += o[c]; n++ }
+                val fx = lm.x * views[k].imageW.toDouble(); val fy = lm.y * views[k].imageH.toDouble()
+                if (photos[k].hasClasses && photos[k].classFractionFull(fx, fy, SegClass.SKIN_BITS) < 1.0) continue
+                if (photos[k].sampleFull(fx, fy, o)) { for (c in 0 until 3) acc[c] += o[c]; n++ }
             }
             return if (n == 0) null else DoubleArray(3) { acc[it] / n }
         }
@@ -512,10 +620,12 @@ object AvatarBuilder {
         val g = GlbWriter()
         fun lin(rgb: IntArray) = floatArrayOf(srgbToLinear(rgb[0] / 255f), srgbToLinear(rgb[1] / 255f), srgbToLinear(rgb[2] / 255f), 1f)
         val img = g.addImage(textureJpeg, "image/jpeg", srgb = true)
-        val faceMat = g.addMaterial(GlbWriter.Material("avatar_face", image = img, roughness = 0.92f))
+        // opaque (no alpha / cut-out), double-sided: a fold or the inside of the neck never shows as a hole
+        val faceMat = g.addMaterial(GlbWriter.Material("avatar_face", image = img, roughness = 0.92f, doubleSided = true))
         val skinMat = g.addMaterial(GlbWriter.Material("avatar_skin", baseColor = lin(skinRgb), roughness = 0.92f))
         val hairMat = g.addMaterial(GlbWriter.Material("avatar_hair", baseColor = lin(hairRgb), roughness = 0.95f))
-        g.addMesh("avatar_face", m.faceVertices, m.faceTriangles, faceMat, GlbWriter.vertexNormals(m.faceVertices, m.faceTriangles), m.faceUvs)
+        val normals = m.weld?.let { HeadMesh.normals(m.faceVertices, m.faceTriangles, it) } ?: GlbWriter.vertexNormals(m.faceVertices, m.faceTriangles)
+        g.addMesh("avatar_face", m.faceVertices, m.faceTriangles, faceMat, normals, m.faceUvs)
         if (m.skinTriangles.isNotEmpty()) g.addMesh("avatar_shell", m.shellVertices, m.skinTriangles, skinMat, GlbWriter.vertexNormals(m.shellVertices, m.skinTriangles))
         if (m.hairTriangles.isNotEmpty()) g.addMesh("avatar_hair", m.shellVertices, m.hairTriangles, hairMat, GlbWriter.vertexNormals(m.shellVertices, m.hairTriangles))
         if (m.earTriangles.isNotEmpty()) g.addMesh("avatar_ears", m.earVertices, m.earTriangles, skinMat, GlbWriter.vertexNormals(m.earVertices, m.earTriangles))
@@ -527,6 +637,20 @@ object AvatarBuilder {
     /** Median colour of 5×5 patches around normalised photo points (skin on the cheeks, hair above the forehead). */
     fun medianColour(px: Pixels, imageW: Int, imageH: Int, points: List<Pair<Double, Double>>): IntArray =
         medianColour(listOf(Triple(px, imageW to imageH, points)))
+
+    /** Median colour of the pixels of one class set ([SegClass]) over all photos with a mask; null if too few. */
+    fun classMedian(photos: List<Pixels>, bits: Int, step: Int = 3): IntArray? {
+        val s = ArrayList<IntArray>()
+        for (px in photos) {
+            val m = px.cls ?: continue
+            for (y in 0 until px.clsH step step) for (x in 0 until px.clsW step step) {
+                if (!SegClass.allowed(m[y * px.clsW + x].toInt() and 0xFF, bits)) continue
+                px.sample((x + 0.5) * px.w / px.clsW, (y + 0.5) * px.h / px.clsH)?.let { s += it }
+            }
+        }
+        if (s.size < 30) return null
+        return IntArray(3) { k -> s.map { it[k] }.sorted()[s.size / 2] }
+    }
 
     /** Median over several photos (hair above the forehead in the front and side photos). */
     fun medianColour(samples: List<Triple<Pixels, Pair<Int, Int>, List<Pair<Double, Double>>>>): IntArray {

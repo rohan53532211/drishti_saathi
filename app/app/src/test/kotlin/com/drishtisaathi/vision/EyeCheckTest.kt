@@ -57,22 +57,27 @@ class EyeCheckTest {
             eyeCheckSteps(plan(answers(VisionProblem.DISTANCE, 30).copy(powerKnown = PowerKnown.YES))).map { it.toString() })
     }
 
-    @Test fun `far letters - a new random set of 5 Sloan letters every 3 cm`() {
+    @Test fun `far letters - 5 Sloan letters that change only on tap, never with distance`() {
         val rnd = Random(1)
         var set = LetterSet.start(rnd)
         assertEquals(5, set.letters.length)
         assertEquals(5, set.letters.toSet().size)
         assertTrue(set.letters.all { it in SLOAN_LETTERS })
-        set = set.update(200.0, rnd)                          // first reading anchors, letters stay
         val first = set.letters
-        assertEquals(first, set.update(229.0, rnd).letters)   // 2.9 cm: same letters
-        assertEquals(first, set.update(171.0, rnd).letters)
-        val moved = set.update(230.0, rnd)                    // 3 cm: new letters, new anchor
-        assertNotEquals(first, moved.letters)
-        assertEquals(230.0, moved.anchorMm!!, 0.0)
-        assertEquals(moved.letters, moved.update(255.0, rnd).letters)
-        assertNotEquals(moved.letters, moved.update(260.0, rnd).letters)
-        assertEquals(moved, moved.update(null, rnd))          // no reading: unchanged
+        // the phone moves 10 → 80 cm and back: the letters never change
+        for (mm in (100..800 step 7).map { it.toDouble() } + listOf(null, 450.0, 120.0)) set = set.update(mm, rnd)
+        assertEquals(first, set.letters)
+        // "New letters": a different random set of 5, same rules
+        val tapped = set.next(rnd)
+        assertNotEquals(first, tapped.letters)
+        assertEquals(5, tapped.letters.toSet().size)
+        assertTrue(tapped.letters.all { it in SLOAN_LETTERS })
+        // the screen wires the button and the "badlo" keyword, and no longer updates letters from readings
+        val src = File("src/main/kotlin/com/drishtisaathi/vision/QuickEstimateFlow.kt").readText()
+        assertTrue(src.contains("onNewLetters = { letters = letters.next(rnd) }"))
+        assertFalse(src.contains("letters = letters.update("))
+        assertTrue(NEW_LETTERS_KEYWORDS.containsAll(listOf("badlo", "बदलो")))
+        assertTrue(BLUR_KEYWORDS.none { it in NEW_LETTERS_KEYWORDS })
     }
 
     @Test fun `near check - a new random sentence on every attempt, 30+ per language`() {

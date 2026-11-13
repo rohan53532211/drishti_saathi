@@ -26,6 +26,8 @@ class HeadTemplate(
     val earRest: FloatArray,
 ) {
     val vertexCount get() = vertices.size / 3
+    /** Seam duplicates → their first vertex (same position). */
+    val weld: IntArray by lazy { HeadMesh.weld(vertices) }
 
     /** The 468 landmark points on the template surface for vertex positions [v] (default: the template's own). */
     fun landmarkPoints(v: FloatArray = vertices): DoubleArray {
@@ -46,6 +48,7 @@ class HeadTemplate(
         const val EAR = 1
         const val SCALP = 2
         const val SKIN = 3
+        const val NECK = 4
 
         fun parse(text: String): HeadTemplate {
             val j = Json.parseToJsonElement(text).jsonObject

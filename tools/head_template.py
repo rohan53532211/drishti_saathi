@@ -203,13 +203,66 @@ def main(base, canon_obj, out, preview=None):
     r2 = -np.ones(len(P), int); r2[used2] = np.arange(len(used2))
     P = P[used2]; F = r2[F]
 
-    # cap holes (eye openings); the neck cut (lowest loop) stays open
+    # neck down to collar level: smooth elliptical rings below the levelled edge (from its own shape to an ellipse,
+    # flaring a little towards the collar), closed with a rounded bottom so the head is watertight
+    loop = min(boundary_loops(F), key=lambda l: P[l, 1].mean())
+    ring = np.array(loop)
+    ctr = P[ring][:, [0, 2]].mean(0)
+    rel = P[ring][:, [0, 2]] - ctr
+    ang = np.arctan2(rel[:, 1], rel[:, 0])
+    rx, rz = np.percentile(np.abs(rel[:, 0]), 90), np.percentile(np.abs(rel[:, 1]), 90)
+    ell = np.stack([rx * np.cos(ang), rz * np.sin(ang)], 1)
+    # edge vertices sticking out of the ellipse (bits of the shoulder) are pulled onto it; the edge is levelled
+    r_edge = np.linalg.norm(rel, axis=1); r_ell = np.linalg.norm(ell, axis=1)
+    stick = r_edge > 1.05 * r_ell
+    rel[stick] = ell[stick]
+    P[ring[stick], 0] = rel[stick, 0] + ctr[0]; P[ring[stick], 2] = rel[stick, 1] + ctr[1]
+    P[ring, 1] = level
+    K, drop = 6, 0.6                                  # 6 rings, 6 cm (dm units here)
+    first = len(P)
+    rings = [ring]
+    new = []
+    for j in range(1, K + 1):
+        t = j / K
+        mix = min(1.0, t * 3.0)                       # ring 1 keeps some of the edge shape, then a clean ellipse
+        flare = 1.0 + 0.16 * t * t
+        xz = ((1 - mix) * rel + mix * ell) * flare + ctr
+        y = level - drop * t
+        new += [[x, y, z] for x, z in xz]
+        rings.append(np.arange(first + (j - 1) * len(ring), first + j * len(ring)))
+    P = np.vstack([P, np.array(new)])
+    bottom = len(P)
+    P = np.vstack([P, [[ctr[0], level - drop - 0.12, ctr[1]]]])
+    tris = []
+    for j in range(K):
+        A, Bn = rings[j], rings[j + 1]
+        for k in range(len(ring)):
+            k2 = (k + 1) % len(ring)
+            a, b, a1, b1 = A[k], A[k2], Bn[k], Bn[k2]
+            tris += [[b, a, a1], [b, a1, b1]]
+    last = rings[-1]
+    for k in range(len(ring)):
+        tris.append([last[(k + 1) % len(ring)], last[k], bottom])
+    F = np.vstack([F, np.array(tris)])
+    neck_new = np.arange(first, len(P))
+    # smooth the joint between the original neck and the extension (x, z only, a 2.5 cm band)
+    nb = [set() for _ in range(len(P))]
+    for t in F:
+        for i in range(3):
+            nb[t[i]].update((t[(i + 1) % 3], t[(i + 2) % 3]))
+    band = np.where(np.abs(P[:, 1] - level) < 0.25)[0]
+    for _ in range(12):
+        Q = P.copy()
+        for vi in band:
+            m = P[list(nb[vi])].mean(0)
+            Q[vi, 0] = 0.5 * P[vi, 0] + 0.5 * m[0]
+            Q[vi, 2] = 0.5 * P[vi, 2] + 0.5 * m[2]
+        P = Q
+
+    # cap any other holes (none expected for hm08)
     loops = boundary_loops(F)
-    neck = min(range(len(loops)), key=lambda i: P[loops[i], 1].mean())
     caps = []
     for i, loop in enumerate(loops):
-        if i == neck:
-            continue
         c = len(P)
         P = np.vstack([P, P[loop].mean(0)])
         for k in range(len(loop)):
@@ -217,8 +270,7 @@ def main(base, canon_obj, out, preview=None):
             caps.append([b, a, c])
     if caps:
         F = np.vstack([F, np.array(caps)])
-    neck_loop = loops[neck]
-    print('template', len(P), 'verts', len(F), 'tris', len(loops) - 1, 'holes capped')
+    print('template', len(P), 'verts', len(F), 'tris', len(loops), 'holes capped, neck +', len(neck_new), 'verts')
 
     # similarity to canonical (cm): pupils and nose tip
     C = canonical(canon_obj)
@@ -234,7 +286,7 @@ def main(base, canon_obj, out, preview=None):
     # skull anchors: far from the face (back, top, neck), they keep the head's own shape during the fit
     face_c = C.mean(0)
     dist_face = cKDTree(C).query(P)[0]
-    anchor_ids = np.where(dist_face > 4.0)[0]
+    anchor_ids = np.where(dist_face > 5.5)[0]
     rng = np.random.default_rng(1)
     anchor_ids = rng.choice(anchor_ids, size=min(80, len(anchor_ids)), replace=False)
 
@@ -269,6 +321,10 @@ def main(base, canon_obj, out, preview=None):
         ((P[:, 2] < C[234][2] + 0.5) & (P[:, 1] > nape_y) & (np.abs(P[:, 0]) < 8.5) & (P[:, 1] > C[234][1] + 1.0)) |
         ((P[:, 2] < C[234][2] - 2.0) & (P[:, 1] > nape_y)))
     region[scalp] = 2
+    # 4: the neck (below the chin, and the extension to the collar)
+    neck = (region == 3) & (P[:, 1] < C[152][1] - 0.3)
+    neck[neck_new] = True
+    region[neck] = 4
     print('regions', np.bincount(region))
 
     # ear rest points (where a temple sits): top of the ear's root, just above where it joins the head
@@ -330,7 +386,7 @@ def main(base, canon_obj, out, preview=None):
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
-        cols = np.array(['#d9a07a', '#c0504d', '#3a2a20', '#b08060'])[region]
+        cols = np.array(['#d9a07a', '#c0504d', '#3a2a20', '#b08060', '#a07050'])[region]
         fig, ax = plt.subplots(1, 3, figsize=(15, 6))
         for a, (i, j, name) in zip(ax, [(0, 1, 'front'), (2, 1, 'side (z, y)'), (0, 2, 'top (x, z)')]):
             a.scatter(P[:, i], P[:, j], s=1, c=cols)
