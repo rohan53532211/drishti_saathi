@@ -56,6 +56,8 @@ fun ResultScreen(
     remoteCard: @Composable () -> Unit = {},
     /** "For the shop" → Edit answers. */
     onEditAnswers: (() -> Unit)? = null,
+    /** Frames this customer saved in 3D (with the session). */
+    savedFrames: @Composable () -> Unit = {},
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -169,6 +171,7 @@ fun ResultScreen(
                         else Text(S.compareHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }
                 }
+                savedFrames()
             }
 
             remoteCard()

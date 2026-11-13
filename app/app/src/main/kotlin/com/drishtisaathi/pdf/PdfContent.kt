@@ -22,6 +22,8 @@ sealed class Block {
     data class Para(val text: String, val bold: Boolean = false, val tone: Tone = Tone.NORMAL) : Block()
     data class Bullet(val text: String, val tone: Tone = Tone.NORMAL) : Block()
     data object Rule : Block()
+    /** A saved frame: thumbnail (looked up by [frameId] when the exporter has one), name and one detail line. */
+    data class FrameRow(val frameId: String, val name: String, val line: String) : Block()
 }
 
 enum class Tone { NORMAL, MUTED, URGENT, ROUTINE, ACCENT }
@@ -50,7 +52,18 @@ object PdfContent {
     }
 
     /** Full staff summary in the shop's chosen language. */
-    fun shopCopy(state: UiState, rules: RulesConfig, ctx: ChoiceContext, l: Lang): List<Block> {
+    /** "Saved frames" section: name, size (estimated *), price. Frame facts only, no power numbers. */
+    private fun savedSection(saved: List<com.drishtisaathi.data.SavedFrameEntity>, l: Lang, out: MutableList<Block>) {
+        if (saved.isEmpty()) return
+        out += Block.Heading(com.drishtisaathi.i18n.S3D.savedFrames[l])
+        saved.forEach { f ->
+            out += Block.FrameRow(f.frameId, f.name, "${f.sizeLabel}${if (f.sizeEstimated) "*" else ""} · ₹${"%,d".format(Locale.US, f.priceInr)}")
+        }
+        if (saved.any { it.sizeEstimated }) out += Block.Para("* " + com.drishtisaathi.i18n.S3D.demoCatalog[l], tone = Tone.MUTED)
+    }
+
+    fun shopCopy(state: UiState, rules: RulesConfig, ctx: ChoiceContext, l: Lang,
+                 saved: List<com.drishtisaathi.data.SavedFrameEntity> = emptyList()): List<Block> {
         val r = state.result ?: return emptyList()
         val a = r.assessment
         val out = mutableListOf<Block>()
@@ -124,6 +137,8 @@ object PdfContent {
             }
         }
 
+        savedSection(saved, l, out)
+
         if (a.notes.isNotEmpty()) {
             out += Block.Heading(S.notesForStaff[l])
             a.notes.forEach { out += Block.Bullet(S.note(it, rules.oldNumbers.freshMaxYears)[l]) }
@@ -167,7 +182,7 @@ object PdfContent {
      * Customer copy, always Hindi. Deliberately carries no power numbers (only the lens package,
      * frames and referral), so it cannot be mistaken for a prescription.
      */
-    fun customerCopy(state: UiState, rules: RulesConfig): List<Block> {
+    fun customerCopy(state: UiState, rules: RulesConfig, saved: List<com.drishtisaathi.data.SavedFrameEntity> = emptyList()): List<Block> {
         val l = Lang.HI
         val r = state.result ?: return emptyList()
         val a = r.assessment
@@ -209,6 +224,7 @@ object PdfContent {
                 }
             }
         }
+        savedSection(saved, l, out)
         out += Block.Rule
         if (!urgent) out += Block.Para(com.drishtisaathi.i18n.SShop.phoneCheckNote[l], bold = true)
         out += Block.Para(S.privacyNote[l], tone = Tone.MUTED)

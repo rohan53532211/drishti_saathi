@@ -45,6 +45,15 @@ object S3D {
     val downloadFailed = tx("Could not load this frame. Showing the photo instead.", "यह फ़्रेम लोड नहीं हुआ। फ़ोटो दिखा रहे हैं।")
     val favourite = tx("Save", "सेव करें")
     val favourited = tx("Saved", "सेव किया")
+    val savedToast = tx("Saved to this customer's frames", "इस ग्राहक के फ़्रेम में सेव हो गया")
+    val removedToast = tx("Removed from this customer's frames", "इस ग्राहक के फ़्रेम से हटाया")
+    val noSessionToast = tx("Finish the eye check first, then save frames", "पहले आँखों की जाँच पूरी करें, फिर फ़्रेम सेव करें")
+    val savedFrames = tx("Saved frames", "सेव किए गए फ़्रेम")
+    val frameCatalogue = tx("Frame catalogue", "फ़्रेम कैटलॉग")
+    val allFrames = tx("All frames", "सभी फ़्रेम")
+    val noSaved = tx("No saved frames yet. Tap Save on a frame in 3D.", "अभी कोई फ़्रेम सेव नहीं। 3D में फ़्रेम पर 'सेव करें' दबाएँ।")
+    val savedSession = tx("Session #%d · %s", "सेशन #%d · %s")
+    val openSession = tx("Open session", "सेशन खोलें")
 
     // ---- live try-on ----
     val liveTitle = tx("Live 3D try-on", "लाइव 3D ट्राई-ऑन")
@@ -141,5 +150,6 @@ object S3D {
         scaleCard, scaleFace, scaleDefault, alignCheck, switchedTo2d, avatarTitle, avatarConsentTitle, avatarConsentBody, avatarAgree,
         avatarNo, stepFront, stepLeft, stepRight, avatarHold, turnMore, turnLess, moreLight, photoFront, photoLeft,
         photoRight, makeAvatar, avatarMaking, avatarFailed, avatarLabel, avatarHint, compare, compareOff, pickSecond, favourites, deleteAvatar, deleteShort, retake,
+        savedToast, removedToast, noSessionToast, savedFrames, frameCatalogue, allFrames, noSaved, savedSession, openSession,
     )
 }

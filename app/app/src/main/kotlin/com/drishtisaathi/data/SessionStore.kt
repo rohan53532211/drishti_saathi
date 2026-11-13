@@ -142,11 +142,15 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :id") suspend fun delete(id: Long)
 }
 
-@Database(entities = [SessionEntity::class, DeviceCorrectionEntity::class, RemoteReviewEntity::class], version = 5, exportSchema = true)
+@Database(
+    entities = [SessionEntity::class, DeviceCorrectionEntity::class, RemoteReviewEntity::class, SavedFrameEntity::class],
+    version = 6, exportSchema = true,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun sessions(): SessionDao
     abstract fun deviceCorrections(): DeviceCorrectionDao
     abstract fun remoteReviews(): RemoteReviewDao
+    abstract fun savedFrames(): SavedFrameDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -180,9 +184,17 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) = db.execSQL(CREATE_REMOTE_REVIEWS)
         }
+        /** v6 adds saved_frames (frames a customer saved, kept with the session). SQL matches schemas/.../6.json. */
+        const val CREATE_SAVED_FRAMES =
+            "CREATE TABLE IF NOT EXISTS `saved_frames` (`sessionId` INTEGER NOT NULL, `frameId` TEXT NOT NULL, `name` TEXT NOT NULL, " +
+                "`sizeLabel` TEXT NOT NULL, `sizeEstimated` INTEGER NOT NULL, `priceInr` INTEGER NOT NULL, `category` TEXT NOT NULL, " +
+                "`savedAt` INTEGER NOT NULL, PRIMARY KEY(`sessionId`, `frameId`))"
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) = db.execSQL(CREATE_SAVED_FRAMES)
+        }
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, DB_NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 // Encrypted with SQLCipher; a plain database from an earlier build is encrypted first (DbEncryption).
                 .openHelperFactory(SupportOpenHelperFactory(DbEncryption.prepare(context.applicationContext, DB_NAME)))
                 .build().also { instance = it }

@@ -114,6 +114,7 @@ private object Routes {
 
     // 3D catalogue, viewer, live 3D try-on, face avatar
     const val CATALOG3D = "catalog3d"
+    const val FRAME_CATALOGUE = "frameCatalogue"
     const val VIEWER3D = "viewer3d/{id}"
     fun viewer3d(id: String) = "viewer3d/$id"
     const val LIVE3D = "live3d?frame={frame}&debug={debug}"
@@ -235,6 +236,20 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onDemo = { nav.navigate(Routes.DEMO) },
                 onBridge = { nav.navigate(Routes.BRIDGE_SETTINGS) },
                 onDiagnostics = { nav.navigate(Routes.DIAGNOSTICS) },
+                onBack = { nav.popBackStack() },
+                onCatalogue = { vm.loadCatalog3D(); nav.navigate(Routes.FRAME_CATALOGUE) },
+            )
+        }
+        composable(Routes.FRAME_CATALOGUE) {
+            val (frames, online) = vm.frames3d.collectAsStateWithLifecycle().value
+            androidx.compose.runtime.LaunchedEffect(Unit) { if (frames.isEmpty()) vm.loadCatalog3D() }
+            val saved by vm.allSavedFrames.collectAsState(initial = emptyList())
+            val sessions by vm.sessions.collectAsState(initial = emptyList())
+            val dates = androidx.compose.runtime.remember(sessions) { sessions.associate { it.id to it.createdAt } }
+            com.drishtisaathi.tryon3d.FrameCatalogueScreen(
+                state.lang, vm::setLang, frames, online, vm::thumb3D, saved, dates,
+                onOpen = { nav.navigate(Routes.viewer3d(it.id)) },
+                onOpenSession = { id -> vm.openSession(id) { nav.navigate(Routes.RESULT) } },
                 onBack = { nav.popBackStack() },
             )
         }
@@ -449,6 +464,12 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onDone = { goHome() },
                 onBack = { goHome() },
                 onEditAnswers = { nav.navigate(Routes.EDIT) },
+                savedFrames = {
+                    val rows by vm.savedFrames.collectAsStateWithLifecycle()
+                    val frames = vm.frames3d.collectAsStateWithLifecycle().value.first
+                    androidx.compose.runtime.LaunchedEffect(rows.isNotEmpty()) { if (rows.isNotEmpty() && frames.isEmpty()) vm.loadCatalog3D() }
+                    com.drishtisaathi.tryon3d.SavedFramesCard(state.lang, rows, frames, vm::thumb3D)
+                },
                 extraActions = {
                     val context = LocalContext.current
                     val l = state.lang
@@ -515,6 +536,14 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             }
         }
         // ---- 3D catalogue, viewer, live 3D try-on and face avatar ----
+        val saveToast: (com.drishtisaathi.data.SaveResult) -> Unit = { res ->
+            val t = when (res) {
+                com.drishtisaathi.data.SaveResult.SAVED -> com.drishtisaathi.i18n.S3D.savedToast
+                com.drishtisaathi.data.SaveResult.REMOVED -> com.drishtisaathi.i18n.S3D.removedToast
+                com.drishtisaathi.data.SaveResult.NO_SESSION -> com.drishtisaathi.i18n.S3D.noSessionToast
+            }
+            Toast.makeText(vm.getApplication<android.app.Application>(), t[vm.state.value.lang], Toast.LENGTH_SHORT).show()
+        }
         val frameArg = listOf(navArgument("frame") { type = NavType.StringType; nullable = true; defaultValue = null })
         composable(Routes.CATALOG3D) {
             val (frames, online) = vm.frames3d.collectAsStateWithLifecycle().value
@@ -533,7 +562,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 androidx.compose.runtime.LaunchedEffect(Unit) { nav.popBackStack() }
             } else {
                 com.drishtisaathi.tryon3d.FrameViewer3DScreen(
-                    state.lang, vm::setLang, f, vm::glb3D, vm::thumb3D, f.id in favs, { vm.toggleFavourite3D(f.id) },
+                    state.lang, vm::setLang, f, vm::glb3D, vm::thumb3D, f.id in favs, { vm.toggleFavourite3D(f.id, saveToast) },
                     onLive = { nav.navigate(Routes.live3d(f.id)) },
                     onAvatar = { nav.navigate(if (vm.avatarStore.exists) Routes.avatar(f.id) else Routes.avatarConsent(f.id)) },
                     onBack = { nav.popBackStack() },
@@ -607,7 +636,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 order.distinct().mapNotNull { id -> all.firstOrNull { it.id == id } }.take(20)
             }
             com.drishtisaathi.tryon3d.AvatarViewerScreen(
-                state.lang, vm::setLang, vm.avatarStore, picks, start, vm::glb3D, vm::thumb3D, favs, vm::toggleFavourite3D,
+                state.lang, vm::setLang, vm.avatarStore, picks, start, vm::glb3D, vm::thumb3D, favs, { id -> vm.toggleFavourite3D(id, saveToast) },
                 config = vm.rules.tryOn,
                 onRetake = { vm.avatarStore.clear(); nav.navigate(Routes.avatarCapture(start)) { popUpTo(Routes.AVATAR) { inclusive = true } } },
                 onDelete = { vm.clearAvatar(); nav.popBackStack() },

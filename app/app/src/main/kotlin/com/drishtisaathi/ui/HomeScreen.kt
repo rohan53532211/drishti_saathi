@@ -66,6 +66,7 @@ fun HomeScreen(
 fun ShopToolsScreen(
     lang: Lang, onLang: (Lang) -> Unit, setupDone: Boolean,
     onSetup: () -> Unit, onDemo: () -> Unit, onBridge: () -> Unit, onDiagnostics: () -> Unit, onBack: () -> Unit,
+    onCatalogue: () -> Unit = {},
 ) {
     val l = lang
     AppScaffold(l, onLang, title = SShop.shopTools[l], onBack = onBack) { pad ->
@@ -76,6 +77,7 @@ fun ShopToolsScreen(
             BigButton(if (setupDone) SShop.phoneSetupDone[l] else SShop.phoneSetup[l], onSetup)
             BigButton(com.drishtisaathi.i18n.SFlow.demoMode[l], onDemo)
             BigButton(com.drishtisaathi.i18n.SBridge.settingsTitle[l], onBridge)
+            BigButton(com.drishtisaathi.i18n.S3D.frameCatalogue[l], onCatalogue)
             BigButton(SShop.diagnostics[l], onDiagnostics)
         }
     }

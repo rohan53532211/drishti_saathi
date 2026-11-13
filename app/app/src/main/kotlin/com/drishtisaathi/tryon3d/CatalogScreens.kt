@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import com.drishtisaathi.data.SavedFrameEntity
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -102,14 +105,32 @@ fun Catalog3DScreen(
     onOpen: (Frame3D) -> Unit,
     onBack: () -> Unit,
 ) {
+    AppScaffold(lang, onLang, title = S3D.catalogTitle[lang], onBack = onBack) { pad ->
+        CatalogBrowser(lang, frames, online, recommendedIds, thumb, onOpen, Modifier.padding(pad).fillMaxSize())
+    }
+}
+
+/** Search, category, filters, sort and the frame grid (used by the customer's 3D catalogue and the shop's). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CatalogBrowser(
+    lang: Lang,
+    frames: List<Frame3D>,
+    online: Boolean,
+    recommendedIds: List<String>,
+    thumb: suspend (Frame3D) -> Bitmap?,
+    onOpen: (Frame3D) -> Unit,
+    modifier: Modifier = Modifier,
+    initialCategory: String? = Frame3D.CATEGORY_EYEGLASSES,
+) {
     val l = lang
-    var filter by remember { mutableStateOf(CatalogFilter(category = Frame3D.CATEGORY_EYEGLASSES)) }
+    var filter by remember { mutableStateOf(CatalogFilter(category = initialCategory)) }
     var sort by remember { mutableStateOf(if (recommendedIds.isEmpty()) CatalogSort.PRICE_LOW else CatalogSort.RECOMMENDED) }
     val shown = remember(frames, filter, sort, recommendedIds) { CatalogOrder.sort(filter.apply(frames), sort, recommendedIds) }
     fun facet(sel: (Frame3D) -> String) = frames.map(sel).distinct().sorted()
 
-    AppScaffold(l, onLang, title = S3D.catalogTitle[l], onBack = onBack) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize()) {
+    run {
+        Column(modifier) {
             OutlinedTextField(
                 filter.query, { filter = filter.copy(query = it) }, singleLine = true,
                 placeholder = { Text(S3D.search[l]) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
@@ -174,6 +195,100 @@ fun Catalog3DScreen(
                 }
             }
             Text("* " + S3D.demoCatalog[l], Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/** A saved frame with its catalogue entry when the catalogue still has it (for the thumbnail). */
+private fun catalogueEntry(frames: List<Frame3D>, row: SavedFrameEntity) = frames.firstOrNull { it.id == row.frameId }
+
+@Composable
+private fun SavedFrameRow(
+    l: Lang, row: SavedFrameEntity, frames: List<Frame3D>, thumb: suspend (Frame3D) -> Bitmap?,
+    subtitle: String? = null, onClick: (() -> Unit)? = null,
+) {
+    Row(
+        Modifier.fillMaxWidth().let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val f = catalogueEntry(frames, row)
+        val box = Modifier.width(96.dp).aspectRatio(2.4f).clip(RoundedCornerShape(6.dp))
+        if (f != null) FrameThumb(f, thumb, box) else Box(box.background(Color(0xFFEEF2F2)))
+        Column(Modifier.padding(start = 10.dp).weight(1f)) {
+            Text(row.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(S3D.sizeLine.format(row.sizeLabel + if (row.sizeEstimated) "*" else "")[l] + " · " + rupees(row.priceInr),
+                style = MaterialTheme.typography.bodySmall, color = Teal, fontWeight = FontWeight.SemiBold)
+            subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}
+
+/** Results screen: the frames this customer saved (thumbnail, name, size, price). */
+@Composable
+fun SavedFramesCard(lang: Lang, rows: List<SavedFrameEntity>, frames: List<Frame3D>, thumb: suspend (Frame3D) -> Bitmap?) {
+    if (rows.isEmpty()) return
+    com.drishtisaathi.ui.SectionCard(S3D.savedFrames[lang]) {
+        rows.forEach { SavedFrameRow(lang, it, frames, thumb) }
+        if (rows.any { it.sizeEstimated }) Text("* " + S3D.demoCatalog[lang], style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** Saved frames across sessions, grouped by session (number and date); a tap opens that session. */
+@Composable
+fun SavedAcrossSessions(
+    lang: Lang, rows: List<SavedFrameEntity>, sessionDates: Map<Long, Long>, frames: List<Frame3D>,
+    thumb: suspend (Frame3D) -> Bitmap?, onOpenSession: (Long) -> Unit, modifier: Modifier = Modifier,
+) {
+    val l = lang
+    val fmt = remember { java.text.SimpleDateFormat("dd MMM yyyy", Locale.US) }
+    // rows of sessions that were deleted are already gone (deleted with the session)
+    val groups = remember(rows, sessionDates) { rows.filter { it.sessionId in sessionDates }.groupBy { it.sessionId } }
+    if (groups.isEmpty()) {
+        Text(S3D.noSaved[l], modifier.padding(20.dp), style = MaterialTheme.typography.bodyLarge)
+        return
+    }
+    androidx.compose.foundation.lazy.LazyColumn(modifier, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        groups.forEach { (sid, list) ->
+            item(key = sid) {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(S3D.savedSession.format(sid.toInt(), fmt.format(java.util.Date(sessionDates[sid] ?: 0L)))[l],
+                                style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            TextButton({ onOpenSession(sid) }) { Text(S3D.openSession[l], maxLines = 1) }
+                        }
+                        list.forEach { SavedFrameRow(l, it, frames, thumb, onClick = { onOpenSession(sid) }) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Shop tools > Frame catalogue: every frame (bundled + backend) with filters and the 3D viewer, and saved frames. */
+@Composable
+fun FrameCatalogueScreen(
+    lang: Lang,
+    onLang: (Lang) -> Unit,
+    frames: List<Frame3D>,
+    online: Boolean,
+    thumb: suspend (Frame3D) -> Bitmap?,
+    saved: List<SavedFrameEntity>,
+    sessionDates: Map<Long, Long>,
+    onOpen: (Frame3D) -> Unit,
+    onOpenSession: (Long) -> Unit,
+    onBack: () -> Unit,
+) {
+    val l = lang
+    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+    AppScaffold(l, onLang, title = S3D.frameCatalogue[l], onBack = onBack) { pad ->
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            androidx.compose.material3.TabRow(tab, containerColor = Color.White) {
+                androidx.compose.material3.Tab(tab == 0, { tab = 0 }, text = { Text(S3D.allFrames[l]) })
+                androidx.compose.material3.Tab(tab == 1, { tab = 1 }, text = { Text(S3D.savedFrames[l]) })
+            }
+            if (tab == 0) CatalogBrowser(l, frames, online, emptyList(), thumb, onOpen, Modifier.weight(1f), initialCategory = null)
+            else SavedAcrossSessions(l, saved, sessionDates, frames, thumb, onOpenSession, Modifier.weight(1f))
         }
     }
 }
