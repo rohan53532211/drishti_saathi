@@ -46,3 +46,7 @@ backend/.pytest_cache/
 
 backend/.env
 !backend/.env.example
+
+# 3D frames generated from the Kaggle photos (licence unknown, demo only) - regenerate with tools/frames_to_glb.py
+generated/
+app/app/src/main/assets/frames3d/

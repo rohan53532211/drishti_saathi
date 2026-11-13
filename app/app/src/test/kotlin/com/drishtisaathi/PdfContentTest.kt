@@ -46,7 +46,7 @@ class PdfContentTest {
 
     private fun text(blocks: List<Block>) = blocks.joinToString("\n") {
         when (it) {
-            is Block.Title -> it.text; is Block.Heading -> it.text; is Block.Para -> it.text; is Block.Bullet -> it.text; Block.Rule -> "---"
+            is Block.Title -> it.text; is Block.Heading -> it.text; is Block.Para -> it.text; is Block.Bullet -> it.text; is Block.FrameRow -> it.name + " " + it.line; Block.Rule -> "---"
         }
     }
 
@@ -76,6 +76,27 @@ class PdfContentTest {
         assertFalse(t.contains("−4.50"))
         assertFalse(t.contains(" D "))
         assertWording(t)
+    }
+
+    @Test fun `saved frames - shop and Hindi customer copies list name, size and price, no power numbers`() {
+        val saved = listOf(
+            com.drishtisaathi.data.SavedFrameEntity(9, "k-a1", "Round Black", "50-20-145", true, 899, "eyeglasses", 1),
+            com.drishtisaathi.data.SavedFrameEntity(9, "shop-7", "Shop Aviator", "56-16-140", false, 2450, "eyeglasses", 2),
+        )
+        val shopBlocks = PdfContent.shopCopy(state(myope), rules, ctx, Lang.EN, saved)
+        val rows = shopBlocks.filterIsInstance<Block.FrameRow>()
+        assertEquals(listOf("k-a1", "shop-7"), rows.map { it.frameId })
+        assertEquals("50-20-145* · ₹899", rows[0].line)
+        assertEquals("56-16-140 · ₹2,450", rows[1].line)
+        assertTrue(text(shopBlocks).contains(com.drishtisaathi.i18n.S3D.savedFrames.en))
+        val cust = text(PdfContent.customerCopy(state(myope), rules, saved))
+        assertTrue(cust.contains(com.drishtisaathi.i18n.S3D.savedFrames.hi))
+        assertTrue(cust.contains("Shop Aviator 56-16-140 · ₹2,450"))
+        assertFalse(cust.contains("−4.50"))
+        assertFalse(cust.contains(" D "))
+        assertWording(cust)
+        // nothing saved: no section
+        assertTrue(PdfContent.customerCopy(state(myope), rules).none { it is Block.FrameRow })
     }
 
     @Test fun `urgent referral - one warning at the top, then lens advice and frames for after the visit`() {

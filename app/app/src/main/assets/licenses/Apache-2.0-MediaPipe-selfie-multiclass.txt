@@ -1,0 +1,11 @@
+selfie_multiclass_256x256.tflite
+
+MediaPipe selfie multiclass segmentation model (background, hair, body-skin, face-skin,
+clothes, others), from
+https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite
+
+Model card ("Model Card Multiclass Segmentation", Google, May 10, 2023):
+LICENSED UNDER Apache License, Version 2.0
+https://www.apache.org/licenses/LICENSE-2.0
+
+Used unmodified, on the phone only, to choose which photo pixels colour the 3D avatar's skin and hair.

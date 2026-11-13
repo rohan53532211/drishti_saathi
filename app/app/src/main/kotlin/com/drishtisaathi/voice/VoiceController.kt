@@ -248,7 +248,7 @@ class VoiceController(
     // ---- keyword listening (quick estimate: "dhundhla" = blur) -----------------------------------
 
     private var keyword: KeywordSession? = null
-    private class KeywordSession(val words: List<List<String>>, val onHeard: () -> Unit)
+    private class KeywordSession(val words: List<List<String>>, val onHeard: () -> Unit, val extra: List<Pair<List<List<String>>, () -> Unit>> = emptyList())
 
     /** True when [listenForKeyword] would use the mic (mic on, allowed, and not the system dialog, which covers the screen). */
     val canListenForKeyword: Boolean
@@ -262,11 +262,12 @@ class VoiceController(
      * included) and calls [onHeard] each time. No read-back: the tap button does the same thing. Stops the
      * interview dialogue first. [stopKeyword] (or [detach]) ends it.
      */
-    fun listenForKeyword(keywords: List<String>, onHeard: () -> Unit) = post {
+    fun listenForKeyword(keywords: List<String>, extra: List<Pair<List<String>, () -> Unit>> = emptyList(), onHeard: () -> Unit) = post {
         stopDialogue()
         session = null
         if (!canListenForKeyword) return@post
-        keyword = KeywordSession(keywords.map(TextNormalizer::tokens).filter { it.isNotEmpty() }, onHeard)
+        fun toks(k: List<String>) = k.map(TextNormalizer::tokens).filter { it.isNotEmpty() }
+        keyword = KeywordSession(toks(keywords), onHeard, extra.map { (k, a) -> toks(k) to a })
         startKeyword()
     }
 
@@ -283,7 +284,9 @@ class VoiceController(
         input.start(_state.value.networkConsent, object : SpeechInput.Listener {
             private var fired = false
             private fun check(text: String) {
-                if (!fired && keywordHeard(text, k.words)) { fired = true; k.onHeard() }
+                if (fired) return
+                if (keywordHeard(text, k.words)) { fired = true; k.onHeard(); return }
+                k.extra.firstOrNull { keywordHeard(text, it.first) }?.let { fired = true; it.second() }
             }
             override fun onPartial(text: String) = post { if (gen == generation) check(text) }
             override fun onResults(hypotheses: List<String>, confidences: List<Float>?) = post {

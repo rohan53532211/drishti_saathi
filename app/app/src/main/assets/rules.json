@@ -339,7 +339,12 @@
     "defaultFocalLengthFraction": 0.7,
     "widthScale": 1.0,
     "smoothingAlpha": 0.5,
-    "smoothingResetFraction": 0.35
+    "smoothingResetFraction": 0.35,
+    "pupilHeightRatio": 0.55,
+    "verticalOffsetMm": 0.0,
+    "bridgeForwardMm": 11.0,
+    "earBehindNasionMm": 95.0,
+    "earBelowPupilMm": 5.0
   },
 
 

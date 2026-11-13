@@ -75,6 +75,10 @@ class MediaPipeFaceTracker(
     context: Context,
     private val config: CameraConfig,
     private val enablePhoto: Boolean = false,
+    /** 3D avatar: full-quality 4:3 colour photos of at least [AVATAR_PHOTO_SHORT_PX] px on the short side. */
+    private val avatarPhoto: Boolean = false,
+    /** Staff mode of the avatar capture: the back camera (staff walk the phone round the customer; not mirrored). */
+    private val backCamera: Boolean = false,
 ) : AnalysedFaceTracker, LifecycleOwner {
 
     private val appContext = context.applicationContext
@@ -91,8 +95,8 @@ class MediaPipeFaceTracker(
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
 
-    private val selector = CameraSelector.DEFAULT_FRONT_CAMERA
-    private val mirrored = true // front camera: PreviewView shows a mirror image
+    private val selector = if (backCamera) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
+    private val mirrored = !backCamera // front camera: PreviewView shows a mirror image
 
     private val preview: Preview = Preview.Builder().setResolutionSelector(selector16x9(config.analysisWidthPx, config.analysisHeightPx)).build()
     private var analysisUseCase: ImageAnalysis? = null
@@ -131,7 +135,7 @@ class MediaPipeFaceTracker(
             try {
                 val p = future.get().also { provider = it }
                 if (!p.hasCamera(selector)) {
-                    _error.value = "No front camera"
+                    _error.value = if (backCamera) "No back camera" else "No front camera"
                     return@addListener
                 }
                 val analysis = ImageAnalysis.Builder()
@@ -142,10 +146,13 @@ class MediaPipeFaceTracker(
                 analysis.setAnalyzer(exec) { analyze(it) }
                 analysisUseCase = analysis
                 val useCases = mutableListOf<UseCase>(preview, analysis)
-                if (enablePhoto) {
+                if (enablePhoto || avatarPhoto) {
                     captureUseCase = ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                        .setResolutionSelector(selector16x9(config.photoWidthPx, config.photoHeightPx))
+                        .setCaptureMode(if (avatarPhoto) ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY else ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setResolutionSelector(
+                            if (avatarPhoto) selector4x3(AVATAR_PHOTO_SHORT_PX * 4 / 3, AVATAR_PHOTO_SHORT_PX)
+                            else selector16x9(config.photoWidthPx, config.photoHeightPx),
+                        )
                         .build()
                         .also { useCases += it }
                 }
@@ -213,6 +220,18 @@ class MediaPipeFaceTracker(
                 cont.resumeWithException(exception)
             }
         })
+    }
+
+    @Volatile private var grab: ((Bitmap, FaceFrame) -> Unit)? = null
+
+    /**
+     * 3D avatar (after its own consent screen): the next analysed frame that has a face, as an upright, not mirrored
+     * copy of the image plus its landmarks, so photo and mesh line up exactly. The caller owns the bitmap; it is
+     * kept only in app-private encrypted storage for this session (see tryon3d/AvatarStore).
+     */
+    suspend fun grabFrame(): Pair<Bitmap, FaceFrame> = suspendCancellableCoroutine { cont ->
+        grab = { bmp, frame -> if (cont.isActive) cont.resume(bmp to frame) else bmp.recycle() }
+        cont.invokeOnCancellation { grab = null }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -296,6 +315,15 @@ class MediaPipeFaceTracker(
         }
         _analysis.value = FrameAnalysis(frame, stats, fps, frame.timestampMs)
         _frames.value = frame
+        grab?.let { g ->
+            grab = null
+            try {
+                g(BitmapExtractor.extract(input).copy(Bitmap.Config.ARGB_8888, false), frame)
+            } catch (e: Exception) {
+                Log.w(TAG, "Frame grab failed", e)
+                grab = g // try again on the next frame
+            }
+        }
     }
 
     private fun updateFps(now: Long) {
@@ -308,6 +336,9 @@ class MediaPipeFaceTracker(
             fpsWindowStart = now
         }
     }
+
+    /** Focal length in pixels for an upright image of [w]×[h] from this camera (Camera2 when known). */
+    fun focalPxFor(w: Int, h: Int): Double = focalPx(w, h)
 
     private fun focalPx(w: Int, h: Int): Double {
         focalCache?.let { (cw, ch, f) -> if (cw == w && ch == h) return f }
@@ -357,6 +388,14 @@ class MediaPipeFaceTracker(
     companion object {
         private const val TAG = "FaceTracker"
         const val MODEL_ASSET = "face_landmarker.task"
+
+        /** Short side of the avatar photos (1920 px wide when held upright). */
+        const val AVATAR_PHOTO_SHORT_PX = 1920
+
+        internal fun selector4x3(w: Int, h: Int): ResolutionSelector = ResolutionSelector.Builder()
+            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+            .setResolutionStrategy(ResolutionStrategy(Size(w, h), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
+            .build()
 
         internal fun selector16x9(w: Int, h: Int): ResolutionSelector = ResolutionSelector.Builder()
             .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)

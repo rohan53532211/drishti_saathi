@@ -413,6 +413,21 @@ class DrishtiEngine(private val rules: RulesConfig, priors: AnthroPriors, privat
     }
 
     /**
+     * Ranks other frames (the 3D catalogue) with the same face width, PD, lens power, budget and style inputs as
+     * [evaluate]; all frames that pass the budget filter are returned, best first.
+     */
+    fun rankFrames(frames: List<Frame>, answers: InterviewAnswers, a: Assessment, face: MeasuredFace? = null): List<RankedFrame> {
+        val adv = a.advice
+        val powers = adv?.eyes?.map { Estimate(it.thicknessPowerD, it.startingTrialLens.confidence, it.startingTrialLens.source) }.orEmpty()
+        val prefs = FramePrefs.from(answers, adv?.lensType?.value)
+        return ranker.rank(
+            frames, a.faceWidthMm, a.pdMm, powers, adv?.materialId?.value ?: rules.materials.first().id, prefs,
+            topN = maxOf(1, frames.size), bridgeWidthMm = face?.bridgeWidthMm?.value,
+            fitUncalibrated = a.fitMeasurementsUncalibrated,
+        )
+    }
+
+    /**
      * Addition 3: thickest point of the thicker lens for [frame] in every material, for side-by-side comparison.
      * Null when no power is known or advice was withheld.
      */

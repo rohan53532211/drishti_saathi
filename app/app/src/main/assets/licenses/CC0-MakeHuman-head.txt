@@ -1,0 +1,11 @@
+Head template (head_template.json)
+
+Derived from the MakeHuman base mesh "hm08" (makehuman/data/3dobjs/base.obj,
+https://github.com/makehumancommunity/makehuman).
+
+The base mesh was explicitly released under CC0 1.0 Universal in September 2020 by its
+copyright holders (Data Collection AB, Joel Palmius, Jonas Hauquier). See
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Changes: head and neck cut from the body, fitted to MediaPipe's canonical face model,
+UVs, regions and landmark correspondence added (tools/head_template.py).

@@ -50,10 +50,14 @@ fun ResultScreen(
     onCompare: () -> Unit = {},
     /** Live try-on (addition 8); the argument is the frame to start with, null = first. */
     onTryOn: ((String?) -> Unit)? = null,
+    /** Opens the 3D catalogue with recommended frames first (live 3D try-on and avatar from each frame). */
+    onTry3D: (() -> Unit)? = null,
     /** Remote Optometrist Bridge card (send / waiting / reviewed). */
     remoteCard: @Composable () -> Unit = {},
     /** "For the shop" → Edit answers. */
     onEditAnswers: (() -> Unit)? = null,
+    /** Frames this customer saved in 3D (with the session). */
+    savedFrames: @Composable () -> Unit = {},
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -142,8 +146,9 @@ fun ResultScreen(
 
                 // ---- Frames ----
                 SectionCard(S.suggestedFrames[l]) {
+                    if (onTry3D != null) BigButton(com.drishtisaathi.i18n.S3D.tryIn3d[l], onTry3D, container = Teal)
                     if (onTryOn != null && r.frames.any { it.frame.overlay != null }) {
-                        BigButton(SFlow.tryOnAll[l], { onTryOn(null) }, container = Teal)
+                        BigButton(SFlow.tryOnAll[l], { onTryOn(null) }, container = if (onTry3D != null) null else Teal)
                     }
                     r.frames.forEachIndexed { i, rf ->
                         if (i > 0) HorizontalDivider()
@@ -166,6 +171,7 @@ fun ResultScreen(
                         else Text(S.compareHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }
                 }
+                savedFrames()
             }
 
             remoteCard()

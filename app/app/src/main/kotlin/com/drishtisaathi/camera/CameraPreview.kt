@@ -25,10 +25,12 @@ fun hasCameraPermission(context: Context): Boolean =
  * the camera permission is granted (see [CameraPermissionGate]).
  */
 @Composable
-fun rememberFaceTracker(config: CameraConfig, enablePhoto: Boolean = false, active: Boolean = true): MediaPipeFaceTracker {
+fun rememberFaceTracker(
+    config: CameraConfig, enablePhoto: Boolean = false, active: Boolean = true, avatarPhoto: Boolean = false, backCamera: Boolean = false,
+): MediaPipeFaceTracker {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
-    val tracker = remember(config, enablePhoto) { MediaPipeFaceTracker(context, config, enablePhoto) }
+    val tracker = remember(config, enablePhoto, avatarPhoto, backCamera) { MediaPipeFaceTracker(context, config, enablePhoto, avatarPhoto, backCamera) }
     DisposableEffect(tracker, owner, active) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {

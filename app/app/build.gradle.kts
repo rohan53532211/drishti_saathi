@@ -32,7 +32,7 @@ android {
     }
     buildFeatures { compose = true }
     // MediaPipe memory-maps the .task model from assets, so it must be stored uncompressed.
-    androidResources { noCompress += listOf("task", "tflite") }
+    androidResources { noCompress += listOf("task", "tflite", "glb") }
     // Compress native libs in the APK (OpenCV + MediaPipe are ~60 MB stored); Android extracts them on install.
     packaging { jniLibs { useLegacyPackaging = true } }
 }
@@ -75,6 +75,9 @@ dependencies {
     implementation(libs.camerax.view)
     implementation(libs.mediapipe.tasks.vision)
     implementation(libs.opencv)
+    // 3D frames, live 3D try-on and the face avatar (glTF via Filament gltfio); 2D try-on stays the fallback.
+    implementation(libs.filament.android)
+    implementation(libs.gltfio.android)
 
     testImplementation(libs.junit)
 }

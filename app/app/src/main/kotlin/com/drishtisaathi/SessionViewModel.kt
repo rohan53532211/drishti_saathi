@@ -39,6 +39,14 @@ import com.drishtisaathi.bridge.BridgeProfile
 import com.drishtisaathi.bridge.BridgeSettings
 import com.drishtisaathi.bridge.ReplyNotifier
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import com.drishtisaathi.data.SavedFrameEntity
+import com.drishtisaathi.data.SavedFrames
+import com.drishtisaathi.data.SaveResult
 import com.drishtisaathi.data.RemoteReviewEntity
 import com.drishtisaathi.i18n.SBridge
 import com.drishtisaathi.i18n.Txt
@@ -142,6 +150,46 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         // Camera code (distance, head pose) uses the engine's maths from here on.
         EngineBridge.rules = rules
     }
+
+    // ---- 3D catalogue, live 3D try-on and the face avatar --------------------------------------
+
+    val catalog3d by lazy { com.drishtisaathi.tryon3d.CatalogRepository(getApplication()) }
+    /** The avatar photo + landmarks for this session only (encrypted, deleted with the session). */
+    val avatarStore by lazy { com.drishtisaathi.tryon3d.AvatarStore(getApplication()) }
+    /** The avatar capture starts in Staff mode (back camera) when the shop tools opened the session. */
+    var avatarStaffDefault = false
+    private val _frames3d = MutableStateFlow<Pair<List<com.drishtisaathi.engine.tryon3d.Frame3D>, Boolean>>(emptyList<com.drishtisaathi.engine.tryon3d.Frame3D>() to false)
+    /** (frames, from the server too) */
+    val frames3d: StateFlow<Pair<List<com.drishtisaathi.engine.tryon3d.Frame3D>, Boolean>> = _frames3d.asStateFlow()
+
+    fun loadCatalog3D() {
+        if (_frames3d.value.first.isEmpty()) _frames3d.value = catalog3d.bundled to false
+        viewModelScope.launch { _frames3d.value = catalog3d.all(bridgeSettings.config.value) }
+    }
+
+
+    /** Catalogue ids best first, by the same ranking as the results (face width, budget, style, lens thickness). */
+    fun recommended3D(frames: List<com.drishtisaathi.engine.tryon3d.Frame3D>): List<String> {
+        val s = _state.value
+        val r = s.result ?: return emptyList()
+        return runCatching {
+            engine.rankFrames(frames.map(com.drishtisaathi.engine.tryon3d.Catalog3D::toEngineFrame), s.answers, r.assessment, s.face)
+                .map { it.frame.id }
+        }.getOrDefault(emptyList())
+    }
+
+    suspend fun glb3D(f: com.drishtisaathi.engine.tryon3d.Frame3D): ByteArray = catalog3d.glb(f, bridgeSettings.config.value)
+    suspend fun thumb3D(f: com.drishtisaathi.engine.tryon3d.Frame3D): android.graphics.Bitmap? = catalog3d.thumb(f, bridgeSettings.config.value)
+
+    /** Deletes the avatar (new customer, consent, or "Delete my 3D face"). Saved frames stay with the session. */
+    fun clearAvatar() {
+        avatarStore.clear()
+    }
+
+    init {
+        // An avatar never outlives its session: anything left from a previous run is deleted at start.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { avatarStore.clear() } }
+    }
     val choiceContext: ChoiceContext by lazy {
         ChoiceContext(rules.frameScoring.budgetMaxPriceInrLow, rules.frameScoring.budgetMaxPriceInrMid)
     }
@@ -149,6 +197,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
     private val dao = db.sessions()
     val sessions: Flow<List<SessionEntity>> = dao.observeAll()
+
 
     // ---- learning loop: per-phone-model correction ------------------------------------------
 
@@ -329,6 +378,37 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    // ---- saved frames: kept in Room with the session, deleted with it ----------------------------
+
+    private val savedDao = db.savedFrames()
+    /** The current session's saved frames (empty before the result is saved). */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val savedFrames: StateFlow<List<SavedFrameEntity>> = _state.map { it.sessionId }.distinctUntilChanged()
+        .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else savedDao.observeSession(id) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val favourites3d: StateFlow<Set<String>> = savedFrames.map { rows -> rows.map { it.frameId }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+    /** Every saved frame across sessions, newest session first (shop tools > Frame catalogue). */
+    val allSavedFrames: Flow<List<SavedFrameEntity>> = savedDao.observeAll()
+
+    /** Save or un-save a frame for this customer's session; [onResult] runs on the main thread (toast). */
+    fun toggleFavourite3D(id: String, onResult: (SaveResult) -> Unit = {}) = viewModelScope.launch {
+        saveJob?.join()
+        val frame = _frames3d.value.first.firstOrNull { it.id == id } ?: catalog3d.bundled.firstOrNull { it.id == id }
+        val res = if (frame == null) SaveResult.NO_SESSION
+        else runCatching { SavedFrames.toggle(savedDao, _state.value.sessionId, frame) }.getOrDefault(SaveResult.NO_SESSION)
+        onResult(res)
+    }
+
+    /** Thumbnails of saved frames for the PDF (frames no longer in the catalogue are listed without one). */
+    private suspend fun savedThumbs(rows: List<SavedFrameEntity>): Map<String, android.graphics.Bitmap> {
+        val frames = _frames3d.value.first.ifEmpty { catalog3d.bundled }
+        return rows.mapNotNull { row ->
+            val f = frames.firstOrNull { it.id == row.frameId } ?: return@mapNotNull null
+            runCatching { kotlinx.coroutines.withTimeoutOrNull(4000) { thumb3D(f) } }.getOrNull()?.let { row.frameId to it }
+        }.toMap()
+    }
+
     /** Tick/untick a frame for comparison; a third tick replaces the oldest. */
     fun toggleCompare(frameId: String) = _state.update { s ->
         val ids = if (frameId in s.compareIds) s.compareIds - frameId else (s.compareIds + frameId).takeLast(2)
@@ -340,12 +420,14 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** Fresh session; keeps the language. Forgets the previous customer's iris calibration. */
     fun startNew() {
         calibration.clearCustomer()
+        clearAvatar()
         _state.update { UiState(lang = it.lang) }
     }
 
     /** Customer tapped "I agree": a fresh session starts with the consent time recorded. */
     fun giveConsent() {
         calibration.clearCustomer()
+        clearAvatar()
         _state.update { UiState(lang = it.lang, consentAt = System.currentTimeMillis()) }
     }
 
@@ -575,6 +657,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** Deletes the stored row and any PDFs exported for it. */
     private suspend fun removeSession(id: Long) {
         removeRemote(id)
+        savedDao.deleteForSession(id)
         dao.delete(id)
         withContext(Dispatchers.IO) { PdfExporter.deleteFor(getApplication(), id) }
         refitDeviceCorrection()
@@ -629,9 +712,11 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         runCatching {
             withContext(Dispatchers.IO) {
-                val blocks = if (customer) PdfContent.customerCopy(st, rules) else PdfContent.shopCopy(st, rules, choiceContext, st.lang)
+                val saved = st.sessionId?.let { savedDao.forSession(it) }.orEmpty()
+                val blocks = if (customer) PdfContent.customerCopy(st, rules, saved) else PdfContent.shopCopy(st, rules, choiceContext, st.lang, saved)
+                val thumbs = if (customer) emptyMap() else savedThumbs(saved)
                 val name = PdfExporter.prefix(st.sessionId) + (if (st.demo) "DEMO_" else "") + (if (customer) "customer_hi" else "shop_${st.lang.name.lowercase()}") + ".pdf"
-                PdfExporter.write(app, blocks, File(PdfExporter.dir(app), name))
+                PdfExporter.write(app, blocks, File(PdfExporter.dir(app), name), thumbs)
             }
         }.onSuccess(onReady).onFailure { onError() }
     }

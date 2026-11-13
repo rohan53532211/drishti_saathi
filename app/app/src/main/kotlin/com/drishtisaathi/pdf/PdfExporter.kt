@@ -29,7 +29,7 @@ object PdfExporter {
         dir(context).listFiles { f -> f.name.startsWith(prefix(sessionId)) }?.forEach { it.delete() }
     }
 
-    fun write(context: Context, blocks: List<Block>, file: File): File {
+    fun write(context: Context, blocks: List<Block>, file: File, thumbs: Map<String, android.graphics.Bitmap> = emptyMap()): File {
         // Same bundled Noto font as the screens, so the PDF does not depend on the phone's font either.
         val regular = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.noto_regular) ?: Typeface.DEFAULT
         val boldFace = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.noto_bold) ?: Typeface.DEFAULT_BOLD
@@ -76,6 +76,24 @@ object PdfExporter {
             is Block.Heading -> draw(b.text, paint(13f, true, Tone.NORMAL), spaceBefore = 10f)
             is Block.Para -> draw(b.text, paint(10.5f, b.bold, b.tone))
             is Block.Bullet -> draw("•  " + b.text, paint(10.5f, false, b.tone), indent = 10f, spaceAfter = 2f)
+            is Block.FrameRow -> {
+                val rowH = 36f
+                val thumbW = 86f
+                if (y + rowH > PAGE_H - MARGIN) newPage()
+                val c = page!!.canvas
+                thumbs[b.frameId]?.let { bmp ->
+                    val s = minOf(thumbW / bmp.width, rowH / bmp.height)
+                    val w = bmp.width * s; val h = bmp.height * s
+                    val dx = MARGIN + (thumbW - w) / 2; val dy = y + (rowH - h) / 2
+                    c.drawBitmap(bmp, null, android.graphics.RectF(dx, dy, dx + w, dy + h), Paint(Paint.FILTER_BITMAP_FLAG))
+                }
+                val tx = MARGIN + thumbW + 10f
+                val pName = paint(11f, true, Tone.NORMAL)
+                val pLine = paint(10f, false, Tone.ACCENT)
+                c.drawText(b.name, tx, y + 14f, pName)
+                c.drawText(b.line, tx, y + 29f, pLine)
+                y += rowH + 4f
+            }
             Block.Rule -> {
                 if (y + 12 > PAGE_H - MARGIN) newPage()
                 page!!.canvas.drawLine(MARGIN, y + 4, PAGE_W - MARGIN, y + 4, Paint().apply { color = Color.LTGRAY; strokeWidth = 1f })
