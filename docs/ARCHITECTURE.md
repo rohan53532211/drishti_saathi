@@ -103,15 +103,25 @@ The method follows MediaPipe's face_effect / face geometry sample. Code: `engine
   - Steps: FRONT (|yaw| < 5°), TURN LEFT (yaw 30–40°), TURN RIGHT (yaw −30 to −40°), with |pitch| < 12°.
   - Each photo is taken automatically after the pose is held for 0.5 s, with the face fully in the picture and enough light.
   - On screen: a guide arrow, a live yaw bar and a hold ring. The prompt is spoken once per step, and each photo has its own Retake.
-- **Geometry** (`AvatarBuilder`):
+- **Photos:** full-colour JPEGs from CameraX ImageCapture (≥1920 px short side, MAXIMIZE_QUALITY). MediaPipe runs again on those same photos (IMAGE mode), so landmarks and pixels match. A photo with almost no colour (chroma < 4) is refused.
+- **Landmarks** (`AvatarBuilder.fuse`):
   - Each view's landmarks are brought into canonical face space with that view's pose: pixel rays cut at the posed canonical depth.
   - The views are averaged per vertex, weighted by view (front ×2) and by how squarely each view sees the point.
-  - A smooth head shell (skin, with a hair-coloured cap) is stitched to the face outline. Simple ear placeholders are added.
-- **Texture:** baked at 512² by projective texturing from the 3 photos. Each texel blends the views by facing^4 (front ×2), so each triangle takes the view that faces it best and the seams blend.
+- **Head shape** (`HeadTemplate`, `HeadDeform`, `AvatarBuilder.buildHead`):
+  - **Template:** the MakeHuman base mesh "hm08" (head and neck cut from the body, 4,369 vertices). Source: `makehuman/data/3dobjs/base.obj` in github.com/makehumancommunity/makehuman. **Licence: CC0 1.0 Universal.** The file header says it was "explicitly released as CC0 in september 2020", and the repository's LICENSE.md lists "The base mesh and proxies" among the CC0 assets. The notice ships in `assets/licenses/CC0-MakeHuman-head.txt`. FLAME, DECA and FitMe are not used (licences).
+  - **Offline, once** (`tools/head_template.py` → `assets/head_template.json`, 0.3 MB): the template is similarity-aligned to MediaPipe's canonical face (pupils, nose tip), then fitted with an RBF (φ(r) = r plus affine, skull anchors fixed) until the 468 canonical landmarks lie on its surface (mean 0.03 mm, max 1.06 mm). It stores each landmark's template triangle and barycentric weights, a region per vertex (face, ear, scalp, other skin), the ear rest points, the skull anchors and cylindrical UVs (the face gets most of the atlas; the seam is at the back of the head).
+  - **On the phone:** a per-axis scale about the face centre (width from the 234–454 face width, height from 10–152, depth from the nose tip to the ears as seen in the side views), then an RBF displacement that puts the template's landmark points on the customer's averaged landmarks. The RBF is pinned to zero at the skull anchors, so skull, ears, back of head and neck stay smooth and proportional. Three corrective passes on the same factorisation bring every landmark within 2 mm (tested). True size still comes from the PD (`GlassesFit` scales the glasses by anchors-PD / measured PD).
+- **Texture:** a 2048² sRGB atlas with mipmaps, baked by projective texturing.
+  - Every vertex is projected into each photo. On the face, each photo's own landmark positions correct that projection: their residuals ride on the same RBF and fade to zero on the skull, so the face is as sharp as the photo.
+  - Texels blend the views by facing^4 (front ×2). A view is skipped beyond 75° on the face and beyond 55° elsewhere, since near the silhouette a photo shows background. Side photos are white-balanced to the front on shared cheek points.
+  - Ears and neck come from the photos that see them. The scalp is a hair colour (the median above the forehead in all three photos). Anything no photo sees well is skin (the median on the cheeks). Nothing is grey.
+  - If the template cannot be used, the app falls back to the face-only avatar (face mesh, shell and simple ears).
+- **Rendering:** PBR-neutral tone mapping, 4× MSAA, a soft key light with a shadow, a fill light, rough (non-shiny) skin. Labelled "Simplified 3D preview, not a scan".
 - **Viewer:**
   - The 3D view takes 60% of the height, with labels below it. Drag turns ±90°, pinch zooms.
-  - Frame carousel underneath. Glasses use the same `GlassesFit.place` as live try-on, with the avatar's own anchors.
-  - Compare shows two side-by-side views that turn together. Session favourites.
+  - Frame carousel underneath. Glasses use the same `GlassesFit.place` as live try-on, with the avatar's own anchors; on the template head the temple tips rest on its ear roots (`FaceAnchors.earRestR/L`, 1.5 mm clearance).
+  - Compare shows two side-by-side views that turn together. Compare / Retake / Delete are icon buttons.
+- **Saved frames:** "Save" stores the frame in Room with the session (`saved_frames`, DB v6) and is deleted with it. Only frame facts are stored (id, name, size, price), nothing about the customer. They appear on the Results screen and in both PDFs (shop copy with thumbnails; the Hindi customer copy as name, size and price, with no power numbers), and under Shop tools > Frame catalogue > Saved frames, grouped by session.
 - **Privacy:**
   - The 3 photos and their landmarks are stored only in `filesDir/avatar`, AES-GCM encrypted under an Android Keystore key.
   - They are deleted on a new session, on consent, on "Delete 3D face", and at app start.
@@ -137,6 +147,6 @@ The method follows MediaPipe's face_effect / face geometry sample. Code: `engine
 - **Sizes:** all Kaggle frame sizes are estimated (135 mm front); the true size of each product is unknown. Material and colour tags are guesses and are labelled "estimated". Prices are placeholders.
 - **Frame shape:** fronts are flat extrusions, with no wrap or bevel. Temples are straight bars with a fixed bend. Nose pads are not modelled.
 - **Cut-outs:** some products are rejected, including clear frames whose lens edge cannot be found, and shadow tabs. Silver rims can still show a faint shadow edge.
-- **Avatar:** three photos, but no hair shape or real ears (cap and placeholders), and the back of the head is an ellipsoid. Depth comes from the canonical face, adjusted by the side views. The scale is only as good as the PD.
+- **Avatar:** the head is a generic (MakeHuman) skull bent to the face, not the customer's own skull; hair is a flat colour on the scalp with no volume or hairstyle; the ears are the template's ears, coloured from the side photos, not their real shape. Depth comes from the canonical face, adjusted by the side views. The scale is only as good as the PD.
 - **Live try-on:** the occluder is the canonical face moved rigidly (not rebuilt from the live landmarks each frame). The temple bend comes from fixed ear points, not from detecting the real ears.
 - **APK:** +8.4 MB over the 2D-only debug build (55.4 → 63.8 MB like for like): Filament and gltfio native code 5.6 MB (arm64-v8a and armeabi-v7a), the 30 bundled frames 2.4 MB, code 0.4 MB.

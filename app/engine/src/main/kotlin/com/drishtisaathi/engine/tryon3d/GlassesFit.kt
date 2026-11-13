@@ -26,7 +26,11 @@ data class V3(val x: Double, val y: Double, val z: Double) {
 }
 
 /** The face points the placement needs, in face space (cm). */
-data class FaceAnchors(val nasion: V3, val pupilR: V3, val pupilL: V3, val earR: V3, val earL: V3) {
+data class FaceAnchors(
+    val nasion: V3, val pupilR: V3, val pupilL: V3, val earR: V3, val earL: V3,
+    /** Where the temples rest on a head model's real ears (the avatar's template); null = the rules.json estimate. */
+    val earRestR: V3? = null, val earRestL: V3? = null,
+) {
     /** Pupil distance in face-space units ×10 (mm for the canonical face). */
     val pdMm: Double get() = pupilR.dist(pupilL) * 10
 
@@ -139,8 +143,9 @@ object GlassesFit {
         fun toFace(p: V3): V3 = Mat4.apply(model, p.x, p.y, p.z).let { V3(it[0], it[1], it[2]) }
         val earY = pupils.y - u * cfg.earBelowPupilMm
         val earZ = anchors.nasion.z - u * cfg.earBehindNasionMm
-        val earR = V3(anchors.earR.x, earY, earZ)
-        val earL = V3(anchors.earL.x, earY, earZ)
+        // on a head with real ears the temple tips rest on the ear roots (just outside the skin); otherwise the estimate
+        val earR = anchors.earRestR?.let { V3(it.x - EAR_CLEARANCE, it.y + EAR_CLEARANCE, it.z) } ?: V3(anchors.earR.x, earY, earZ)
+        val earL = anchors.earRestL?.let { V3(it.x + EAR_CLEARANCE, it.y + EAR_CLEARANCE, it.z) } ?: V3(anchors.earL.x, earY, earZ)
         val straight = templeStraightMm(frame)
         var stretch = 1.0
         fun temple(name: String, sign: Double, ear: V3): FloatArray {
@@ -158,6 +163,9 @@ object GlassesFit {
         val lens = listOf("lens_R", "lens_L").mapNotNull { n -> frame.anchors.lensCentresMm[n]?.let { toFace(V3(it[0], it[1], pivot.z)) } }
         return GlassesPlacement(model, tr, tl, k, lens, earR, earL, toFace(pivot), stretch)
     }
+
+    /** Temple tip clearance above / outside the ear root (face-space cm). */
+    const val EAR_CLEARANCE = 0.15
 
     /** Head width (mm) for the fit text: the face's 234–454 width at true scale. */
     fun headWidthMm(anchors: FaceAnchors, pdMm: Double?): Double {

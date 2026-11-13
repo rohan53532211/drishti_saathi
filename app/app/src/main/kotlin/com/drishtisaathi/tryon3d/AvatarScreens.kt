@@ -102,6 +102,16 @@ object FaceMeshAsset {
     fun vertices(context: Context): FloatArray = load(context).second
 }
 
+/** The full-head template (MakeHuman CC0 head fitted to the canonical face; tools/head_template.py). */
+object HeadTemplateAsset {
+    @Volatile private var cached: com.drishtisaathi.engine.tryon3d.HeadTemplate? = null
+    fun get(context: Context): com.drishtisaathi.engine.tryon3d.HeadTemplate? = cached ?: synchronized(this) {
+        cached ?: runCatching {
+            com.drishtisaathi.engine.tryon3d.HeadTemplate.parse(context.assets.open("head_template.json").bufferedReader().use { it.readText() })
+        }.getOrNull()?.also { cached = it }
+    }
+}
+
 @Composable
 fun AvatarConsentScreen(lang: Lang, onLang: (Lang) -> Unit, onAgree: () -> Unit, onNo: () -> Unit) {
     val l = lang
@@ -388,8 +398,15 @@ fun buildAvatar(context: Context, store: AvatarStore): BuiltAvatar? = runCatchin
     val fi = a.views.indexOfFirst { it.step == AvatarStep.FRONT }.takeIf { it >= 0 } ?: return null
     val fv = a.views[fi]
     val skin = AvatarBuilder.medianColour(photos[fi], fv.imageW, fv.imageH, AvatarBuilder.skinPoints(fv.landmarks))
-    val hair = AvatarBuilder.medianColour(photos[fi], fv.imageW, fv.imageH, AvatarBuilder.hairPoints(fv.landmarks))
-    val model = AvatarBuilder.build(views, photos, FaceMeshAsset.vertices(context), FaceMeshAsset.triangles(context), skin) ?: return null
+    // hair colour from above the forehead in the front and the side photos
+    val hair = AvatarBuilder.medianColour(a.views.indices.map { k ->
+        Triple(photos[k], a.views[k].imageW to a.views[k].imageH, AvatarBuilder.hairPoints(a.views[k].landmarks))
+    })
+    val canonical = FaceMeshAsset.vertices(context)
+    val tris = FaceMeshAsset.triangles(context)
+    // the real head shape from the template; the face-only avatar if the template cannot be used
+    val model = HeadTemplateAsset.get(context)?.let { t -> runCatching { AvatarBuilder.buildHead(views, photos, canonical, tris, t, skin, hair) }.getOrNull() }
+        ?: AvatarBuilder.build(views, photos, canonical, tris, skin) ?: return null
     val tex = Bitmap.createBitmap(model.texture, AvatarBuilder.TEX, AvatarBuilder.TEX, Bitmap.Config.ARGB_8888)
     val jpeg = ByteArrayOutputStream().also { tex.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
     tex.recycle()
@@ -420,7 +437,7 @@ fun AvatarPane(avatar: BuiltAvatar, frame: Frame3D?, glb: suspend (Frame3D) -> B
         // turn about the middle of the head; look at it from the front (+z)
         val c = doubleArrayOf(0.0, eyeY - 1.5, a.nasion.z - 8.0)
         render.onFrame = {
-            val d = 58.0 / orbit.zoom
+            val d = 66.0 / orbit.zoom
             render.perspectiveLookAt(doubleArrayOf(c[0], c[1], c[2] + d), c, fovDeg = 30.0, near = 5.0, far = 400.0)
             val rot = Mat4.mul(
                 Mat4.translate(c[0], c[1], c[2]),

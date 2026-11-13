@@ -142,6 +142,9 @@ object AvatarBuilder {
     /** A view never contributes to points it sees at more than this angle (no smeared, back-facing texture or geometry). */
     const val MAX_VIEW_ANGLE_DEG = 75.0
     private val COS_CUT = cos(MAX_VIEW_ANGLE_DEG * PI / 180)
+    /** Off the face (ears, neck, sides) a photo is used only up to this angle: near the silhouette it shows background. */
+    const val MAX_VIEW_ANGLE_OFF_FACE_DEG = 55.0
+    private val COS_CUT_OFF_FACE = cos(MAX_VIEW_ANGLE_OFF_FACE_DEG * PI / 180).toFloat()
     val FACE_OVAL = intArrayOf(
         10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377,
         152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
@@ -215,6 +218,23 @@ object AvatarBuilder {
      * the canonical topology (CCW from the front). Returns null when no view gives a pose.
      */
     fun build(views: List<AvatarView>, photos: List<Pixels>, canonical: FloatArray, triangles: IntArray, skinRgb: IntArray): AvatarModel? {
+        val f = fuse(views, photos, canonical, triangles) ?: return null
+        val usable = f.usable; val verts = f.verts; val cams = f.cams; val baseW = f.baseW
+        val canonN = GlbWriter.vertexNormals(canonical, triangles)
+        val anchors = FaceAnchors.fromVertices(verts)
+        val uvs = uvLayout(canonical)
+        val best = bestViews(verts, triangles, cams, baseW)
+        val gains = colourGains(verts, canonN, usable.map { views[it] }, usable.map { photos[it] }, cams)
+        val tex = bake(verts, triangles, uvs, usable.map { views[it] }, usable.map { photos[it] }, cams, baseW, skinRgb, gains)
+        val shell = shell(verts, anchors)
+        val ears = ears(anchors)
+        return AvatarModel(verts, uvs, triangles.copyOf(), tex, shell.first, shell.second, shell.third, ears.first, ears.second, anchors, best)
+    }
+
+    /** The views that gave a pose, their poses and cameras, and the averaged 468 landmarks in face space. */
+    class Fused(val usable: List<Int>, val poses: List<FloatArray>, val cams: List<V3>, val baseW: List<Double>, val verts: FloatArray)
+
+    fun fuse(views: List<AvatarView>, photos: List<Pixels>, canonical: FloatArray, triangles: IntArray): Fused? {
         require(views.size == photos.size && views.isNotEmpty())
         val poses = views.map { FacePose.solve(it.face(), it.focalPx) }
         val usable = views.indices.filter { poses[it] != null }
@@ -238,15 +258,65 @@ object AvatarBuilder {
             val r = if (sw > 0) acc * (1 / sw) else v(per[usable.indexOfFirst { views[it].step == AvatarStep.FRONT }.coerceAtLeast(0)], i)
             verts[3 * i] = r.x.toFloat(); verts[3 * i + 1] = r.y.toFloat(); verts[3 * i + 2] = r.z.toFloat()
         }
-        val anchors = FaceAnchors.fromVertices(verts)
-        val uvs = uvLayout(canonical)
-        val camsAvatar = cams
-        val best = bestViews(verts, triangles, camsAvatar, baseW)
-        val gains = colourGains(verts, canonN, usable.map { views[it] }, usable.map { photos[it] }, camsAvatar)
-        val tex = bake(verts, triangles, uvs, usable.map { views[it] }, usable.map { photos[it] }, camsAvatar, baseW, skinRgb, gains)
-        val shell = shell(verts, anchors)
-        val ears = ears(anchors)
-        return AvatarModel(verts, uvs, triangles.copyOf(), tex, shell.first, shell.second, shell.third, ears.first, ears.second, anchors, best)
+        return Fused(usable, usable.map { poses[it]!! }, cams, baseW, verts)
+    }
+
+    /** Normalised image position of a face-space point seen with [pose] (face → camera) and focal [f] px. */
+    fun project(pose: FloatArray, f: Double, w: Int, h: Int, x: Double, y: Double, z: Double, out: DoubleArray, o: Int = 0) {
+        val q = Mat4.apply(pose, x, y, z)
+        val d = max(-q[2], 1e-6)
+        out[o] = (w / 2.0 + f * q[0] / d) / w
+        out[o + 1] = (h / 2.0 - f * q[1] / d) / h
+    }
+
+    /**
+     * Real head shape: the [template] (MakeHuman CC0 head) deformed so its face region sits on the averaged landmarks
+     * ([HeadDeform]), proportional skull, ears and neck. Texture: every vertex is projected into each photo; on the face
+     * each photo's own landmark positions correct that projection (their residuals ride on the same RBF, fading to
+     * zero on the skull), so the face is as sharp as the face-only avatar. Ears and neck come from the photos that see
+     * them; the scalp is [hairRgb]; anything no photo sees well is [skinRgb]. Nothing grey.
+     */
+    fun buildHead(
+        views: List<AvatarView>, photos: List<Pixels>, canonical: FloatArray, triangles: IntArray, template: HeadTemplate,
+        skinRgb: IntArray, hairRgb: IntArray,
+    ): AvatarModel? {
+        val f = fuse(views, photos, canonical, triangles) ?: return null
+        val uv = f.usable.map { views[it] }
+        val ph = f.usable.map { photos[it] }
+        val nv = uv.size
+        // per view, landmark image position minus the projection of the averaged landmark: the photo's own correction
+        val tmp = DoubleArray(2)
+        val extra = Array(468) { i ->
+            DoubleArray(2 * nv).also { r ->
+                for (k in 0 until nv) {
+                    val v = uv[k]
+                    project(f.poses[k], v.focalPx, v.imageW, v.imageH, f.verts[3 * i].toDouble(), f.verts[3 * i + 1].toDouble(), f.verts[3 * i + 2].toDouble(), tmp)
+                    r[2 * k] = v.landmarks[i].x - tmp[0]
+                    r[2 * k + 1] = v.landmarks[i].y - tmp[1]
+                }
+            }
+        }
+        val d = HeadDeform.deform(template, canonical, f.verts, extra)
+        val n = template.vertexCount
+        val imagePts = (0 until nv).map { k ->
+            val v = uv[k]
+            FloatArray(2 * n).also { out ->
+                for (i in 0 until n) {
+                    project(f.poses[k], v.focalPx, v.imageW, v.imageH, d.vertices[3 * i].toDouble(), d.vertices[3 * i + 1].toDouble(), d.vertices[3 * i + 2].toDouble(), tmp)
+                    out[2 * i] = (tmp[0] + d.extra[i][2 * k]).toFloat()
+                    out[2 * i + 1] = (tmp[1] + d.extra[i][2 * k + 1]).toFloat()
+                }
+            }
+        }
+        val hair = FloatArray(n) { if (template.region[it] == HeadTemplate.SCALP) 1f else 0f }
+        val canonN = GlbWriter.vertexNormals(canonical, triangles)
+        val gains = colourGains(f.verts, canonN, uv, ph, f.cams)
+        val tex = bake(d.vertices, template.triangles, template.uvs, uv, ph, f.cams, f.baseW, skinRgb, gains, imagePts = imagePts, hairMask = hair, hairRgb = hairRgb,
+            cosCut = FloatArray(n) { if (template.region[it] == HeadTemplate.FACE) COS_CUT.toFloat() else COS_CUT_OFF_FACE })
+        val anchors = FaceAnchors.fromVertices(f.verts).copy(earRestR = d.earRestR, earRestL = d.earRestL)
+        val best = bestViews(d.vertices, template.triangles, f.cams, f.baseW)
+        return AvatarModel(d.vertices, template.uvs, template.triangles.copyOf(), tex, FloatArray(0), IntArray(0), IntArray(0),
+            FloatArray(0), IntArray(0), anchors, best)
     }
 
     /** Cheek and forehead points used to match white balance and exposure between the photos. */
@@ -289,8 +359,17 @@ object AvatarBuilder {
         verts: FloatArray, triangles: IntArray, uvs: FloatArray, views: List<AvatarView>, photos: List<Pixels>,
         cams: List<V3>, baseW: List<Double>, skinRgb: IntArray, gains: List<DoubleArray> = views.map { doubleArrayOf(1.0, 1.0, 1.0) },
         size: Int = TEX,
+        /** Per view, normalised image (x, y) of every vertex; default: the view's landmarks (canonical topology). */
+        imagePts: List<FloatArray>? = null,
+        /** Per vertex 0..1: how much of the texel is [hairRgb] (the scalp) instead of photo / skin. */
+        hairMask: FloatArray? = null,
+        hairRgb: IntArray? = null,
+        /** Per vertex: cos of the widest angle a view may see it at (default [MAX_VIEW_ANGLE_DEG] everywhere). */
+        cosCut: FloatArray? = null,
     ): IntArray {
         val skin = (0xFF shl 24) or (skinRgb[0] shl 16) or (skinRgb[1] shl 8) or skinRgb[2]
+        val ip = imagePts ?: views.map { v -> FloatArray(2 * v.landmarks.size) { j -> if (j % 2 == 0) v.landmarks[j / 2].x else v.landmarks[j / 2].y } }
+        val hr = hairRgb ?: skinRgb
         val tex = IntArray(size * size) { skin }
         val nrm = GlbWriter.vertexNormals(verts, triangles)
         val nv = views.size
@@ -322,21 +401,32 @@ object AvatarBuilder {
                 val nl = sqrt(n0 * n0 + n1 * n1 + n2 * n2).takeIf { it > 1e-9 } ?: continue
                 n0 /= nl; n1 /= nl; n2 /= nl
                 var r = 0.0; var g = 0.0; var b = 0.0; var sw = 0.0
+                val hm = if (hairMask == null) 0f else l0 * hairMask[ia] + l1 * hairMask[ib] + l2 * hairMask[ic]
+                if (hm >= 0.999f) {
+                    tex[y * size + x] = (0xFF shl 24) or (hr[0] shl 16) or (hr[1] shl 8) or hr[2]
+                    continue
+                }
+                val cut = if (cosCut == null) COS_CUT else (l0 * cosCut[ia] + l1 * cosCut[ib] + l2 * cosCut[ic]).toDouble()
                 for (k in 0 until nv) {
                     val dx = camX[k] - p0; val dy = camY[k] - p1; val dz = camZ[k] - p2
                     val dl = sqrt(dx * dx + dy * dy + dz * dz)
                     val c = (n0 * dx + n1 * dy + n2 * dz) / dl
-                    if (c < COS_CUT) { wv[k] = 0.0; continue }
+                    if (c < cut) { wv[k] = 0.0; continue }
                     val w = baseW[k] * c.pow(FACING_POWER)
-                    val lm = views[k].landmarks
-                    val sx = (lm[ia].x * l0 + lm[ib].x * l1 + lm[ic].x * l2) * views[k].imageW.toDouble()
-                    val sy = (lm[ia].y * l0 + lm[ib].y * l1 + lm[ic].y * l2) * views[k].imageH.toDouble()
+                    val q = ip[k]
+                    val sx = (q[2 * ia] * l0 + q[2 * ib] * l1 + q[2 * ic] * l2) * views[k].imageW.toDouble()
+                    val sy = (q[2 * ia + 1] * l0 + q[2 * ib + 1] * l1 + q[2 * ic + 1] * l2) * views[k].imageH.toDouble()
                     if (!photos[k].sampleFull(sx, sy, px)) continue
                     val gk = gains[k]
                     r += px[0] * gk[0] * w; g += px[1] * gk[1] * w; b += px[2] * gk[2] * w; sw += w
                 }
-                if (sw > 0) {
-                    val ri = (r / sw).toInt().coerceIn(0, 255); val gi = (g / sw).toInt().coerceIn(0, 255); val bi = (b / sw).toInt().coerceIn(0, 255)
+                if (sw > 0 || hm > 0f) {
+                    // photo colour (or skin where no photo sees it), then the hair colour blended in at the hairline
+                    var cr = if (sw > 0) r / sw else skinRgb[0].toDouble()
+                    var cg = if (sw > 0) g / sw else skinRgb[1].toDouble()
+                    var cb = if (sw > 0) b / sw else skinRgb[2].toDouble()
+                    if (hm > 0f) { cr += (hr[0] - cr) * hm; cg += (hr[1] - cg) * hm; cb += (hr[2] - cb) * hm }
+                    val ri = cr.toInt().coerceIn(0, 255); val gi = cg.toInt().coerceIn(0, 255); val bi = cb.toInt().coerceIn(0, 255)
                     tex[y * size + x] = (0xFF shl 24) or (ri shl 16) or (gi shl 8) or bi
                 }
             }
@@ -428,15 +518,25 @@ object AvatarBuilder {
         g.addMesh("avatar_face", m.faceVertices, m.faceTriangles, faceMat, GlbWriter.vertexNormals(m.faceVertices, m.faceTriangles), m.faceUvs)
         if (m.skinTriangles.isNotEmpty()) g.addMesh("avatar_shell", m.shellVertices, m.skinTriangles, skinMat, GlbWriter.vertexNormals(m.shellVertices, m.skinTriangles))
         if (m.hairTriangles.isNotEmpty()) g.addMesh("avatar_hair", m.shellVertices, m.hairTriangles, hairMat, GlbWriter.vertexNormals(m.shellVertices, m.hairTriangles))
-        g.addMesh("avatar_ears", m.earVertices, m.earTriangles, skinMat, GlbWriter.vertexNormals(m.earVertices, m.earTriangles))
+        if (m.earTriangles.isNotEmpty()) g.addMesh("avatar_ears", m.earVertices, m.earTriangles, skinMat, GlbWriter.vertexNormals(m.earVertices, m.earTriangles))
         return g.build()
     }
 
     fun srgbToLinear(c: Float): Float = if (c <= 0.04045f) c / 12.92f else ((c + 0.055) / 1.055).pow(2.4).toFloat()
 
     /** Median colour of 5×5 patches around normalised photo points (skin on the cheeks, hair above the forehead). */
-    fun medianColour(px: Pixels, imageW: Int, imageH: Int, points: List<Pair<Double, Double>>): IntArray {
+    fun medianColour(px: Pixels, imageW: Int, imageH: Int, points: List<Pair<Double, Double>>): IntArray =
+        medianColour(listOf(Triple(px, imageW to imageH, points)))
+
+    /** Median over several photos (hair above the forehead in the front and side photos). */
+    fun medianColour(samples: List<Triple<Pixels, Pair<Int, Int>, List<Pair<Double, Double>>>>): IntArray {
         val s = ArrayList<IntArray>()
+        for ((px, wh, points) in samples) collect(px, wh.first, wh.second, points, s)
+        if (s.isEmpty()) return intArrayOf(200, 160, 140)
+        return IntArray(3) { k -> s.map { it[k] }.sorted()[s.size / 2] }
+    }
+
+    private fun collect(px: Pixels, imageW: Int, imageH: Int, points: List<Pair<Double, Double>>, s: ArrayList<IntArray>) {
         val o = DoubleArray(3)
         for ((x, y) in points) {
             val cx = (x * imageW - px.offsetX) * px.scale; val cy = (y * imageH - px.offsetY) * px.scale
@@ -444,8 +544,6 @@ object AvatarBuilder {
                 if (px.sampleInto(cx + dx, cy + dy, o)) s += intArrayOf(o[0].toInt(), o[1].toInt(), o[2].toInt())
             }
         }
-        if (s.isEmpty()) return intArrayOf(200, 160, 140)
-        return IntArray(3) { k -> s.map { it[k] }.sorted()[s.size / 2] }
     }
 
     /**
