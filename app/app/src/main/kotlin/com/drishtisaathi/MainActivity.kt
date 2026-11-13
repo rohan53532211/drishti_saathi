@@ -222,9 +222,9 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.HOME) {
             HomeScreen(
                 state, vm::setLang,
-                onStart = { precisionRun = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
+                onStart = { precisionRun = false; vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onHistory = { nav.navigate(Routes.HISTORY) },
-                onShopTools = { nav.navigate(Routes.SHOP_TOOLS) },
+                onShopTools = { vm.avatarStaffDefault = true; nav.navigate(Routes.SHOP_TOOLS) },
                 setupDone = setupDone,
                 onSetup = { nav.navigate(Routes.PHONE_SETUP) },
             )
@@ -613,9 +613,13 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             val l = state.lang
             val id = entry.arguments?.getString("frame")
             CameraPermissionGate(l, onSkip = { nav.popBackStack() }) {
-                val tracker = rememberFaceTracker(vm.rules.camera, avatarPhoto = true)
+                // Staff mode (back camera) by default when the shop tools started the session, else Self
+                var mode by androidx.compose.runtime.saveable.rememberSaveable {
+                    mutableStateOf(if (vm.avatarStaffDefault) com.drishtisaathi.engine.tryon3d.CaptureMode.STAFF else com.drishtisaathi.engine.tryon3d.CaptureMode.SELF)
+                }
+                val tracker = rememberFaceTracker(vm.rules.camera, avatarPhoto = true, backCamera = mode == com.drishtisaathi.engine.tryon3d.CaptureMode.STAFF)
                 com.drishtisaathi.tryon3d.AvatarCaptureScreen(
-                    l, vm::setLang, tracker,
+                    l, vm::setLang, tracker, mode, { mode = it },
                     cameraPreview = { CameraPreview(tracker, Modifier.fillMaxSize()) },
                     speak = { t -> voice.instructionSpeaker.speak(t, l) },
                     pdMm = state.face?.pdMm?.value,

@@ -13,52 +13,112 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** The three guided photos: straight, turned to the subject's left (yaw > 0), turned to the subject's right (yaw < 0). */
-enum class AvatarStep { FRONT, LEFT, RIGHT }
+/**
+ * The guided photos (yaw > 0 = the face turned to the subject's own left, as the camera sees it): front, 30°, 60° and
+ * 90° (profile) to each side, and an optional photo from above for the hair. [yawDeg] is the target (null: no yaw).
+ * The 30° views give the face shape; every view with a pose colours the texture and outlines the hair.
+ */
+enum class AvatarStep(val yawDeg: Double?) {
+    FRONT(0.0), LEFT(30.0), RIGHT(-30.0), LEFT_60(60.0), RIGHT_60(-60.0), LEFT_90(90.0), RIGHT_90(-90.0), TOP(null);
+
+    val isProfile get() = this == LEFT_90 || this == RIGHT_90
+    /** The landmarks of these views shape the face (MediaPipe is reliable up to about 40°). */
+    val shapesFace get() = this == FRONT || this == LEFT || this == RIGHT
+    /** May be skipped: the profiles (the 60° views are enough when they are hard to hold) and the top of the head. */
+    val optional get() = isProfile || this == TOP
+    /** +1 for the subject's left, −1 right, 0 front / top. */
+    val side get() = when { yawDeg == null || yawDeg == 0.0 -> 0; yawDeg > 0 -> 1; else -> -1 }
+
+    companion object {
+        /** Capture order: a sweep to one side, then the other, then (optional) from above. */
+        val ORDER = listOf(FRONT, LEFT, LEFT_60, LEFT_90, RIGHT, RIGHT_60, RIGHT_90, TOP)
+        /** Required before the avatar can be made. */
+        val REQUIRED = ORDER.filter { !it.optional }
+    }
+}
+
+/** How the photos are taken: the customer turns the head (front camera), or staff walk the phone around (back camera). */
+enum class CaptureMode { SELF, STAFF }
 
 /** Capture gates (degrees, ms). Yaw > 0 = the subject turned to their own left. */
 data class AvatarCaptureConfig(
     val frontMaxYawDeg: Double = 5.0,
-    val sideMinYawDeg: Double = 30.0,
+    val sideMinYawDeg: Double = 27.0,
     val sideMaxYawDeg: Double = 40.0,
+    val wideMinYawDeg: Double = 52.0,
+    val wideMaxYawDeg: Double = 70.0,
+    /** A profile is accepted when MediaPipe still sees the face this far round... */
+    val profileMinYawDeg: Double = 78.0,
+    /** ...or when the face was lost after being seen at least this far round, within [profileLostWithinMs]. */
+    val profileLostFromYawDeg: Double = 55.0,
+    val profileLostWithinMs: Long = 4000,
     val maxPitchDeg: Double = 12.0,
     val holdMs: Long = 500,
 )
 
 /**
  * Auto-capture: a photo is taken once the pose for the current step has been held for [AvatarCaptureConfig.holdMs]
- * with the quality gates passing. Pure, so the gating is unit-tested.
+ * with the quality gates passing. For the 90° profiles MediaPipe often loses the face: the last good head pose is
+ * used (the face seen turned at least [AvatarCaptureConfig.profileLostFromYawDeg] just before). The photo from above
+ * has no yaw and is taken by hand. Pure, so the gating is unit-tested.
  */
 class AvatarCaptureGate(private val cfg: AvatarCaptureConfig = AvatarCaptureConfig()) {
-    data class State(val poseOk: Boolean, val qualityOk: Boolean, val held: Double, val ready: Boolean)
+    data class State(val poseOk: Boolean, val qualityOk: Boolean, val held: Double, val ready: Boolean, val fromLastPose: Boolean = false)
 
     private var since = -1L
+    private var lastYaw: Double? = null
+    private var lastYawMs = -1L
 
-    fun poseOk(step: AvatarStep, yawDeg: Double, pitchDeg: Double): Boolean {
-        if (abs(pitchDeg) > cfg.maxPitchDeg) return false
+    /** The accepted yaw range of a step (signed degrees), null for the photo from above. */
+    fun zone(step: AvatarStep): ClosedFloatingPointRange<Double>? {
+        val s = step.side.toDouble()
+        fun r(lo: Double, hi: Double) = if (s >= 0) lo..hi else -hi..-lo
         return when (step) {
-            AvatarStep.FRONT -> abs(yawDeg) < cfg.frontMaxYawDeg
-            AvatarStep.LEFT -> yawDeg in cfg.sideMinYawDeg..cfg.sideMaxYawDeg
-            AvatarStep.RIGHT -> -yawDeg in cfg.sideMinYawDeg..cfg.sideMaxYawDeg
+            AvatarStep.FRONT -> -cfg.frontMaxYawDeg..cfg.frontMaxYawDeg
+            AvatarStep.LEFT, AvatarStep.RIGHT -> r(cfg.sideMinYawDeg, cfg.sideMaxYawDeg)
+            AvatarStep.LEFT_60, AvatarStep.RIGHT_60 -> r(cfg.wideMinYawDeg, cfg.wideMaxYawDeg)
+            AvatarStep.LEFT_90, AvatarStep.RIGHT_90 -> r(cfg.profileMinYawDeg, 110.0)
+            AvatarStep.TOP -> null
         }
     }
 
+    fun poseOk(step: AvatarStep, yawDeg: Double, pitchDeg: Double): Boolean {
+        if (abs(pitchDeg) > cfg.maxPitchDeg) return false
+        val z = zone(step) ?: return false
+        return if (step == AvatarStep.FRONT) abs(yawDeg) < cfg.frontMaxYawDeg else yawDeg in z
+    }
+
     /** Target yaw of a step (degrees), for the on-screen indicator. */
-    fun targetYaw(step: AvatarStep) = when (step) {
+    fun targetYaw(step: AvatarStep): Double = when (step) {
         AvatarStep.FRONT -> 0.0
         AvatarStep.LEFT -> (cfg.sideMinYawDeg + cfg.sideMaxYawDeg) / 2
         AvatarStep.RIGHT -> -(cfg.sideMinYawDeg + cfg.sideMaxYawDeg) / 2
+        AvatarStep.LEFT_60 -> (cfg.wideMinYawDeg + cfg.wideMaxYawDeg) / 2
+        AvatarStep.RIGHT_60 -> -(cfg.wideMinYawDeg + cfg.wideMaxYawDeg) / 2
+        AvatarStep.LEFT_90 -> 90.0
+        AvatarStep.RIGHT_90 -> -90.0
+        AvatarStep.TOP -> 0.0
     }
 
+    /** Restart the hold (the last seen yaw is kept: the profile fallback needs it). */
     fun reset() { since = -1 }
 
     /** [yawDeg]/[pitchDeg] null = no face. */
     fun update(step: AvatarStep, yawDeg: Double?, pitchDeg: Double?, qualityOk: Boolean, timeMs: Long): State {
-        val pose = yawDeg != null && pitchDeg != null && poseOk(step, yawDeg, pitchDeg)
-        if (!pose || !qualityOk) { since = -1; return State(pose, qualityOk, 0.0, false) }
+        if (yawDeg != null) { lastYaw = yawDeg; lastYawMs = timeMs }
+        var fromLast = false
+        val pose = when {
+            yawDeg != null && pitchDeg != null -> poseOk(step, yawDeg, pitchDeg)
+            step.isProfile -> {
+                val ly = lastYaw
+                (ly != null && ly * step.side >= cfg.profileLostFromYawDeg && timeMs - lastYawMs <= cfg.profileLostWithinMs).also { fromLast = it }
+            }
+            else -> false
+        }
+        if (!pose || !qualityOk) { since = -1; return State(pose, qualityOk, 0.0, false, fromLast) }
         if (since < 0) since = timeMs
         val held = ((timeMs - since).toDouble() / cfg.holdMs).coerceIn(0.0, 1.0)
-        return State(true, true, held, held >= 1.0)
+        return State(true, true, held, held >= 1.0, fromLast)
     }
 
     companion object {
@@ -201,7 +261,7 @@ object AvatarBuilder {
     const val MAX_VIEW_ANGLE_DEG = 75.0
     private val COS_CUT = cos(MAX_VIEW_ANGLE_DEG * PI / 180)
     /** Off the face (ears, neck, sides) a photo is used only up to this angle: near the silhouette it shows background. */
-    const val MAX_VIEW_ANGLE_OFF_FACE_DEG = 55.0
+    const val MAX_VIEW_ANGLE_OFF_FACE_DEG = 60.0
     private val COS_CUT_OFF_FACE = cos(MAX_VIEW_ANGLE_OFF_FACE_DEG * PI / 180).toFloat()
     val FACE_OVAL = intArrayOf(
         10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377,
@@ -294,7 +354,8 @@ object AvatarBuilder {
 
     fun fuse(views: List<AvatarView>, photos: List<Pixels>, canonical: FloatArray, triangles: IntArray): Fused? {
         require(views.size == photos.size && views.isNotEmpty())
-        val poses = views.map { FacePose.solve(it.face(), it.focalPx) }
+        // the 90° profiles and the photo from above have no reliable landmarks: they get their pose later (or none)
+        val poses = views.map { v -> if (v.step.isProfile || v.step == AvatarStep.TOP || v.landmarks.size < 468) null else FacePose.solve(v.face(), v.focalPx) }
         val usable = views.indices.filter { poses[it] != null }
         if (usable.isEmpty() || usable.none { views[it].step == AvatarStep.FRONT }) return null
         val cams = usable.map { cameraInFace(poses[it]!!) }
@@ -308,6 +369,7 @@ object AvatarBuilder {
             val n = v(canonN, i); val p = v(canonical, i)
             var sw = 0.0; var acc = V3(0.0, 0.0, 0.0)
             for (k in per.indices) {
+                if (!views[usable[k]].step.shapesFace) continue      // the 60° landmarks are too rough for the shape
                 val c = dot(n, norm(cams[k] - p))
                 if (c < COS_CUT) continue
                 val w = baseW[k] * c
@@ -336,33 +398,49 @@ object AvatarBuilder {
      */
     fun buildHead(
         views: List<AvatarView>, photos: List<Pixels>, canonical: FloatArray, triangles: IntArray, template: HeadTemplate,
-        skinRgb: IntArray, hairRgb: IntArray,
-    ): AvatarModel? = buildHeadDetailed(views, photos, canonical, triangles, template, skinRgb, hairRgb)?.model
+        skinRgb: IntArray, hairRgb: IntArray, extraHair: List<Pixels> = emptyList(),
+    ): AvatarModel? = buildHeadDetailed(views, photos, canonical, triangles, template, skinRgb, hairRgb, extraHair)?.model
 
-    class HeadBuild(val model: AvatarModel, val bake: HeadBake.Result, val hairOffsets: FloatArray, val folds: Int, val neck: NeckFit.Size)
+    class HeadBuild(
+        val model: AvatarModel, val bake: HeadBake.Result, val hairOffsets: FloatArray, val folds: Int, val neck: NeckFit.Size,
+        /** The steps whose photos were used for the texture (a profile whose placement could not be verified is left out). */
+        val usedSteps: List<AvatarStep> = emptyList(),
+        /** Per used view: its pose (face → camera). */
+        val poses: List<FloatArray> = emptyList(),
+    )
+
+    /** Texture angle limits: a photo colours the face up to 70° off its axis and everything else up to 60°. */
+    const val HEAD_FACE_VIEW_DEG = 70.0
+    private val COS_HEAD_FACE = cos(HEAD_FACE_VIEW_DEG * PI / 180).toFloat()
 
     /**
      * Real head shape: the [template] (MakeHuman CC0 head) deformed so its face region sits on the averaged landmarks
-     * ([HeadDeform]); folds left by the deformation are relaxed; the neck takes its width / depth from the body-skin
-     * silhouette; the scalp is pushed out to the hair outline of the photos ([HairShell]). Texture from [HeadBake]:
-     * class-gated, depth-tested, feathered, inpainted. With no segmentation masks everything still works (no hair
-     * volume, no neck fit, every pixel allowed).
+     * of the front and 30° views ([HeadDeform]); folds left by the deformation are relaxed; the 90° profiles (where
+     * MediaPipe loses the face) are placed from the 60° view and the face-skin silhouette ([ProfilePose]) or skipped;
+     * the neck takes its width / depth from the body-skin silhouette; the scalp is pushed out to the hair outline of
+     * every photo ([HairShell]). Texture from [HeadBake]: class-gated, depth-tested, multi-band blended, eyes from the
+     * front photo only, filled with synthesized skin / hair. [extraHair]: photos without a pose (the top of the head)
+     * that still give hair texture. With no segmentation masks everything still works (no hair volume, no neck fit,
+     * no profiles, every pixel allowed).
      */
     fun buildHeadDetailed(
         views: List<AvatarView>, photos: List<Pixels>, canonical: FloatArray, triangles: IntArray, template: HeadTemplate,
-        skinRgb: IntArray, hairRgb: IntArray,
+        skinRgb: IntArray, hairRgb: IntArray, extraHair: List<Pixels> = emptyList(),
     ): HeadBuild? {
         val f = fuse(views, photos, canonical, triangles) ?: return null
-        val uv = f.usable.map { views[it] }
-        val ph = f.usable.map { photos[it] }
-        val nv = uv.size
+        val uv = f.usable.map { views[it] }.toMutableList()
+        val ph = f.usable.map { photos[it] }.toMutableList()
+        val poses = f.poses.toMutableList()
+        val cams = f.cams.toMutableList()
+        val baseW = f.baseW.toMutableList()
+        val nLm = uv.size
         // per view, landmark image position minus the projection of the averaged landmark: the photo's own correction
         val tmp = DoubleArray(2)
         val extra = Array(468) { i ->
-            DoubleArray(2 * nv).also { r ->
-                for (k in 0 until nv) {
+            DoubleArray(2 * nLm).also { r ->
+                for (k in 0 until nLm) {
                     val v = uv[k]
-                    project(f.poses[k], v.focalPx, v.imageW, v.imageH, f.verts[3 * i].toDouble(), f.verts[3 * i + 1].toDouble(), f.verts[3 * i + 2].toDouble(), tmp)
+                    project(poses[k], v.focalPx, v.imageW, v.imageH, f.verts[3 * i].toDouble(), f.verts[3 * i + 1].toDouble(), f.verts[3 * i + 2].toDouble(), tmp)
                     r[2 * k] = v.landmarks[i].x - tmp[0]
                     r[2 * k + 1] = v.landmarks[i].y - tmp[1]
                 }
@@ -375,8 +453,25 @@ object AvatarBuilder {
         HeadMesh.copyWelded(vtx, weld)
         // folds (e.g. a long jaw pressed into the neck) are relaxed away from the face
         val folds = HeadMesh.unfold(template.vertices, vtx, template.triangles, weld, { template.region[it] != HeadTemplate.FACE })
-        // the neck from the body-skin silhouette (front: width, sides: depth)
         val chinY = f.verts[3 * 152 + 1].toDouble()
+        // 90° profiles: the 60° view of that side (else 30°) turned further, fitted to the face-skin silhouette
+        val anchors0 = FaceAnchors.fromVertices(f.verts)
+        val headCentre = V3(0.0, (anchors0.pupilR.y + anchors0.pupilL.y) / 2 - 1.0, anchors0.nasion.z - 9.0)
+        val faceTris = ArrayList<Int>()
+        for (t in template.triangles.indices step 3) {
+            val q = IntArray(3) { weld[template.triangles[t + it]] }
+            if (q.all { (template.region[it] == HeadTemplate.FACE || template.region[it] == HeadTemplate.EAR) && vtx[3 * it + 1] > chinY - 0.5 }) q.forEach { faceTris += it }
+        }
+        for (i in views.indices) {
+            val st = views[i].step
+            if (!st.isProfile) continue
+            val refSteps = if (st.side > 0) listOf(AvatarStep.LEFT_60, AvatarStep.LEFT) else listOf(AvatarStep.RIGHT_60, AvatarStep.RIGHT)
+            val ref = refSteps.firstNotNullOfOrNull { s -> uv.indexOfFirst { it.step == s }.takeIf { it in 0 until nLm } } ?: continue
+            val fit = ProfilePose.fit(views[i], photos[i], poses[ref], st.side, vtx, faceTris.toIntArray(), headCentre) ?: continue
+            uv += views[i]; ph += photos[i]; poses += fit.pose; cams += cameraInFace(fit.pose); baseW += SIDE_WEIGHT
+        }
+        val nv = uv.size
+        // the neck from the body-skin silhouette (front: width, sides: depth)
         val neckIds = (0 until n).filter { template.region[it] == HeadTemplate.NECK }
         val level = chinY - 3.5
         val ring = neckIds.filter { abs(vtx[3 * it + 1] - level) < 0.6 }
@@ -384,45 +479,49 @@ object AvatarBuilder {
         if (ring.size >= 6) {
             val xs = ring.map { vtx[3 * it].toDouble() }; val zs = ring.map { vtx[3 * it + 2].toDouble() }
             val centre = V3((xs.max() + xs.min()) / 2, level, (zs.max() + zs.min()) / 2)
-            neckSize = NeckFit.measure(V3(centre.x, centre.y, zs.max()), uv, f.poses, ph, f.cams)
+            neckSize = NeckFit.measure(V3(centre.x, centre.y, zs.max()), uv, poses, ph, cams)
             val weight = FloatArray(n) { i ->
                 if (template.region[i] != HeadTemplate.NECK) 0f
                 else ((chinY - 1.0 - vtx[3 * i + 1]) / 3.0).coerceIn(0.0, 1.0).toFloat()
             }
             NeckFit.apply(vtx, weight, centre, neckSize, xs.max() - xs.min(), zs.max() - zs.min())
         }
-        // hair volume up to the hair outline in the photos; kept flat where the temples pass
+        // hair volume up to the hair outline in every photo; kept flat where the temples pass
         val hair = HairShell.hairness(template.region, template.triangles, weld)
         val protect = HairShell.templeProtect(vtx, listOf(d.earRestR, d.earRestL))
-        val off = HairShell.offsets(vtx, template.triangles, weld, hair, uv, f.poses, ph, f.cams, protect)
+        val off = HairShell.offsets(vtx, template.triangles, weld, hair, uv, poses, ph, cams, protect)
         HairShell.displace(vtx, template.triangles, weld, off)
         HeadMesh.copyWelded(vtx, weld)
-        // every vertex into every photo (plus the face correction), and its depth for the visibility test
+        // every vertex into every photo (plus the face correction for the landmark views), and its depth
         val imagePts = ArrayList<FloatArray>(); val depths = ArrayList<FloatArray>()
         for (k in 0 until nv) {
             val v = uv[k]
             val ip = FloatArray(2 * n); val dp = FloatArray(n)
             for (i in 0 until n) {
                 val x = vtx[3 * i].toDouble(); val y = vtx[3 * i + 1].toDouble(); val z = vtx[3 * i + 2].toDouble()
-                project(f.poses[k], v.focalPx, v.imageW, v.imageH, x, y, z, tmp)
-                ip[2 * i] = (tmp[0] + d.extra[i][2 * k]).toFloat()
-                ip[2 * i + 1] = (tmp[1] + d.extra[i][2 * k + 1]).toFloat()
-                dp[i] = (-Mat4.apply(f.poses[k], x, y, z)[2]).toFloat()
+                project(poses[k], v.focalPx, v.imageW, v.imageH, x, y, z, tmp)
+                val ex = if (k < nLm) d.extra[i][2 * k] else 0.0
+                val ey = if (k < nLm) d.extra[i][2 * k + 1] else 0.0
+                ip[2 * i] = (tmp[0] + ex).toFloat()
+                ip[2 * i + 1] = (tmp[1] + ey).toFloat()
+                dp[i] = (-Mat4.apply(poses[k], x, y, z)[2]).toFloat()
             }
             imagePts += ip; depths += dp
         }
         val neckW = FloatArray(n) { if (template.region[it] == HeadTemplate.NECK) 1f else 0f }
-        val cosCut = FloatArray(n) { if (template.region[it] == HeadTemplate.FACE) COS_CUT.toFloat() else COS_CUT_OFF_FACE }
+        val cosCut = FloatArray(n) { if (template.region[it] == HeadTemplate.FACE) COS_HEAD_FACE else COS_CUT_OFF_FACE }
         val canonN = GlbWriter.vertexNormals(canonical, triangles)
-        val gains = colourGains(f.verts, canonN, uv, ph, f.cams)
-        val bake = HeadBake.bake(vtx, template.triangles, template.uvs, weld, uv, ph, f.cams, f.baseW, imagePts, depths,
-            hair, neckW, cosCut, skinRgb, neckSize.rgb ?: skinRgb, hairRgb, gains)
+        val gains = colourGains(f.verts, canonN, uv, ph, cams)
+        val eye = EyeRegion.weights(template.vertices, template.region, canonical)
+        val bake = HeadBake.bake(vtx, template.triangles, template.uvs, weld, uv, ph, cams, baseW, imagePts, depths,
+            hair, neckW, cosCut, skinRgb, neckSize.rgb ?: skinRgb, hairRgb, gains, eye = eye,
+            frontIndex = uv.indexOfFirst { it.step == AvatarStep.FRONT }, extraHair = extraHair)
         // temples rest on the ear roots (ears are not moved by the hair: the band around the temples is protected)
-        val anchors = FaceAnchors.fromVertices(f.verts).copy(earRestR = d.earRestR, earRestL = d.earRestL)
-        val best = bestViews(vtx, template.triangles, f.cams, f.baseW)
+        val anchors = anchors0.copy(earRestR = d.earRestR, earRestL = d.earRestL)
+        val best = bestViews(vtx, template.triangles, cams, baseW)
         val model = AvatarModel(vtx, template.uvs, template.triangles.copyOf(), bake.texture, FloatArray(0), IntArray(0), IntArray(0),
             FloatArray(0), IntArray(0), anchors, best, weld)
-        return HeadBuild(model, bake, off, folds, neckSize)
+        return HeadBuild(model, bake, off, folds, neckSize, uv.map { it.step }, poses.toList())
     }
 
     /** Cheek and forehead points used to match white balance and exposure between the photos. */
@@ -445,8 +544,14 @@ object AvatarBuilder {
             }
             return if (n == 0) null else DoubleArray(3) { acc[it] / n }
         }
+        val frontSkin by lazy { if (fi >= 0) classMedian(listOf(photos[fi]), 1 shl SegClass.FACE_SKIN, 2) else null }
         return views.indices.map { k ->
             if (k == fi || fi < 0) return@map doubleArrayOf(1.0, 1.0, 1.0)
+            if (views[k].landmarks.size < 468) {
+                // a profile: the median face skin of the two photos
+                val a = frontSkin; val b = classMedian(listOf(photos[k]), 1 shl SegClass.FACE_SKIN, 2)
+                return@map if (a == null || b == null) doubleArrayOf(1.0, 1.0, 1.0) else DoubleArray(3) { c -> (a[c] / max(b[c].toDouble(), 1.0)).coerceIn(0.75, 1.33) }
+            }
             // skin points both the front and this view see within 45°
             val both = SKIN_POINTS.filter { i ->
                 val p = v(verts, i); val n = v(normals, i)

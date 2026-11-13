@@ -16,7 +16,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * The avatar's source data for ONE session: the three guided photos (front, left, right, JPEG) with their landmarks,
+ * The avatar's source data for ONE session: the guided photos (front, 30°, 60°, 90° each side, top; JPEG) with their landmarks,
  * transformation matrices and focal length. Kept in app-private storage, AES-GCM encrypted with an Android Keystore
  * key, deleted with the session (new customer, consent, "Delete 3D face", app start). Never uploaded, never part of
  * the bridge profile or the PDFs. The mesh and texture are rebuilt from it in memory.
@@ -115,6 +115,6 @@ class AvatarStore(context: Context) {
 
     companion object {
         private const val ALIAS = "drishti_avatar"
-        private const val VERSION = 3
+        private const val VERSION = 4
     }
 }

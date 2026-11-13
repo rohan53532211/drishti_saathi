@@ -156,6 +156,8 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     val catalog3d by lazy { com.drishtisaathi.tryon3d.CatalogRepository(getApplication()) }
     /** The avatar photo + landmarks for this session only (encrypted, deleted with the session). */
     val avatarStore by lazy { com.drishtisaathi.tryon3d.AvatarStore(getApplication()) }
+    /** The avatar capture starts in Staff mode (back camera) when the shop tools opened the session. */
+    var avatarStaffDefault = false
     private val _frames3d = MutableStateFlow<Pair<List<com.drishtisaathi.engine.tryon3d.Frame3D>, Boolean>>(emptyList<com.drishtisaathi.engine.tryon3d.Frame3D>() to false)
     /** (frames, from the server too) */
     val frames3d: StateFlow<Pair<List<com.drishtisaathi.engine.tryon3d.Frame3D>, Boolean>> = _frames3d.asStateFlow()

@@ -102,6 +102,29 @@ object S3D {
     val deleteShort = tx("Delete", "मिटाएँ")
     val retake = tx("Retake", "फिर से लें")
 
+    // ---- seven-photo capture (Self: the customer turns the head; Staff: the phone goes round the head) ----
+    val modeSelf = tx("Self: turn your head", "ख़ुद: सिर घुमाएँ")
+    val modeStaff = tx("Staff: move the phone round", "स्टाफ़: फ़ोन घुमाएँ")
+    val selfLeft30 = tx("Turn your head a little to your left (about 30°) and hold", "सिर थोड़ा अपनी बाईं ओर घुमाएँ (लगभग 30°) और रुकें")
+    val selfLeft60 = tx("Turn further to your left (about 60°) and hold", "और बाईं ओर घुमाएँ (लगभग 60°) और रुकें")
+    val selfLeft90 = tx("Turn fully to your left so your ear faces the phone, and hold. Too hard? Tap Skip.", "पूरा बाईं ओर घूमें ताकि कान फ़ोन की ओर हो, और रुकें। मुश्किल हो तो छोड़ें दबाएँ।")
+    val selfRight30 = tx("Now turn your head a little to your right (about 30°) and hold", "अब सिर थोड़ा अपनी दाईं ओर घुमाएँ (लगभग 30°) और रुकें")
+    val selfRight60 = tx("Turn further to your right (about 60°) and hold", "और दाईं ओर घुमाएँ (लगभग 60°) और रुकें")
+    val selfRight90 = tx("Turn fully to your right so your ear faces the phone, and hold. Too hard? Tap Skip.", "पूरा दाईं ओर घूमें ताकि कान फ़ोन की ओर हो, और रुकें। मुश्किल हो तो छोड़ें दबाएँ।")
+    val staffFront = tx("Customer looks straight ahead. Hold the phone in front of the face, at eye level.", "ग्राहक सीधे देखें। फ़ोन चेहरे के सामने, आँखों की ऊँचाई पर रखें।")
+    val staffRight30 = tx("Walk the phone to the customer's right side, about 30°, same height", "फ़ोन को ग्राहक की दाईं ओर लगभग 30° ले जाएँ, उतनी ही ऊँचाई पर")
+    val staffRight60 = tx("Keep going round the customer's right side, about 60°", "ग्राहक की दाईं ओर और घूमें, लगभग 60°")
+    val staffRight90 = tx("Now the customer's right ear: a side view", "अब ग्राहक का दायाँ कान: साइड से")
+    val staffLeft30 = tx("Now the customer's left side, about 30°, same height", "अब ग्राहक की बाईं ओर, लगभग 30°, उतनी ही ऊँचाई पर")
+    val staffLeft60 = tx("Keep going round the customer's left side, about 60°", "ग्राहक की बाईं ओर और घूमें, लगभग 60°")
+    val staffLeft90 = tx("Now the customer's left ear: a side view", "अब ग्राहक का बायाँ कान: साइड से")
+    val stepTop = tx("Optional: hold the phone above the head, camera down, and tap Take photo", "चाहें तो: फ़ोन सिर के ऊपर रखें, कैमरा नीचे की ओर, और फ़ोटो लें दबाएँ")
+    val photoTop = tx("Top", "ऊपर")
+    val skip = tx("Skip", "छोड़ें")
+    val takePhoto = tx("Take photo", "फ़ोटो लें")
+    val profileLastPose = tx("Face out of view: using the last head position", "चेहरा नहीं दिख रहा: पिछली स्थिति ली जा रही है")
+    val enoughPhotos = tx("Enough photos: you can make the 3D face now", "काफ़ी फ़ोटो हो गईं: अब 3D चेहरा बना सकते हैं")
+
     // shape / rim / colour / material / band labels (catalogue values are English ids); built once
     private val labels: Map<String, Txt> = mapOf(
         "round" to tx("Round", "गोल"),
@@ -150,6 +173,9 @@ object S3D {
         scaleCard, scaleFace, scaleDefault, alignCheck, switchedTo2d, avatarTitle, avatarConsentTitle, avatarConsentBody, avatarAgree,
         avatarNo, stepFront, stepLeft, stepRight, avatarHold, turnMore, turnLess, moreLight, photoFront, photoLeft,
         photoRight, makeAvatar, avatarMaking, avatarFailed, avatarLabel, avatarHint, compare, compareOff, pickSecond, favourites, deleteAvatar, deleteShort, retake,
+        modeSelf, modeStaff, selfLeft30, selfLeft60, selfLeft90, selfRight30, selfRight60, selfRight90, staffFront,
+        staffRight30, staffRight60, staffRight90, staffLeft30, staffLeft60, staffLeft90, stepTop, photoTop, skip, takePhoto,
+        profileLastPose, enoughPhotos,
         savedToast, removedToast, noSessionToast, savedFrames, frameCatalogue, allFrames, noSaved, savedSession, openSession,
     )
 }

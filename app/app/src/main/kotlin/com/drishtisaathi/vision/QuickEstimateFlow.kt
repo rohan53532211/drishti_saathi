@@ -413,7 +413,6 @@ private fun ReadScreen(
                 fontWeight = FontWeight.Bold)
             BigButton(SShop.cantRead[l], selected = true, onClick = tapNow)
             second?.let { (label, action) -> BigButton(label[l], enabled = action != null, onClick = { action?.invoke() }) }
-            onNewLetters?.let { BigButton(SShop.newLetters[l], onClick = it) }
             if (!typing) {
                 TextButton(onClick = { typing = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SShop.typeDistance[l]) }
             } else {
@@ -429,7 +428,7 @@ private fun ReadScreen(
                 }
             }
     }
-    if (shortInstruction != null) PanelLayout(env, header, shortInstruction, instruction, reading, debugLine, onSkip, target, controls)
+    if (shortInstruction != null) PanelLayout(env, header, shortInstruction, instruction, reading, debugLine, onSkip, target, controls, onNewLetters)
     else TestLayout(
         env, SAnamnesis.quickTitle, eye, instruction,
         reading, status, 0, 1, onSkip, background = Color.White, bigDistance = true, header = header, quiet = true,
@@ -446,6 +445,7 @@ private fun ReadScreen(
 private fun PanelLayout(
     env: TestEnv, header: Txt, short: Txt, full: Txt, reading: DistanceReading?, debugLine: String?, onSkip: () -> Unit,
     target: @Composable BoxScope.() -> Unit, controls: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+    onNewLetters: (() -> Unit)? = null,
 ) {
     val l = env.lang
     var showHow by remember { mutableStateOf(false) }
@@ -471,6 +471,8 @@ private fun PanelLayout(
             contentAlignment = Alignment.Center,
             content = target,
         )
+        // "New letters": a small refresh button right under the letter panel (also by voice, "badlo")
+        onNewLetters?.let { NewLettersButton(SShop.newLettersShort[l], it, Modifier.align(Alignment.End)) }
         Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = controls)
         TextButton(onClick = onSkip, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SVision.skipTest[l], color = Color.Black) }
     }
@@ -480,6 +482,24 @@ private fun PanelLayout(
         title = { Text(SShop.howTo[l]) },
         text = { Text(full[l], style = MaterialTheme.typography.bodyLarge) },
     )
+}
+
+/** A small icon button (refresh arrow + "New") for a new set of letters. */
+@Composable
+private fun NewLettersButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    androidx.compose.material3.OutlinedButton(
+        onClick = onClick, modifier = modifier.height(40.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+    ) {
+        val c = MaterialTheme.colorScheme.primary
+        androidx.compose.foundation.Canvas(Modifier.size(18.dp)) {
+            val w = size.width
+            drawArc(c, 40f, 290f, false, androidx.compose.ui.geometry.Offset(w * 0.12f, w * 0.12f),
+                androidx.compose.ui.geometry.Size(w * 0.76f, w * 0.76f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.13f))
+            drawPath(androidx.compose.ui.graphics.Path().apply { moveTo(w, w * 0.4f); lineTo(w * 0.6f, w * 0.4f); lineTo(w * 0.9f, w * 0.05f); close() }, c)
+        }
+        Text(label, Modifier.padding(start = 6.dp), maxLines = 1, style = MaterialTheme.typography.labelLarge)
+    }
 }
 
 /** The far letter panel takes at least this share of the screen height. */

@@ -77,6 +77,8 @@ class MediaPipeFaceTracker(
     private val enablePhoto: Boolean = false,
     /** 3D avatar: full-quality 4:3 colour photos of at least [AVATAR_PHOTO_SHORT_PX] px on the short side. */
     private val avatarPhoto: Boolean = false,
+    /** Staff mode of the avatar capture: the back camera (staff walk the phone round the customer; not mirrored). */
+    private val backCamera: Boolean = false,
 ) : AnalysedFaceTracker, LifecycleOwner {
 
     private val appContext = context.applicationContext
@@ -93,8 +95,8 @@ class MediaPipeFaceTracker(
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
 
-    private val selector = CameraSelector.DEFAULT_FRONT_CAMERA
-    private val mirrored = true // front camera: PreviewView shows a mirror image
+    private val selector = if (backCamera) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
+    private val mirrored = !backCamera // front camera: PreviewView shows a mirror image
 
     private val preview: Preview = Preview.Builder().setResolutionSelector(selector16x9(config.analysisWidthPx, config.analysisHeightPx)).build()
     private var analysisUseCase: ImageAnalysis? = null
@@ -133,7 +135,7 @@ class MediaPipeFaceTracker(
             try {
                 val p = future.get().also { provider = it }
                 if (!p.hasCamera(selector)) {
-                    _error.value = "No front camera"
+                    _error.value = if (backCamera) "No back camera" else "No front camera"
                     return@addListener
                 }
                 val analysis = ImageAnalysis.Builder()

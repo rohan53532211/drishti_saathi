@@ -80,8 +80,10 @@ class CatalogRepository(private val context: Context, maxCacheBytes: Long = 100L
         val bytes = frame.glb?.let { rel -> runCatching { context.assets.open("$ASSET_DIR/$rel").use { it.readBytes() } }.getOrNull() }
             ?: cached("${frame.id}.glb") { get(bridge, frame.glbUrl ?: error("no glb for ${frame.id}")) }
         require(bytes.size > 12 && bytes[0] == 'g'.code.toByte() && bytes[1] == 'l'.code.toByte()) { "not a GLB" }
-        memory.put(frame.id, bytes)
-        bytes
+        // clear lenses transparent and matte (no grey sheen over the eyes); sunglasses keep their tint
+        val out = com.drishtisaathi.engine.tryon3d.FrameLens.clearLenses(bytes)
+        memory.put(frame.id, out)
+        out
     }
 
     suspend fun thumb(frame: Frame3D, bridge: BridgeConfig): Bitmap? = withContext(Dispatchers.IO) {

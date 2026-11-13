@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -66,6 +67,7 @@ import com.drishtisaathi.engine.tryon3d.AvatarBuilder
 import com.drishtisaathi.engine.tryon3d.AvatarCaptureGate
 import com.drishtisaathi.engine.tryon3d.AvatarStep
 import com.drishtisaathi.engine.tryon3d.AvatarView
+import com.drishtisaathi.engine.tryon3d.CaptureMode
 import com.drishtisaathi.engine.tryon3d.FaceAnchors
 import com.drishtisaathi.engine.tryon3d.Frame3D
 import com.drishtisaathi.engine.tryon3d.GlassesFit
@@ -126,16 +128,31 @@ fun AvatarConsentScreen(lang: Lang, onLang: (Lang) -> Unit, onAgree: () -> Unit,
     }
 }
 
-fun stepPrompt(s: AvatarStep): Txt = when (s) {
+fun stepPrompt(s: AvatarStep, mode: CaptureMode = CaptureMode.SELF): Txt = if (mode == CaptureMode.SELF) when (s) {
     AvatarStep.FRONT -> S3D.stepFront
-    AvatarStep.LEFT -> S3D.stepLeft
-    AvatarStep.RIGHT -> S3D.stepRight
+    AvatarStep.LEFT -> S3D.selfLeft30
+    AvatarStep.LEFT_60 -> S3D.selfLeft60
+    AvatarStep.LEFT_90 -> S3D.selfLeft90
+    AvatarStep.RIGHT -> S3D.selfRight30
+    AvatarStep.RIGHT_60 -> S3D.selfRight60
+    AvatarStep.RIGHT_90 -> S3D.selfRight90
+    AvatarStep.TOP -> S3D.stepTop
+} else when (s) {
+    // the face turned to the customer's left (yaw > 0) = the phone moved to the customer's right
+    AvatarStep.FRONT -> S3D.staffFront
+    AvatarStep.LEFT -> S3D.staffRight30
+    AvatarStep.LEFT_60 -> S3D.staffRight60
+    AvatarStep.LEFT_90 -> S3D.staffRight90
+    AvatarStep.RIGHT -> S3D.staffLeft30
+    AvatarStep.RIGHT_60 -> S3D.staffLeft60
+    AvatarStep.RIGHT_90 -> S3D.staffLeft90
+    AvatarStep.TOP -> S3D.stepTop
 }
 
-private fun stepLabel(s: AvatarStep): Txt = when (s) {
-    AvatarStep.FRONT -> S3D.photoFront
-    AvatarStep.LEFT -> S3D.photoLeft
-    AvatarStep.RIGHT -> S3D.photoRight
+private fun stepLabel(s: AvatarStep): String = when (s) {
+    AvatarStep.FRONT -> "0°"
+    AvatarStep.TOP -> "Top"
+    else -> (if (s.side > 0) "L " else "R ") + kotlin.math.abs(s.yawDeg ?: 0.0).toInt() + "°"
 }
 
 /** One captured photo: what is stored (encrypted) and a small thumbnail for the screen. */
@@ -146,27 +163,31 @@ fun faceInFrame(f: FaceFrame, margin: Float = 0.02f): Boolean =
     f.landmarks.size >= 468 && f.landmarks.take(468).all { it.x in margin..(1 - margin) && it.y in margin..(1 - margin) }
 
 /**
- * A shot from one full-resolution colour photo: cropped to the head (face box + 80% at the sides, 90% above for hair,
- * 70% below for the neck),
- * at most [MAX_CROP_PX] on the long side, JPEG 92. The landmarks stay in full-photo coordinates.
+ * A shot from one full-resolution colour photo: cropped to the head (face box + [side]× its width at the sides, 90%
+ * above for hair, 70% below for the neck), at most [MAX_CROP_PX] on the long side, JPEG 92. The landmarks stay in
+ * full-photo coordinates. Without a face (profile, top of the head) the whole photo is kept (downscaled).
  */
-private fun shotFrom(step: AvatarStep, bmp: Bitmap, f: FaceFrame, defaultFocalFraction: Double): Shot {
-    val lm = f.landmarks.take(468)
-    val x0 = lm.minOf { it.x } * bmp.width; val x1 = lm.maxOf { it.x } * bmp.width
-    val y0 = lm.minOf { it.y } * bmp.height; val y1 = lm.maxOf { it.y } * bmp.height
-    // room for big hair at the sides and on top, and the neck down to the collar
-    val mx = (x1 - x0) * 0.8f; val myTop = (y1 - y0) * 0.9f; val myBottom = (y1 - y0) * 0.7f
-    val cx0 = (x0 - mx).toInt().coerceIn(0, bmp.width - 1); val cy0 = (y0 - myTop).toInt().coerceIn(0, bmp.height - 1)
-    val cx1 = (x1 + mx).toInt().coerceIn(cx0 + 1, bmp.width); val cy1 = (y1 + myBottom).toInt().coerceIn(cy0 + 1, bmp.height)
+private fun shotFrom(step: AvatarStep, bmp: Bitmap, f: FaceFrame?, focalPx: Double, side: Float = 0.8f): Shot {
+    var cx0 = 0; var cy0 = 0; var cx1 = bmp.width; var cy1 = bmp.height
+    if (f != null && f.landmarks.size >= 468) {
+        val lm = f.landmarks.take(468)
+        val x0 = lm.minOf { it.x } * bmp.width; val x1 = lm.maxOf { it.x } * bmp.width
+        val y0 = lm.minOf { it.y } * bmp.height; val y1 = lm.maxOf { it.y } * bmp.height
+        // room for big hair at the sides and on top, and the neck down to the collar
+        val mx = (x1 - x0) * side; val myTop = (y1 - y0) * 0.9f; val myBottom = (y1 - y0) * 0.7f
+        cx0 = (x0 - mx).toInt().coerceIn(0, bmp.width - 1); cy0 = (y0 - myTop).toInt().coerceIn(0, bmp.height - 1)
+        cx1 = (x1 + mx).toInt().coerceIn(cx0 + 1, bmp.width); cy1 = (y1 + myBottom).toInt().coerceIn(cy0 + 1, bmp.height)
+    }
     val crop = Bitmap.createBitmap(bmp, cx0, cy0, cx1 - cx0, cy1 - cy0)
     val sc = minOf(1f, MAX_CROP_PX.toFloat() / maxOf(crop.width, crop.height))
-    val img = if (sc < 1f) Bitmap.createScaledBitmap(crop, (crop.width * sc).toInt(), (crop.height * sc).toInt(), true).also { crop.recycle() } else crop
+    val img = if (sc < 1f) Bitmap.createScaledBitmap(crop, (crop.width * sc).toInt(), (crop.height * sc).toInt(), true).also { if (crop !== bmp) crop.recycle() } else crop
     val jpeg = ByteArrayOutputStream().also { img.compress(Bitmap.CompressFormat.JPEG, 92, it) }.toByteArray()
     val th = Bitmap.createScaledBitmap(img, 96, (96f * img.height / img.width).toInt().coerceAtLeast(1), true)
-    img.recycle()
-    val focal = f.focalLengthPx ?: (defaultFocalFraction * maxOf(f.imageWidthPx, f.imageHeightPx))
+    if (img !== bmp) img.recycle()
+    val withFace = f != null && f.landmarks.size >= 468
     return Shot(
-        AvatarStore.View(step, jpeg, f.landmarks, f.imageWidthPx, f.imageHeightPx, f.transformMatrix, focal, cx0.toDouble(), cy0.toDouble(), sc.toDouble()),
+        AvatarStore.View(step, jpeg, if (withFace) f!!.landmarks else emptyList(), bmp.width, bmp.height, if (withFace) f!!.transformMatrix else null,
+            focalPx, cx0.toDouble(), cy0.toDouble(), sc.toDouble()),
         th.asImageBitmap(),
     )
 }
@@ -183,16 +204,22 @@ private fun pixelsOf(b: Bitmap, step: Int = 1): Pixels {
 }
 
 /**
- * Guided three-photo capture: FRONT → TURN LEFT → TURN RIGHT. Each photo is taken automatically once the pose is held
- * for 0.5 s and the quality gates pass (face fully in the picture, enough light). On-screen arrow and live yaw
- * indicator; the prompt is spoken once per step; any photo can be retaken. The photos are stored encrypted on this
- * phone only.
+ * Guided capture over 180°: front, 30°, 60° and 90° (profile) to each side, and an optional photo from above for the
+ * hair. Two modes: Self (the customer turns the head in front of the front camera) and Staff (the customer looks
+ * straight ahead and staff walk the phone round the head at the same height, back camera). Each photo is taken
+ * automatically once the pose is held for 0.5 s and the quality gates pass (face fully in the picture, enough light,
+ * colour). For the profiles, where MediaPipe may lose the face, the last good head pose is used (the placement is
+ * checked later against the segmentation, and a view that does not fit is left out). The prompt is spoken once per
+ * step; every photo can be retaken; the profiles and the top can be skipped (the 60° photos are enough). The photos
+ * are stored encrypted on this phone only.
  */
 @Composable
 fun AvatarCaptureScreen(
     lang: Lang,
     onLang: (Lang) -> Unit,
     tracker: MediaPipeFaceTracker,
+    mode: CaptureMode,
+    onMode: (CaptureMode) -> Unit,
     cameraPreview: @Composable () -> Unit,
     speak: (Txt) -> Unit,
     pdMm: Double?,
@@ -206,21 +233,26 @@ fun AvatarCaptureScreen(
     val l = lang
     val gate = remember { AvatarCaptureGate() }
     val shots = remember { mutableStateMapOf<AvatarStep, Shot>() }
+    val skipped = remember { mutableStateListOf<AvatarStep>() }
     var step by remember { mutableStateOf<AvatarStep?>(AvatarStep.FRONT) }
     var gs by remember { mutableStateOf<AvatarCaptureGate.State?>(null) }
     var yawNow by remember { mutableStateOf<Double?>(null) }
     var dark by remember { mutableStateOf(false) }
     var hasFace by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var shooting by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val still = remember { lazy { StillFaceLandmarker(context) } }
     DisposableEffect(Unit) { onDispose { if (still.isInitialized()) runCatching { still.value.close() } } }
+    fun next() { step = AvatarStep.ORDER.firstOrNull { it !in shots && it !in skipped } }
+    val ready = AvatarStep.REQUIRED.all { it in shots }
 
-    LaunchedEffect(step) { step?.let { speak(stepPrompt(it)) } }
-    LaunchedEffect(step) {
+    LaunchedEffect(step, mode) { step?.let { speak(stepPrompt(it, mode)) } }
+    LaunchedEffect(step, tracker) {
         val s = step ?: return@LaunchedEffect
+        if (s == AvatarStep.TOP) return@LaunchedEffect          // no face to track: taken by hand
         gate.reset()
         tracker.analysis.collect { a ->
             val face = a?.face
@@ -229,7 +261,7 @@ fun AvatarCaptureScreen(
             yawNow = ang?.first
             val light = a?.stats?.meanBrightness?.let { it in minBrightness..maxBrightness } ?: true
             dark = face != null && !light
-            val quality = face != null && light && faceInFrame(face)
+            val quality = if (s.isProfile) light else face != null && light && faceInFrame(face)
             val st = gate.update(s, ang?.first, ang?.second, quality, a?.timestampMs ?: 0L)
             gs = st
             if (st.ready) {
@@ -238,17 +270,27 @@ fun AvatarCaptureScreen(
                     val bmp = tracker.takePhoto()
                     try {
                         withContext(Dispatchers.Default) {
-                            val fr = still.value.detect(bmp, tracker.focalPxFor(bmp.width, bmp.height))
+                            val focal = tracker.focalPxFor(bmp.width, bmp.height)
+                            val fr = still.value.detect(bmp, focal)
                             val ang2 = AvatarCaptureGate.angles(fr)
                             val colour = AvatarBuilder.chroma(pixelsOf(bmp, 8)) >= AvatarBuilder.MIN_CHROMA
-                            if (fr != null && ang2 != null && gate.poseOk(s, ang2.first, ang2.second) && faceInFrame(fr) && colour)
-                                shotFrom(s, bmp, fr, defaultFocalFraction) else null
+                            when {
+                                !colour -> null
+                                s.isProfile -> {
+                                    // a profile: kept whole; refused only when the face is clearly turned back towards the phone
+                                    if (ang2 != null && kotlin.math.abs(ang2.first) < 45.0) null
+                                    else shotFrom(s, bmp, null, focal)
+                                }
+                                fr != null && ang2 != null && gate.poseOk(s, ang2.first, ang2.second) && faceInFrame(fr) ->
+                                    shotFrom(s, bmp, fr, focal, side = if (kotlin.math.abs(s.yawDeg ?: 0.0) >= 50.0) 1.4f else 0.8f)
+                                else -> null
+                            }
                         }
                     } finally { bmp.recycle() }
                 }.getOrNull()
                 if (shot != null) {
                     shots[s] = shot
-                    step = AvatarStep.entries.firstOrNull { it !in shots }
+                    next()
                 } else gate.reset()
             }
         }
@@ -256,6 +298,17 @@ fun AvatarCaptureScreen(
 
     AppScaffold(l, onLang, title = S3D.avatarTitle[l], onBack = onBack) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
+            // Self / Staff
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (m in CaptureMode.entries) {
+                    val sel = m == mode
+                    Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (sel) Teal else Color(0xFFE6ECEC))
+                        .clickable(enabled = !busy) { onMode(m) }.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                        Text((if (m == CaptureMode.SELF) S3D.modeSelf else S3D.modeStaff)[l], color = if (sel) Color.White else Color.Black,
+                            style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
             Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
                 cameraPreview()
                 val s = step
@@ -264,53 +317,75 @@ fun AvatarCaptureScreen(
                     val target = gate.targetYaw(s)
                     val y = yawNow
                     val msg = when {
-                        !hasFace -> com.drishtisaathi.i18n.STryOn.noFace[l]
+                        s == AvatarStep.TOP -> stepPrompt(s, mode)[l]
+                        st?.fromLastPose == true -> S3D.profileLastPose[l]
+                        !hasFace && !s.isProfile -> com.drishtisaathi.i18n.STryOn.noFace[l]
                         dark -> S3D.moreLight[l]
                         st?.poseOk == true -> S3D.avatarHold[l]
-                        s != AvatarStep.FRONT && y != null && kotlin.math.abs(y) < kotlin.math.abs(target) -> stepPrompt(s)[l] + " · " + S3D.turnMore[l]
-                        s != AvatarStep.FRONT && y != null -> S3D.turnLess[l]
-                        else -> stepPrompt(s)[l]
+                        s != AvatarStep.FRONT && y != null && kotlin.math.abs(y) < kotlin.math.abs(target) -> stepPrompt(s, mode)[l] + " · " + S3D.turnMore[l]
+                        s != AvatarStep.FRONT && y != null && gate.zone(s)?.let { y in it } == false -> S3D.turnLess[l]
+                        else -> stepPrompt(s, mode)[l]
                     }
                     Hint(msg, Modifier.align(Alignment.TopCenter).padding(8.dp))
-                    if (s != AvatarStep.FRONT) GuideArrow(pointLeft = s == AvatarStep.LEFT, Modifier.align(Alignment.Center).size(120.dp))
-                    YawIndicator(y, target, ok = st?.poseOk == true, held = st?.held ?: 0.0,
-                        Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth().height(36.dp))
+                    if (s.side != 0) GuideArrow(pointLeft = s.side > 0, Modifier.align(Alignment.Center).size(110.dp))
+                    if (s != AvatarStep.TOP) YawIndicator(y, s, gate, ok = st?.poseOk == true, held = st?.held ?: 0.0,
+                        Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth().height(40.dp))
+                    Row(Modifier.align(Alignment.BottomEnd).padding(bottom = 60.dp, end = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (s == AvatarStep.TOP) BigButton(S3D.takePhoto[l], {
+                            shooting = true
+                            scope.launch {
+                                val shot = runCatching {
+                                    val bmp = tracker.takePhoto()
+                                    try { withContext(Dispatchers.Default) { shotFrom(s, bmp, null, tracker.focalPxFor(bmp.width, bmp.height)) } } finally { bmp.recycle() }
+                                }.getOrNull()
+                                shooting = false
+                                if (shot != null) { shots[s] = shot; next() }
+                            }
+                        }, enabled = !shooting, container = Teal)
+                        if (s.optional) BigButton(S3D.skip[l], { skipped += s; next() }, enabled = !shooting)
+                    }
                 }
-                if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
+                if (busy || shooting) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
             }
-            // the three photos, each with its own retake
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (s in AvatarStep.entries) {
+            // the photos, each with its own retake
+            LazyRow(contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(AvatarStep.ORDER, key = { it.name }) { s ->
                     val shot = shots[s]
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.height(72.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFE6ECEC))
-                            .border(BorderStroke(if (s == step) 3.dp else 1.dp, if (s == step) Teal else Color.LightGray), RoundedCornerShape(8.dp))) {
-                            if (shot != null) Image(shot.thumb, null, Modifier.fillMaxSize().graphicsLayer { scaleX = -1f }, contentScale = ContentScale.Crop)
+                    Column(Modifier.width(64.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.height(64.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFE6ECEC))
+                            .border(BorderStroke(if (s == step) 3.dp else 1.dp, if (s == step) Teal else Color.LightGray), RoundedCornerShape(8.dp))
+                            .clickable(enabled = !busy && shot == null && s in skipped) { skipped.remove(s); step = s }) {
+                            if (shot != null) Image(shot.thumb, null, Modifier.fillMaxSize().graphicsLayer { scaleX = if (mode == CaptureMode.SELF) -1f else 1f }, contentScale = ContentScale.Crop)
+                            else if (s in skipped) Text(S3D.skip[l], Modifier.align(Alignment.Center), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                         }
-                        Text(stepLabel(s)[l], style = MaterialTheme.typography.labelMedium, maxLines = 1)
-                        if (shot != null) TextButton({ shots.remove(s); step = s; failed = false }, enabled = !busy) {
-                            Text(S3D.retake[l], maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium)
+                        Text(if (s == AvatarStep.TOP) S3D.photoTop[l] else stepLabel(s), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                        if (shot != null) TextButton({ shots.remove(s); step = s; failed = false }, enabled = !busy,
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)) {
+                            Text(S3D.retake[l], maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
             }
             if (failed) Text(S3D.avatarFailed[l], Modifier.padding(horizontal = 12.dp), color = Color(0xFFB00020))
-            if (step == null) BigButton(S3D.makeAvatar[l], {
-                busy = true; failed = false
-                scope.launch {
-                    val ok = runCatching {
-                        val views = AvatarStep.entries.map { shots.getValue(it).view }
-                        withContext(Dispatchers.IO) { store.save(AvatarStore.Avatar(views, pdMm)) }
-                    }.isSuccess
-                    busy = false
-                    if (ok) onDone() else failed = true
-                }
-            }, Modifier.padding(12.dp), enabled = !busy, container = Teal)
+            if (ready) {
+                if (step != null) Text(S3D.enoughPhotos[l], Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
+                BigButton(S3D.makeAvatar[l], {
+                    busy = true; failed = false
+                    scope.launch {
+                        val ok = runCatching {
+                            val views = AvatarStep.ORDER.mapNotNull { shots[it]?.view }
+                            withContext(Dispatchers.IO) { store.save(AvatarStore.Avatar(views, pdMm)) }
+                        }.isSuccess
+                        busy = false
+                        if (ok) onDone() else failed = true
+                    }
+                }, Modifier.padding(12.dp), enabled = !busy && !shooting, container = Teal)
+            }
         }
     }
 }
 
-/** Big arrow showing which way to turn (as seen in the mirror-like preview). */
+/** Big arrow showing which way to turn (Self, mirror-like preview) or to walk (Staff: the customer's right is on your left). */
 @Composable
 private fun GuideArrow(pointLeft: Boolean, modifier: Modifier) {
     Canvas(modifier) {
@@ -333,22 +408,27 @@ private fun GuideArrow(pointLeft: Boolean, modifier: Modifier) {
 }
 
 /**
- * Live yaw: a bar from −50° to +50°, the target band, and a dot for the current head turn (mirrored like the preview:
- * turning to your left moves the dot left). The dot fills while the pose is held.
+ * Live yaw: a bar from −100° to +100° with the target zone of every step (the current one bright) and a dot for the
+ * current head turn (turning to your left, or walking to the customer's right, moves the dot left). The dot fills
+ * while the pose is held.
  */
 @Composable
-private fun YawIndicator(yawDeg: Double?, targetDeg: Double, ok: Boolean, held: Double, modifier: Modifier) {
+private fun YawIndicator(yawDeg: Double?, step: AvatarStep, gate: AvatarCaptureGate, ok: Boolean, held: Double, modifier: Modifier) {
     Canvas(modifier.clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.5f))) {
         val w = size.width; val h = size.height
-        fun x(deg: Double) = (w / 2 - (deg / 50.0).coerceIn(-1.0, 1.0) * (w / 2 - 20)).toFloat()
+        fun x(deg: Double) = (w / 2 - (deg / 100.0).coerceIn(-1.0, 1.0) * (w / 2 - 20)).toFloat()
         drawLine(Color.White.copy(alpha = 0.6f), Offset(20f, h / 2), Offset(w - 20f, h / 2), strokeWidth = 4f)
-        val band = 5.0
-        drawLine(Color(0xFF7CE0C8), Offset(x(targetDeg - band), h / 2), Offset(x(targetDeg + band), h / 2), strokeWidth = 14f)
+        for (s in AvatarStep.ORDER) {
+            val z = gate.zone(s) ?: continue
+            val cur = s == step
+            drawLine(if (cur) Color(0xFF7CE0C8) else Color.White.copy(alpha = 0.25f), Offset(x(z.start), h / 2), Offset(x(z.endInclusive.coerceAtMost(100.0)), h / 2),
+                strokeWidth = if (cur) 16f else 8f)
+        }
         yawDeg?.let {
             val c = Offset(x(it), h / 2)
-            drawCircle(if (ok) Color(0xFF2ECC71) else Color.White, h * 0.32f, c)
-            if (ok) drawArc(Teal, -90f, (360 * held).toFloat(), false, Offset(c.x - h * 0.42f, c.y - h * 0.42f),
-                androidx.compose.ui.geometry.Size(h * 0.84f, h * 0.84f), style = Stroke(5f))
+            drawCircle(if (ok) Color(0xFF2ECC71) else Color.White, h * 0.3f, c)
+            if (ok) drawArc(Teal, -90f, (360 * held).toFloat(), false, Offset(c.x - h * 0.4f, c.y - h * 0.4f),
+                androidx.compose.ui.geometry.Size(h * 0.8f, h * 0.8f), style = Stroke(5f))
         }
     }
 }
@@ -385,22 +465,30 @@ private fun drawDeleteIcon(d: DrawScope, c: Color) = with(d) {
     drawRoundRect(c, Offset(w * 0.25f, w * 0.32f), androidx.compose.ui.geometry.Size(w * 0.5f, w * 0.58f), CornerRadius(w * 0.06f), style = st)
 }
 
-/** The avatar built from the stored photos (in memory only) and its face anchors. */
-class BuiltAvatar(val glb: ByteArray, val anchors: FaceAnchors, val pdMm: Double?)
+/** The avatar built from the stored photos (in memory only), its face anchors and how long it took to make. */
+class BuiltAvatar(val glb: ByteArray, val anchors: FaceAnchors, val pdMm: Double?, val buildMs: Long = 0, val photos: Int = 0)
 
-/** Builds the avatar from the encrypted store: geometry from the 3 views, baked texture, GLB. Null if it cannot. */
+/**
+ * Builds the avatar from the encrypted store: shape from the front and 30° views, texture and hair outline from every
+ * photo with a pose (the profiles placed from the 60° views and the segmentation), hair texture also from the photo
+ * above the head; GLB. Null if it cannot.
+ */
 fun buildAvatar(context: Context, store: AvatarStore): BuiltAvatar? = runCatching {
-    val a = store.load() ?: return null
+    val t0 = android.os.SystemClock.elapsedRealtime()
+    val stored = store.load() ?: return null
+    val a = AvatarStore.Avatar(stored.views.filter { it.step != AvatarStep.TOP }, stored.pdMm)
+    val tops = stored.views.filter { it.step == AvatarStep.TOP }
     val views = a.views.map { AvatarView(it.step, it.landmarks, it.imageW, it.imageH, it.matrix, it.focalPx) }
     // each photo with its segmentation (hair / face-skin / body-skin / background / clothes), on the phone only
     val segmenter = runCatching { com.drishtisaathi.camera.PhotoSegmenter(context) }.getOrNull()
-    val photos = try {
-        a.views.map { v ->
-            val b = BitmapFactory.decodeByteArray(v.jpeg, 0, v.jpeg.size)
-            val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
-            val seg = segmenter?.classes(b)
-            Pixels(b.width, b.height, px, v.cropX, v.cropY, v.cropScale, seg?.first, seg?.second ?: 0, seg?.third ?: 0).also { b.recycle() }
-        }
+    fun decode(v: AvatarStore.View): Pixels {
+        val b = BitmapFactory.decodeByteArray(v.jpeg, 0, v.jpeg.size)
+        val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+        val seg = segmenter?.classes(b)
+        return Pixels(b.width, b.height, px, v.cropX, v.cropY, v.cropScale, seg?.first, seg?.second ?: 0, seg?.third ?: 0).also { b.recycle() }
+    }
+    val (photos, topPhotos) = try {
+        a.views.map(::decode) to tops.map(::decode)
     } finally {
         segmenter?.close()
     }
@@ -408,19 +496,21 @@ fun buildAvatar(context: Context, store: AvatarStore): BuiltAvatar? = runCatchin
     val fv = a.views[fi]
     val skin = AvatarBuilder.medianColour(photos[fi], fv.imageW, fv.imageH, AvatarBuilder.skinPoints(fv.landmarks))
     // hair colour: the hair pixels of all three photos (segmentation), else above the forehead in each photo
-    val hair = AvatarBuilder.classMedian(photos, com.drishtisaathi.engine.tryon3d.SegClass.HAIR_BITS)
-        ?: AvatarBuilder.medianColour(a.views.indices.map { k ->
+    val hair = AvatarBuilder.classMedian(photos + topPhotos, com.drishtisaathi.engine.tryon3d.SegClass.HAIR_BITS)
+        ?: AvatarBuilder.medianColour(a.views.indices.filter { a.views[it].landmarks.size >= 468 }.map { k ->
             Triple(photos[k], a.views[k].imageW to a.views[k].imageH, AvatarBuilder.hairPoints(a.views[k].landmarks))
         })
     val canonical = FaceMeshAsset.vertices(context)
     val tris = FaceMeshAsset.triangles(context)
     // the real head shape from the template; the face-only avatar if the template cannot be used
-    val model = HeadTemplateAsset.get(context)?.let { t -> runCatching { AvatarBuilder.buildHead(views, photos, canonical, tris, t, skin, hair) }.getOrNull() }
+    val model = HeadTemplateAsset.get(context)?.let { t -> runCatching { AvatarBuilder.buildHead(views, photos, canonical, tris, t, skin, hair, topPhotos) }.getOrNull() }
         ?: AvatarBuilder.build(views, photos, canonical, tris, skin) ?: return null
     val tex = Bitmap.createBitmap(model.texture, AvatarBuilder.TEX, AvatarBuilder.TEX, Bitmap.Config.ARGB_8888)
     val jpeg = ByteArrayOutputStream().also { tex.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
     tex.recycle()
-    BuiltAvatar(AvatarBuilder.glb(model, jpeg, skin, hair), model.anchors, a.pdMm)
+    val ms = android.os.SystemClock.elapsedRealtime() - t0
+    android.util.Log.i("Avatar3D", "avatar built from ${stored.views.size} photos in $ms ms")
+    BuiltAvatar(AvatarBuilder.glb(model, jpeg, skin, hair), model.anchors, a.pdMm, ms, stored.views.size)
 }.getOrNull()
 
 /**
@@ -521,7 +611,8 @@ fun AvatarViewerScreen(
                 }
             }
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                Text(S3D.avatarLabel[l] + " · " + S3D.avatarHint[l], Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                val made = b?.takeIf { it.buildMs > 0 }?.let { " · ${it.photos} 📷 · %.1f s".format(java.util.Locale.US, it.buildMs / 1000.0) } ?: ""
+                Text(S3D.avatarLabel[l] + " · " + S3D.avatarHint[l] + made, Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                 f1?.let { f ->
                     Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
