@@ -461,6 +461,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     allowDemoWithoutCamera = state.demo || state.precision,
                     // Staff / device checks: the far letters' size line
                     debug = state.precision || state.demo,
+                    // learning loop: in lens-assisted mode the phone-model correction applies to the residual only
+                    deviceFit = vm.deviceFit.collectAsStateWithLifecycle().value.takeIf { !state.demo && vm.rules.deviceCorrection.enabled },
                 )
             }
         }

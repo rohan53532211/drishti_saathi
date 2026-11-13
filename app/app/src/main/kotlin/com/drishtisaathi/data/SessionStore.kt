@@ -229,15 +229,27 @@ object PairedRecords {
      * Uses verified, non-demo sessions with screen-test results. Per eye: a measured SE (not "no myopia at arm's
      * length") and a readable final trial lens. Rows from other phone models must already be filtered out.
      */
-    fun from(rows: List<SessionEntity>): List<PairedEye> = rows.flatMap { e ->
+    fun from(rows: List<SessionEntity>, lens: com.drishtisaathi.engine.config.LensAssistedConfig? = null): List<PairedEye> = rows.flatMap { e ->
         if (e.verifiedAt == null) return@flatMap emptyList()
         val m = runCatching { SessionCodec.measurements(e) }.getOrNull() ?: return@flatMap emptyList()
         if (m.demo) return@flatMap emptyList()
-        val tests = m.tests ?: return@flatMap emptyList()
+        val tests = m.tests
         listOfNotNull(
-            pair(e.id, tests.right, e.finalTrialRight),
-            pair(e.id, tests.left, e.finalTrialLeft),
+            pair(e.id, tests?.right, e.finalTrialRight) ?: residualPair(e.id, m.quick?.right, e.finalTrialRight, lens),
+            pair(e.id, tests?.left, e.finalTrialLeft) ?: residualPair(e.id, m.quick?.left, e.finalTrialLeft, lens),
         )
+    }
+
+    /**
+     * Lens-assisted mode: the lens power is known, so the pair is the raw residual the phone measured through it
+     * against what the residual should have been (final trial lens − the lens at the eye).
+     */
+    private fun residualPair(id: Long, q: com.drishtisaathi.engine.QuickEye?, finalText: String?, lens: com.drishtisaathi.engine.config.LensAssistedConfig?): PairedEye? {
+        if (lens == null || q?.method != com.drishtisaathi.engine.profile.PowerMethod.LENS_ASSISTED) return null
+        val raw = q.residualRawD ?: return null
+        val held = q.lensD ?: return null
+        val final = TrialLensText.sphericalEquivalent(finalText) ?: return null
+        return PairedEye(id, raw, final - com.drishtisaathi.engine.profile.LensAssisted.effectiveLens(held, lens))
     }
 
     private fun pair(id: Long, eye: com.drishtisaathi.engine.MeasuredEye?, finalText: String?): PairedEye? {

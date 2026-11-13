@@ -133,6 +133,18 @@ data class QuickEye(
     /** The power shown to people as a range, never one exact number: [seD] ± 0.25 D (less minus, more minus). */
     val rangeFromD: Double? = null,
     val rangeToD: Double? = null,
+    /** How this eye was measured; null = without a lens (also every session from before lens-assisted mode). */
+    val method: com.drishtisaathi.engine.profile.PowerMethod? = null,
+    /** Lens-assisted mode: the minus lens staff held in front of the eye (D); [seD] is then lens + residual. */
+    val lensD: Double? = null,
+    /** Lens-assisted mode: the residual through the lens, rounded to 0.25 D. */
+    val residualD: Double? = null,
+    /** Lens-assisted mode: the residual as measured (−1/d), before rounding and before any phone-model correction. */
+    val residualRawD: Double? = null,
+    /** Lens-assisted mode: the first pass without the lens (D). */
+    val unaidedSeD: Double? = null,
+    /** Stronger than lensAssisted.highMyopiaBeyondSeD: the optometrist must confirm; eye-health check advised. */
+    val highMyopia: Boolean = false,
 )
 
 /**

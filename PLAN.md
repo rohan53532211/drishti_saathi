@@ -211,8 +211,8 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 | Phase | What | Status |
 |---|---|---|
 | A | Safety rules: full check for everyone, red flags, emergency short path, child myopia, report always queued for the optometrist | Done |
-| B | Lens-assisted mode (over-refraction) for strong minus powers | Next |
-| C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Engine logic written, screens to do |
+| B | Lens-assisted mode (over-refraction) for strong minus powers | Done |
+| C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Next: engine logic written, screens to do |
 | D | Survey upgrade (sections, skip logic, "Why we ask") | Survey engine, questions and screen written in phase A; skip tests, Sarvam topics to do |
 | E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | To do |
 | F | Premium UI redesign (tokens, fonts, all screens) | Tokens written; screens to do |
@@ -233,6 +233,17 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 - **The report is always sent** (`bridge/ReportQueue.kt`): every finished session is queued at once and sent when the backend answers (app start, after each result, "Send to optometrist"). The queue holds session ids only and survives restarts. The consent at the start of the session now says so, is read aloud, and covers the report; the separate send-consent screen is no longer used.
 - **Changed on purpose:** urgent sessions used to show lens and frame suggestions "for after the eye doctor visit". They no longer do (screen, both PDFs, optometrist report).
 - Tests: `SafetyTest`, `SurveyTest` (engine), `SafetyOutputTest` (app).
+
+### Phase B: lens-assisted mode (done)
+- **Why:** power = −1/d. At −4.25 D the blur point is at 23.5 cm, where 1 cm is about 0.18 D.
+- The first pass runs without a lens as before. From −3.75 D (`lensAssisted.triggerSeD`) the eye switches to lens-assisted mode.
+- Staff hold a known minus lens (trial lens or the customer's old glasses). The app suggests one about 2 D weaker, rounded towards the weaker lens to 0.5 D (−4.25 → −2.00, −6.00 → −4.00), and staff type the lens actually held on a number pad (0.25 D steps).
+- The blur-distance test is repeated through the lens. Total = lens + residual; from 4 D the lens gets the vertex correction for a 12 mm hold, Fe = F / (1 − 0.012·F).
+- Letters sharp at every distance through the lens: "Use a weaker lens", never a guess. "No lens here" keeps the first reading.
+- Stronger than −8 D: still measured through a lens, with "High myopia – optometrist must confirm; eye-health check advised".
+- Every output (result screen, shop PDF, optometrist report) states the method, e.g. "Measured through −2.00 D lens, residual −2.25 D, total −4.25 D (range −4.00 to −4.50)".
+- Learning loop: the phone-model correction is applied to the residual only; lens, residual (raw and rounded), first pass and method are stored with the session, and a verified lens-assisted eye gives a pair for the residual.
+- Tests: `LensAssistedTest` (engine), `LensAssistedFlowTest` (app).
 
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.

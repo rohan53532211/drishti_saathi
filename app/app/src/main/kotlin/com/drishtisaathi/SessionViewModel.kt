@@ -224,7 +224,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         val previous = refitJob
         refitJob = viewModelScope.launch {
             previous?.join()
-            val fit = DeviceCorrection.fit(PairedRecords.from(dao.verifiedFor(phoneModel)), rules.deviceCorrection)
+            val fit = DeviceCorrection.fit(PairedRecords.from(dao.verifiedFor(phoneModel), rules.lensAssisted), rules.deviceCorrection)
             if (fit == null) db.deviceCorrections().delete(phoneModel)
             else db.deviceCorrections().upsert(DeviceCorrectionEntity.from(phoneModel, fit, System.currentTimeMillis()))
             _deviceFit.value = fit

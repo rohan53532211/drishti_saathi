@@ -148,7 +148,7 @@ internal fun eyeCheckSteps(plan: EyeCheckPlan): List<QuickStep> = buildList {
     add(QuickStep.Done)
 }
 
-private enum class QPhase { RUN, RESULT }
+private enum class QPhase { RUN, LENS_ENTRY, LENS_RUN, RESULT }
 
 /** The result line for one eye: a range, never one exact number. */
 fun quickEyeText(e: QuickEye): Txt {
@@ -156,7 +156,21 @@ fun quickEyeText(e: QuickEye): Txt {
     if (se == null || e.noMyopiaAtReach) return SAnamnesis.quickNoMyopia
     val from = e.rangeFromD ?: PowerRange.around(se).fromD
     val to = e.rangeToD ?: PowerRange.around(se).toD
-    return SShop.farRange.format(fmtD(from), fmtD(to), e.blurAtCm?.roundToInt() ?: 0)
+    val P = com.drishtisaathi.i18n.SProfile
+    val lens = e.lensD
+    val base = if (e.method == com.drishtisaathi.engine.profile.PowerMethod.LENS_ASSISTED && lens != null) {
+        // every report shows the method: the lens, the residual through it, the total and its range
+        P.methodLens.format(fmtD(lens), fmtD(e.residualD ?: (se - lens)), fmtD(se), fmtD(from), fmtD(to))
+    } else SShop.farRange.format(fmtD(from), fmtD(to), e.blurAtCm?.roundToInt() ?: 0)
+    return if (e.highMyopia) Txt("${base.en}. ${P.highMyopiaNote.en}", "${base.hi}। ${P.highMyopiaNote.hi}") else base
+}
+
+/** How the eye was measured, short (QR, optometrist page): "through −2.00 D lens" / "without a lens". */
+fun quickMethodText(e: QuickEye): Txt {
+    val P = com.drishtisaathi.i18n.SProfile
+    val lens = e.lensD
+    return if (e.method == com.drishtisaathi.engine.profile.PowerMethod.LENS_ASSISTED && lens != null) P.methodLensShort.format(fmtD(lens))
+    else P.methodUnaidedShort
 }
 
 /** Near reading check result: the add as a range (38+), or the near point against the age-expected one (no plus number). */
@@ -218,6 +232,8 @@ fun QuickEstimateFlow(
     onInstruction: (Txt) -> Unit = {},
     /** Staff / device checks: show the far letters' size line. */
     debug: Boolean = false,
+    /** This phone model's correction from verified shop records; in lens-assisted mode it corrects the residual only. */
+    deviceFit: com.drishtisaathi.engine.vision.DeviceFit? = null,
 ) {
     DisposableEffect(distance) {
         distance.start()
@@ -245,9 +261,15 @@ fun QuickEstimateFlow(
     var nearDone by remember { mutableStateOf(false) }
     var lastSentence by remember { mutableStateOf<String?>(null) }
     val step = steps[index.coerceAtMost(steps.lastIndex)]
+    // ---- lens-assisted mode (Phase B): the first pass of the eye being measured, the lens typed in, "too strong" ----
+    val lensCfg = rules.lensAssisted
+    var firstPass by remember { mutableStateOf<QuickEye?>(null) }
+    var lensD by remember { mutableStateOf<Double?>(null) }
+    var tooStrong by remember { mutableStateOf(false) }
 
-    fun next() { index = (index + 1).coerceAtMost(steps.lastIndex); phase = QPhase.RUN; attempt++ }
-    fun again() { phase = QPhase.RUN; attempt++ }
+    fun next() { index = (index + 1).coerceAtMost(steps.lastIndex); phase = QPhase.RUN; attempt++; firstPass = null; lensD = null; tooStrong = false }
+    fun again() { phase = QPhase.RUN; attempt++; firstPass = null; lensD = null; tooStrong = false }
+    fun setEye(eye: TestEye, e: QuickEye) { if (eye == TestEye.RIGHT) right = e else left = e }
     fun nearLine() = nearResultText(near?.nearPointCm, near?.addD, near?.expectedNearPointCm, near?.fartherThanExpected == true)
 
     Column(modifier.fillMaxSize()) {
@@ -276,10 +298,33 @@ fun QuickEstimateFlow(
                     skip = SShop.doAgain to { again() },
                     speak = env.onInstruction,
                 )
+                step is QuickStep.Power && phase == QPhase.LENS_ENTRY -> {
+                    val first = firstPass
+                    if (first?.seD == null) LaunchedEffect(Unit) { phase = QPhase.RESULT }
+                    else com.drishtisaathi.profile.LensEntryScreen(
+                        lang, header(step.eye, com.drishtisaathi.i18n.SProfile.lensModeTitle), first.seD!!, lensCfg, tooStrong, env.onInstruction,
+                        onStart = { d -> lensD = d; tooStrong = false; attempt++; phase = QPhase.LENS_RUN },
+                        // no lens at hand: the first reading stays, never a guess
+                        onNoLens = { setEye(step.eye, PowerRange.unaided(first, lensCfg)); phase = QPhase.RESULT },
+                    )
+                }
+                step is QuickStep.Power && phase == QPhase.LENS_RUN -> key(step, attempt, "lens") {
+                    FarLetterScreen(
+                        env, step.eye, reading, voice, header(step.eye, com.drishtisaathi.i18n.SProfile.lensModeTitle), simulated, debug,
+                        onSkip = { setEye(step.eye, PowerRange.unaided(firstPass!!, lensCfg)); phase = QPhase.RESULT },
+                        throughLens = lensD,
+                    ) { through ->
+                        val e = PowerRange.lensAssistedEye(firstPass!!, through, lensD ?: 0.0, lensCfg, deviceFit)
+                        // letters sharp at every distance: the lens is too strong, ask for a weaker one
+                        if (e == null) { tooStrong = true; phase = QPhase.LENS_ENTRY } else { setEye(step.eye, e); phase = QPhase.RESULT }
+                    }
+                }
                 step is QuickStep.Power -> key(step, attempt) {
                     FarLetterScreen(env, step.eye, reading, voice, stepHeader(step), simulated, debug, onSkip = { next() }) { eye ->
-                        if (step.eye == TestEye.RIGHT) right = eye else left = eye
-                        phase = QPhase.RESULT
+                        // from −3.75 D the blur point is so close that 1 cm changes the result a lot: repeat through a lens
+                        if (com.drishtisaathi.engine.profile.LensAssisted.needed(eye.seD.takeIf { !eye.noMyopiaAtReach }, lensCfg)) {
+                            firstPass = eye; setEye(step.eye, PowerRange.unaided(eye, lensCfg)); phase = QPhase.LENS_ENTRY
+                        } else { setEye(step.eye, eye); phase = QPhase.RESULT }
                     }
                 }
                 step == QuickStep.Near -> key(step, attempt) {
@@ -528,7 +573,10 @@ const val FAR_LETTER_LOGMAR = 0.0
 @Composable
 private fun FarLetterScreen(
     env: TestEnv, eye: TestEye, reading: DistanceReading?, voice: VoiceController?, header: Txt, simulated: Boolean,
-    debug: Boolean, onSkip: () -> Unit, onFrozen: (QuickEye) -> Unit,
+    debug: Boolean, onSkip: () -> Unit,
+    /** Lens-assisted mode: the minus lens (D) staff hold in front of this eye; null = the normal first pass. */
+    throughLens: Double? = null,
+    onFrozen: (QuickEye) -> Unit,
 ) {
     val rules = env.rules
     val rnd = remember { Random(System.nanoTime()) }
@@ -546,9 +594,10 @@ private fun FarLetterScreen(
     // Spoken once per attempt: glasses off, which eye to cover, and how to move the phone.
     val other = if (eye == TestEye.RIGHT) SShop.leftWord else SShop.rightWord
     val setup = Txt(SShop.glassesOffCover.en.format(other.en), SShop.glassesOffCover.hi.format(other.hi))
+    val lensText = throughLens?.let { com.drishtisaathi.i18n.SProfile.lensInstruction.format(fmtD(it)) }
     val instruction = if (firstMm != null) SShop.repeatOnce
-        else Txt("${setup.en} ${SShop.farInstruction.en}", "${setup.hi} ${SShop.farInstruction.hi}")
-    val short = if (firstMm != null) SShop.repeatOnce else SShop.farShort.format(other.en).let {
+        else lensText ?: Txt("${setup.en} ${SShop.farInstruction.en}", "${setup.hi} ${SShop.farInstruction.hi}")
+    val short = if (firstMm != null) SShop.repeatOnce else lensText ?: SShop.farShort.format(other.en).let {
         Txt(it.en, SShop.farShort.hi.format(other.hi))
     }
     val shown = FarLetters.layout(letters.letters, lastMm, env.scale, rules.farPoint, panelWidthPx.takeIf { it > 0 } ?: 1000.0)
@@ -639,18 +688,19 @@ fun CameraQuickEstimateFlow(
     onInstruction: (Txt) -> Unit = {},
     allowDemoWithoutCamera: Boolean = false,
     debug: Boolean = false,
+    deviceFit: com.drishtisaathi.engine.vision.DeviceFit? = null,
 ) {
     var demo by remember { mutableStateOf(false) }
     if (demo) {
         val fake = remember { FakeDistanceProvider() }
-        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug)
+        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug, deviceFit)
         return
     }
     CameraPermissionGate(lang, onSkip = { if (allowDemoWithoutCamera) demo = true else onSkip() }, autoRequest = true) {
         val relaxed = remember(rules) { powerCheckCamera(rules.camera) }
         val tracker = rememberFaceTracker(relaxed)
         val provider = remember(tracker) { CameraDistanceProvider(tracker, calibration, relaxed, controlsTracker = false) }
-        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug)
+        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug, deviceFit)
     }
 }
 

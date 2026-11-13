@@ -55,6 +55,41 @@ object SProfile {
     )
     fun redFlag(f: RedFlag): Txt = FLAG.getValue(f)
 
+    // ---- Phase B: lens-assisted mode ----
+    val lensModeTitle = tx("Check through a lens", "लेंस के साथ जाँच")
+    val lensModeWhy = tx(
+        "This eye reads only very close. That close, 1 cm changes the result a lot, so the check is repeated through a known lens.",
+        "यह आँख बहुत पास से ही पढ़ पाती है। इतने पास 1 cm से भी नतीजा बहुत बदलता है, इसलिए जाँच एक जाने हुए लेंस के साथ दोबारा होगी।",
+    )
+    val lensSuggest = tx(
+        "Staff: hold a %s D lens close in front of this eye (a trial lens, or the customer's old glasses).",
+        "स्टाफ़: इस आँख के ठीक सामने %s D का लेंस पकड़ें (ट्रायल लेंस, या ग्राहक का पुराना चश्मा)।",
+    )
+    val lensEnter = tx("Lens held in front of the eye (D)", "आँख के सामने पकड़ा गया लेंस (D)")
+    val lensFirstPass = tx("First reading without a lens: about %s D", "बिना लेंस की पहली रीडिंग: लगभग %s D")
+    val lensStart = tx("Start the check through the lens", "लेंस के साथ जाँच शुरू करें")
+    val lensNone = tx("No lens here: keep the first reading", "लेंस नहीं है: पहली रीडिंग ही रखें")
+    val lensInvalid = tx("Enter a minus lens in steps of 0.25 D", "0.25 D के क़दमों में माइनस लेंस भरें")
+    val lensTooStrong = tx(
+        "The letters stayed sharp at every distance, so this lens is too strong. Use a weaker lens.",
+        "अक्षर हर दूरी पर साफ़ रहे, यानी यह लेंस ज़्यादा तेज़ है। कमज़ोर लेंस लें।",
+    )
+    val lensInstruction = tx(
+        "Staff hold the %s D lens close in front of the eye. Start close, move the phone slowly away, tap when the letters blur.",
+        "स्टाफ़ %s D का लेंस आँख के ठीक सामने पकड़ें। पास से शुरू करें, फ़ोन धीरे-धीरे दूर ले जाएँ, अक्षर धुंधले हों तो दबाएँ।",
+    )
+    val methodLens = tx(
+        "Measured through %s D lens, residual %s D, total %s D (range %s to %s)",
+        "%s D के लेंस के साथ नापा, बचा हुआ %s D, कुल %s D (रेंज %s से %s)",
+    )
+    val methodLensShort = tx("through %s D lens", "%s D लेंस के साथ")
+    val methodUnaidedShort = tx("without a lens", "बिना लेंस")
+    val highMyopiaNote = tx(
+        "High myopia – optometrist must confirm; eye-health check advised",
+        "बहुत ज़्यादा माइनस नंबर – ऑप्टोमेट्रिस्ट पक्का करें; आँखों की सेहत की जाँच की सलाह",
+    )
+    val padDelete = tx("Delete", "मिटाएँ")
+
     // ---- report queue / bridge chip ----
     val bridgeConnected = tx("Connected", "जुड़ा है")
     val bridgeOffline = tx("Offline – queued %d", "ऑफ़लाइन – %d कतार में")
