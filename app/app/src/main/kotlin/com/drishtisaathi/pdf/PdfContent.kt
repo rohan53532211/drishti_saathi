@@ -11,6 +11,7 @@ import com.drishtisaathi.ui.Fmt
 import com.drishtisaathi.ui.PowerPathText
 import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.ui.answerText
+import com.drishtisaathi.profile.gate
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -71,11 +72,22 @@ object PdfContent {
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${state.sessionId?.let { S.sessionNo.format(it.toInt())[l] + " · " } ?: ""}${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
-        val urgent = a.referral.level == ReferralLevel.URGENT
-        if (urgent) {
+        val gate = state.gate(rules)
+        val P = com.drishtisaathi.i18n.SProfile
+        val urgent = a.referral.level == ReferralLevel.URGENT || gate.urgent
+        out += Block.Para(P.reportTagLine.format(P.tag(gate.tag)[l])[l], bold = true,
+            tone = when (gate.tag) { com.drishtisaathi.engine.profile.ReportTag.URGENT -> Tone.URGENT; com.drishtisaathi.engine.profile.ReportTag.CHILD_MYOPIA -> Tone.ROUTINE; else -> Tone.MUTED })
+        if (gate.urgent) {
+            out += Block.Para(P.seeDoctorToday[l], bold = true, tone = Tone.URGENT)
+            gate.redFlags.forEach { out += Block.Bullet(P.redFlag(it)[l], Tone.URGENT) }
+            out += Block.Para(P.noLensToday[l], bold = true)
+        } else if (urgent) {
             out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
             reasonGroups(a.referral, rules, l, out)
-            out += Block.Para(com.drishtisaathi.i18n.SShop.afterDoctor[l], bold = true)
+        }
+        if (gate.childMyopia) {
+            out += Block.Para(P.childMyopiaTitle[l], bold = true, tone = Tone.ROUTINE)
+            out += Block.Para(P.childMyopiaBody[l])
         }
         out += Block.Rule
 
@@ -83,6 +95,7 @@ object PdfContent {
         val quick = PowerPathText.quickLines(state)
         if (quick.isNotEmpty()) {
             out += Block.Heading(com.drishtisaathi.i18n.SShop.eyeCheckTitle[l])
+            if (gate.powerForOptometristOnly) out += Block.Para(P.forOptometristOnly[l], bold = true, tone = Tone.URGENT)
             quick.forEach { out += Block.Bullet(it[l]) }
         }
 
@@ -93,8 +106,10 @@ object PdfContent {
         }
         if (state.glassesOn) out += Block.Para(com.drishtisaathi.i18n.SFlow.glassesOnNote[l], bold = true, tone = Tone.ROUTINE)
 
-        val adv = a.advice
-        if (adv == null) {
+        val adv = a.advice.takeIf { gate.lensAllowed }
+        if (!gate.lensAllowed) {
+            // a red flag or child myopia: referral only, no lens or frame suggestion
+        } else if (adv == null) {
             out += Block.Para(S.adviceWithheld[l], bold = true)
         } else {
             out += Block.Heading(S.startingTrialLens[l])
@@ -191,11 +206,20 @@ object PdfContent {
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
-        val urgent = a.referral.level == ReferralLevel.URGENT
-        if (urgent) {
+        val gate = state.gate(rules)
+        val P = com.drishtisaathi.i18n.SProfile
+        val urgent = a.referral.level == ReferralLevel.URGENT || gate.urgent
+        if (gate.urgent) {
+            out += Block.Para(P.seeDoctorToday[l], bold = true, tone = Tone.URGENT)
+            gate.redFlags.forEach { out += Block.Bullet(P.redFlag(it)[l], Tone.URGENT) }
+            out += Block.Para(P.noLensToday[l], bold = true)
+        } else if (urgent) {
             out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
             reasonGroups(a.referral, rules, l, out)
-            out += Block.Para(com.drishtisaathi.i18n.SShop.afterDoctor[l], bold = true)
+        }
+        if (gate.childMyopia) {
+            out += Block.Para(P.childMyopiaTitle[l], bold = true, tone = Tone.ROUTINE)
+            out += Block.Para(P.childMyopiaBody[l])
         }
         out += Block.Para(S.customerIntro[l])
         out += Block.Rule
@@ -208,7 +232,7 @@ object PdfContent {
         }
         if (!urgent) reasonGroups(a.referral, rules, l, out)
 
-        a.advice?.let { adv ->
+        a.advice?.takeIf { gate.lensAllowed }?.let { adv ->
             out += Block.Heading(S.lensPackage[l])
             out += Block.Bullet("${S.lensType[l]}: ${S.lensType(adv.lensType.value)[l]}")
             out += Block.Bullet("${S.material[l]}: ${S.material(adv.materialId.value)[l]}")

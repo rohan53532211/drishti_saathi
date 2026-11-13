@@ -122,6 +122,10 @@ data class UiState(
     val bridgeError: Txt? = null,
     /** AI voice interview transcript for this session (staff and shop PDF only); null = not used. */
     val aiInterview: com.drishtisaathi.aivoice.AiInterviewRecord? = null,
+    /** Vision-profile survey answers. */
+    val survey: com.drishtisaathi.engine.profile.SurveyAnswers = com.drishtisaathi.engine.profile.SurveyAnswers(),
+    /** Screening tests (grid, contrast, colour); null = not run. */
+    val screening: com.drishtisaathi.engine.profile.ScreeningResults? = null,
 ) {
     /** Every question asked for these answers (summary, edit screen, PDF); after an urgent flag only the red-flag ones. */
     val visibleQuestions: List<Question> get() = Questions.visible(answers)
@@ -375,6 +379,75 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** The pending save; delete waits for it so a fast "Delete" never leaves a row behind. */
     private var saveJob: Job? = null
 
+    // ---- Phase A: safety gate, survey, and the report that is always sent ----------------------
+
+    val surveyFile: com.drishtisaathi.engine.profile.SurveyFile by lazy { com.drishtisaathi.interview.QuestionBank.survey }
+
+    /** Red flags, emergency, child myopia and the report tag for everything gathered so far. */
+    fun safety(s: UiState = _state.value): com.drishtisaathi.engine.profile.SafetyGate =
+        com.drishtisaathi.engine.profile.Safety.gate(s.answers, s.survey, rules.safety, s.quick, s.tests.takeIf { s.testsDone }, s.screening)
+
+    /** Emergency signs: only the safety section of the survey is asked (short path). */
+    fun surveySections(): Set<String>? = if (safety().emergency) setOf("SAFETY") else null
+
+    fun nextSurveyQuestion(): com.drishtisaathi.engine.profile.SurveyQuestion? =
+        com.drishtisaathi.engine.profile.Survey.nextUnanswered(surveyFile, _state.value.answers, _state.value.survey, surveySections())
+
+    /** Records a survey answer (answers of blocks that no longer apply are dropped) and fills the old interview fields it covers. */
+    fun answerSurvey(id: String, picked: List<String>) = _state.update { s ->
+        val survey = com.drishtisaathi.engine.profile.Survey.prune(surveyFile, s.answers, s.survey.with(id, picked))
+        val (answers, answered) = com.drishtisaathi.profile.SurveyBridge.apply(s.answers, s.answered, survey, rules)
+        s.copy(survey = survey, answers = answers, answered = answered, result = null)
+    }
+
+    fun setScreening(r: com.drishtisaathi.engine.profile.ScreeningResults?) = _state.update { it.copy(screening = r, result = null) }
+
+    val reportQueue = com.drishtisaathi.bridge.ReportQueue(com.drishtisaathi.bridge.PrefsQueueStore(app))
+    private val _bridgeOnline = MutableStateFlow(false)
+    /** The backend answered the last time it was tried ("Connected" / "Offline – queued N"). */
+    val bridgeOnline: StateFlow<Boolean> = _bridgeOnline.asStateFlow()
+
+    /** Sends one queued session's report; the consent given at the start of the session covers it. */
+    private suspend fun sendQueued(id: Long): com.drishtisaathi.bridge.SendResult {
+        val e = dao.get(id) ?: return com.drishtisaathi.bridge.SendResult.DROP
+        val cfg = bridgeSettings.config.value
+        if (!cfg.isValid) return com.drishtisaathi.bridge.SendResult.RETRY_LATER
+        val st = loaded(UiState(lang = runCatching { Lang.valueOf(e.lang) }.getOrDefault(Lang.HI)), e, null)
+        val consentAt = e.consentAt ?: e.createdAt
+        return try {
+            val profile = BridgeProfile.build(st, rules, BridgeConsent(consentAt, spoken = true, tapped = true), appVersion)
+            val old = remoteDao.get(id)
+            val created = withContext(Dispatchers.IO) {
+                // an edited session replaces its earlier copy on the server
+                old?.let { runCatching { BridgeClient(cfg.copy(url = it.backendUrl), timeoutMs = 5_000).delete(it.remoteId) } }
+                BridgeClient(cfg).send(profile)
+            }
+            val row = RemoteReviewEntity(id, created.id, cfg.baseUrl, System.currentTimeMillis(), consentAt, created.status)
+            remoteDao.upsert(row)
+            _state.update { if (it.sessionId == id) it.copy(remote = row, bridgeError = null) else it }
+            com.drishtisaathi.bridge.SendResult.SENT
+        } catch (ex: BridgeException) {
+            if (ex.kind == BridgeException.Kind.REJECTED) com.drishtisaathi.bridge.SendResult.DROP else com.drishtisaathi.bridge.SendResult.RETRY_LATER
+        } catch (ex: Exception) {
+            com.drishtisaathi.bridge.SendResult.DROP
+        }
+    }
+
+    /** Checks the backend and sends whatever is queued. Called at app start, after every result and while Home is open. */
+    fun flushReports() = viewModelScope.launch {
+        saveJob?.join()
+        val cfg = bridgeSettings.config.value
+        val online = cfg.isValid && withContext(Dispatchers.IO) {
+            try { BridgeClient(cfg, timeoutMs = 4_000).health().let { it.ok && it.tokenOk } } catch (_: Exception) { false }
+        }
+        _bridgeOnline.value = online
+        if (online && reportQueue.pending.value > 0) {
+            reportQueue.flush(::sendQueued)
+        }
+    }
+
+    init { flushReports() }
+
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -481,6 +554,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     /** After the eye check: urgent from the answers or the checks (e.g. wavy grid lines) → straight to the referral. */
     fun needsUrgentReferral(): Boolean {
         val s = _state.value
+        if (safety(s).urgent) return true
         return engine.evaluate(s.answers, s.staff, s.tests, quick = quickFor(s)).assessment.referral.level == ReferralLevel.URGENT
     }
 
@@ -614,15 +688,20 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 finalAdd = s.verification.finalAdd.ifBlank { null },
                 pdMeterMm = s.verification.pdMeterMm,
                 verifiedAt = s.verification.verifiedAt,
-                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo, glassesOn = s.glassesOn, quick = quickFor(s), aiInterview = s.aiInterview)),
+                measurementsJson = SessionCodec.encode(Measurements(s.face, s.tests.takeIf { s.testsDone }, demo = s.demo, glassesOn = s.glassesOn, quick = quickFor(s), aiInterview = s.aiInterview, survey = s.survey, screening = s.screening)),
             )
-            if (current == null) {
+            val savedId = if (current == null) {
                 val id = dao.insert(entity)
                 _state.update { it.copy(sessionId = id) }
+                id
             } else {
                 dao.update(entity)
+                current
             }
+            // Phase A: every report goes to the optometrist; queued now, sent when the backend connects (demo never).
+            if (!s.demo) reportQueue.enqueue(savedId)
         }
+        if (!s.demo) flushReports()
         return result
     }
 
@@ -656,6 +735,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Deletes the stored row and any PDFs exported for it. */
     private suspend fun removeSession(id: Long) {
+        reportQueue.remove(id)
         removeRemote(id)
         savedDao.deleteForSession(id)
         dao.delete(id)
@@ -672,9 +752,15 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     fun openSession(id: Long, onLoaded: () -> Unit) = viewModelScope.launch {
         val e = dao.get(id) ?: return@launch
         val remote = remoteDao.get(id)
+        _state.update { loaded(it, e, remote) }
+        onLoaded()
+    }
+
+    /** [base] with everything stored for session [e] (also used to rebuild a queued report). */
+    private fun loaded(base: UiState, e: SessionEntity, remote: RemoteReviewEntity?): UiState {
         val answers = SessionCodec.answers(e)
         val m = SessionCodec.measurements(e)
-        _state.update {
+        return base.let {
             it.copy(
                 answers = answers,
                 answered = Questions.visible(answers).map { q -> q.id }.toSet(),
@@ -693,6 +779,8 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 glassesOn = m.glassesOn,
                 quick = m.quick,
                 aiInterview = m.aiInterview,
+                survey = m.survey,
+                screening = m.screening,
                 remote = remote,
                 bridgeError = null,
                 verification = Verification(
@@ -700,7 +788,6 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
                 ),
             )
         }
-        onLoaded()
     }
 
     // ---- PDF ---------------------------------------------------------------------------------

@@ -61,7 +61,7 @@ class BridgeProfileTest {
             assertEquals(c.id, emptyList<String>(), BridgeProfile.forbiddenPaths(p))
             assertTrue(strings(p).all { it.length <= 2000 })
             assertTrue(p.toString().toByteArray().size < 256 * 1024)
-            assertEquals(setOf("consent", "app", "demo", "answers", "functionalProfile", "powerSource", "power", "measurements", "estimates"), p.keys)
+            assertEquals(setOf("triage", "consent", "app", "demo", "answers", "functionalProfile", "powerSource", "power", "measurements", "estimates"), p.keys)
             // the ranked frame list (names, prices) is never sent
             assertFalse(keys(p).any { it == "frames" || it == "priceInr" || it == "overlay" })
         }

@@ -71,7 +71,19 @@ object BridgeProfile {
         val a = r.assessment
         val adv = a.advice
         val answers = state.answers
+        val gate = com.drishtisaathi.engine.profile.Safety.gate(
+            answers, state.survey, rules.safety, state.quick, state.tests.takeIf { state.testsDone }, state.screening)
         return buildJsonObject {
+            // Phase A: how the optometrist's list marks and sorts this report; the red-flag reasons come first.
+            put("triage", buildJsonObject {
+                put("tag", gate.tag.name)
+                put("redFlags", kotlinx.serialization.json.JsonArray(gate.redFlags.map { JsonPrimitive(it.name) }))
+                put("redFlagReasons", kotlinx.serialization.json.JsonArray(gate.redFlags.map { JsonPrimitive(com.drishtisaathi.i18n.SProfile.redFlag(it).en) }))
+                put("emergency", gate.emergency)
+                put("childMyopia", gate.childMyopia)
+                put("lensSuggested", gate.lensAllowed)
+                if (gate.powerForOptometristOnly) put("powerLabel", com.drishtisaathi.i18n.SProfile.forOptometristOnly.en)
+            })
             put("consent", buildJsonObject {
                 put("consentAt", consent.consentAt); put("spoken", consent.spoken); put("tapped", consent.tapped)
                 put("textVersion", CONSENT_TEXT_VERSION)
@@ -112,12 +124,11 @@ object BridgeProfile {
                 put("material", adv?.materialId?.value?.let(::JsonPrimitive) ?: JsonNull)
                 put("coatings", enc(ListSerializer(com.drishtisaathi.engine.Coating.serializer()), adv?.coatings))
                 put("notes", enc(ListSerializer(com.drishtisaathi.engine.Note.serializer()), a.notes))
-                put("suggestedFrames", kotlinx.serialization.json.JsonArray(r.frames.take(5).map {
+                // a red flag or child myopia: nothing is suggested or sold, so no frames are listed either
+                put("suggestedFrames", kotlinx.serialization.json.JsonArray((if (gate.lensAllowed) r.frames.take(5) else emptyList()).map {
                     JsonPrimitive("${it.frame.id} · ₹${it.frame.priceInr}")
                 }))
-                if (a.referral.level == com.drishtisaathi.engine.ReferralLevel.URGENT) {
-                    put("suggestionsNote", com.drishtisaathi.i18n.SShop.afterDoctor.en)
-                }
+                if (!gate.lensAllowed) put("suggestionsNote", com.drishtisaathi.i18n.SProfile.noLensToday.en)
             })
         }
     }

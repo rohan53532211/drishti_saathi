@@ -34,6 +34,7 @@ import com.drishtisaathi.i18n.SFlow
 import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.i18n.SShop
 import androidx.compose.foundation.clickable
+import com.drishtisaathi.profile.gate
 
 /** M6: one screen with profile, bands + confidence, starting trial lens, lens package, frames, referral status. */
 @Composable
@@ -58,6 +59,8 @@ fun ResultScreen(
     onEditAnswers: (() -> Unit)? = null,
     /** Frames this customer saved in 3D (with the session). */
     savedFrames: @Composable () -> Unit = {},
+    /** Phase A safety gate: red flags and child myopia hide every lens suggestion. */
+    gate: com.drishtisaathi.engine.profile.SafetyGate = state.gate(rules),
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -72,27 +75,33 @@ fun ResultScreen(
         ) {
             // Order: functional vision profile, power and its source, referral, lens package, frames.
             // An urgent referral goes first.
-            val urgent = a.referral.level == ReferralLevel.URGENT
-            // Urgent warning signs: ONE red card at the very top (message and reasons), never hidden or softened.
-            if (urgent) SectionCard(S.referral[l], container = UrgentBg) {
+            val urgent = a.referral.level == ReferralLevel.URGENT || gate.urgent
+            // Urgent warning signs: ONE red banner at the very top (message and reasons), never hidden or softened.
+            if (gate.urgent) com.drishtisaathi.profile.UrgentBanner(l, gate)
+            else if (urgent) SectionCard(S.referral[l], container = UrgentBg) {
                 Text(SShop.urgentTop[l], style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = UrgentRed)
                 a.referral.reasons.forEach {
                     Text("• " + S.referralReason(it, rules)[l], style = MaterialTheme.typography.bodyLarge, color = UrgentRed)
                 }
             }
-            // Below it, the eye check, lens package and frames as for everyone else.
-            if (urgent) Text(SShop.afterDoctor[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             // The eye check runs for everyone: its ranges show even when lens advice is withheld.
+            // With a red flag the power is for the optometrist only.
             val eyeLines = PowerPathText.quickLines(state)
             if (eyeLines.isNotEmpty()) SectionCard(SShop.eyeCheckTitle[l]) {
+                if (gate.powerForOptometristOnly) Text(com.drishtisaathi.i18n.SProfile.forOptometristOnly[l],
+                    style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = UrgentRed)
                 eyeLines.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyLarge) }
             }
+            // A red flag or child myopia: the referral card replaces every lens and frame suggestion.
+            if (!gate.lensAllowed) com.drishtisaathi.profile.ReferralCard(l, gate)
             SectionCard(SAnamnesis.profileTitle[l]) {
                 PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
             }
 
-            val adv = a.advice
-            if (adv == null) {
+            val adv = a.advice.takeIf { gate.lensAllowed }
+            if (!gate.lensAllowed) {
+                if (!gate.urgent) ReferralBlock(a.referral, rules, l)
+            } else if (adv == null) {
                 SectionCard(S.lensPackage[l]) { Text(S.adviceWithheld[l], fontWeight = FontWeight.SemiBold) }
                 if (!urgent) ReferralBlock(a.referral, rules, l)
             } else {

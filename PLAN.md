@@ -204,6 +204,36 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 - Two backend failures in a row, or a permanent one (no key, wrong token, no server), switch to the standard interview with the answers so far.
 - The transcript (text only) is stored in the session's measurements JSON (`aiInterview`). It appears only in staff mode on the summary and on the shop PDF. It is never on the customer copy and never in the optometrist profile, and it is deleted with the session.
 
+## Vision profile branch (`feature/vision-profile`, from `feature-3d-avatar`, 14 Nov 2026)
+
+Rules for this branch: push only `feature/vision-profile`; thresholds live in `rules.json` or `lens_catalog.json`; Gradle runs with `--no-daemon --max-workers=2 -Xmx2g`.
+
+| Phase | What | Status |
+|---|---|---|
+| A | Safety rules: full check for everyone, red flags, emergency short path, child myopia, report always queued for the optometrist | Done |
+| B | Lens-assisted mode (over-refraction) for strong minus powers | Next |
+| C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Engine logic written, screens to do |
+| D | Survey upgrade (sections, skip logic, "Why we ask") | Survey engine, questions and screen written in phase A; skip tests, Sarvam topics to do |
+| E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | To do |
+| F | Premium UI redesign (tokens, fonts, all screens) | Tokens written; screens to do |
+| G | QR, WhatsApp share, PDF additions, backend page | To do |
+| H | All tests, APK, README, architecture doc | To do |
+
+### Phase A: safety rules (done)
+- **Order of the check:** core questions → (red banner if a red flag) → vision-profile survey → camera distance + PD → power of each eye → screening tests → remaining questions → results. Before this branch the power came before the PD.
+- **Red flags** (`engine/profile/Safety.kt`, `rules.json` → `safety`): sudden loss of vision, eye pain or redness, new flashes, new floaters, curtain or shadow, double vision, wavy or missing lines on the grid.
+  - The two red-flag questions stay where they were (question 3 in the AI interview). After a "yes" the survey asks "which of these?" (`redFlagSigns`); the survey's Digital section asks about double vision.
+  - A "yes" without that follow-up is kept as "unspecified" and counts as an emergency.
+- **When a red flag is found:**
+  - a red banner comes first: "Please see an eye doctor today" with the reasons, in Hindi or English, spoken;
+  - the check continues, no lens or frame is suggested, the power is labelled "For the optometrist only";
+  - the report is tagged URGENT with the reasons first (`triage` block of the profile).
+- **Emergency signs** (sudden vision loss, curtain / shadow, new flashes): short path only (power of each eye + grid), then the results.
+- **Under 18 with any minus power:** the power is measured, no lens choice, "Get your child checked by an optometrist (myopia control)", tag CHILD_MYOPIA. Under 18 without myopia may get a lens family, labelled "optometrist confirms" (phase E).
+- **The report is always sent** (`bridge/ReportQueue.kt`): every finished session is queued at once and sent when the backend answers (app start, after each result, "Send to optometrist"). The queue holds session ids only and survives restarts. The consent at the start of the session now says so, is read aloud, and covers the report; the separate send-consent screen is no longer used.
+- **Changed on purpose:** urgent sessions used to show lens and frame suggestions "for after the eye doctor visit". They no longer do (screen, both PDFs, optometrist report).
+- Tests: `SafetyTest`, `SurveyTest` (engine), `SafetyOutputTest` (app).
+
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:

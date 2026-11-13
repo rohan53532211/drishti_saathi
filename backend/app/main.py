@@ -61,12 +61,30 @@ class ProfileIn(BaseModel):
     power: dict[str, Any] = Field(default_factory=dict)
     measurements: dict[str, Any] = Field(default_factory=dict)
     estimates: dict[str, Any] = Field(default_factory=dict)
+    # Vision-profile app: how the report is marked (URGENT / CHILD_MYOPIA / ROUTINE) with the red-flag reasons,
+    # the profile rings, the screening tests and the suggested lens family. Older apps do not send these.
+    triage: Optional[dict[str, Any]] = None
+    visionProfile: Optional[dict[str, Any]] = None
+    screening: Optional[dict[str, Any]] = None
+    lens: Optional[dict[str, Any]] = None
+    survey: Optional[dict[str, Any]] = None
 
 
 class ReviewIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     advice: str = Field(min_length=1, max_length=4000)
     needsInPersonExam: bool
+
+
+TAGS = ("URGENT", "CHILD_MYOPIA", "ROUTINE")
+
+
+def tag_of(profile: dict[str, Any]) -> str:
+    """URGENT / CHILD_MYOPIA / ROUTINE. The app's own tag when it is valid; an urgent referral level is always URGENT."""
+    tag = ((profile.get("triage") or {}).get("tag") or "").upper()
+    if (profile.get("estimates") or {}).get("referralLevel") == "URGENT":
+        return "URGENT"
+    return tag if tag in TAGS else "ROUTINE"
 
 
 def case_id(pid: str) -> str:
@@ -205,15 +223,20 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
                     "dominantZone": fp.get("dominant"), "impliedLens": fp.get("impliedLens"),
                     "referralLevel": est.get("referralLevel"), "referralReasons": est.get("referralReasons") or [],
                     "needsInPersonExam": rv.get("needsInPersonExam"),
+                    "tag": tag_of(p),
+                    "redFlagReasons": (p.get("triage") or {}).get("redFlagReasons") or [],
                 })
+            # URGENT first, then CHILD_MYOPIA, then ROUTINE; the newest first inside each group
+            out.sort(key=lambda x: (TAGS.index(x["tag"]), -x["receivedAt"]))
             return out
 
     @app.get("/profiles/{pid}", dependencies=[Depends(check_token)])
     def get_profile(pid: str) -> dict[str, Any]:
         with db() as con:
             r = get_row(con, pid)
-            return {"id": pid, "caseId": case_id(pid), "receivedAt": r["received_at"], "profile": json.loads(r["payload"]),
-                    "review": review_of(con, pid)}
+            profile = json.loads(r["payload"])
+            return {"id": pid, "caseId": case_id(pid), "receivedAt": r["received_at"], "profile": profile,
+                    "tag": tag_of(profile), "review": review_of(con, pid)}
 
     @app.delete("/profiles/{pid}", status_code=204, dependencies=[Depends(check_token)])
     def delete_profile(pid: str) -> Response:

@@ -40,6 +40,12 @@ data class RulesConfig(
     // ---- Adaptive anamnesis: power path quick estimate and functional vision profile ----
     val quickEstimate: com.drishtisaathi.engine.config.QuickEstimateConfig = com.drishtisaathi.engine.config.QuickEstimateConfig(),
     val functionalProfile: com.drishtisaathi.engine.config.FunctionalProfileConfig = com.drishtisaathi.engine.config.FunctionalProfileConfig(),
+    // ---- Vision profile branch: safety, lens-assisted mode, screening tests, profile rings, lens engine ----
+    val safety: com.drishtisaathi.engine.config.SafetyConfig = com.drishtisaathi.engine.config.SafetyConfig(),
+    val lensAssisted: com.drishtisaathi.engine.config.LensAssistedConfig = com.drishtisaathi.engine.config.LensAssistedConfig(),
+    val screening: com.drishtisaathi.engine.config.ScreeningConfig = com.drishtisaathi.engine.config.ScreeningConfig(),
+    val visionProfile: com.drishtisaathi.engine.config.VisionProfileConfig = com.drishtisaathi.engine.config.VisionProfileConfig(),
+    val lensEngine: com.drishtisaathi.engine.config.LensEngineConfig = com.drishtisaathi.engine.config.LensEngineConfig(),
 ) {
     fun material(id: String): MaterialSpec =
         materials.firstOrNull { it.id == id } ?: error("Material '$id' is not defined in rules.json")

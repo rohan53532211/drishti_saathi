@@ -1,0 +1,119 @@
+{
+  "version": "2026-11-14",
+  "source": "zeiss.co.in 'Need new lenses?' pages (ZEISS Vision Center Gomti Nagar page links) + zeiss.com DriveSafe & DuraVision pages. 'trigger' rules are Drishti Saathi's own, not ZEISS's. Always label output: 'Suggested ZEISS lens family - optician confirms'.",
+  "selection_order": [
+    "1. Red flag present -> NO lens suggestion, referral only (full check still runs, report always sent)",
+    "2. Pick LENS TYPE (single vision / anti-fatigue / progressive / myopia management)",
+    "3. Pick DESIGN within the type (ClearView / Light 2 / SmartLife / ClearMind / DriveSafe / SmartLife Young)",
+    "4. Add MATERIAL options (BlueGuard / PhotoFusion X); UVProtect always",
+    "5. Pick COATING (DuraVision ...)",
+    "6. Suggest up to 2 SECOND PAIRS (Office / DriveSafe / prescription sun)"
+  ],
+  "lens_types": [
+    {
+      "id": "single_vision",
+      "name": "ZEISS Single Vision lenses",
+      "who_for": "Short-sighted (minus), long-sighted (plus) or astigmatism; one prescription over the whole lens; clear at one distance (far OR near). All-day or task-only (reading, driving).",
+      "how_it_works": "One power across the lens. Premium designs reduce blur/distortion toward the edges without extra thickness.",
+      "benefits": ["Clear at the corrected distance", "Thin and light", "UV protection to 400 nm in clear lenses"],
+      "limits": ["No help for near focus once eyes start ageing; ZEISS suggests a second pair (e.g. Office) if discomfort"],
+      "trigger": "age < 30, OR age 30-44 without near/screen tiredness, AND no near add needed",
+      "why_en": "Your blur is at one distance ({distance}); one power fixes it.",
+      "why_hi": "आपको एक ही दूरी ({distance}) पर धुंधला दिखता है; एक पावर वाला लेंस यह ठीक करता है।",
+      "url": "https://www.zeiss.co.in/vision-care/need-new-lenses/single-vision-lenses.html"
+    },
+    {
+      "id": "anti_fatigue",
+      "name": "ZEISS Anti-fatigue (Digital) lenses",
+      "who_for": "30s to mid-40s; need distance glasses but struggle up close; tired eyes or blur at end of day / after near work; heavy screen users; difficulty switching near-far.",
+      "how_it_works": "Distance lens with a small near 'boost' in the lower part; gentle addition, smaller side blur than progressives.",
+      "benefits": ["Less eye strain and tiredness from screens/reading", "Smooth near-far switching", "Less blur than progressives, quick adaptation", "All-day wear", "Can ease later move to progressives"],
+      "limits": ["Not enough near help once a full reading add is needed (then progressive)"],
+      "designs_available": ["clearmind", "smartlife"],
+      "trigger": "age 30-44 AND (screen hours >= 4 OR tired eyes/near blur >= sometimes) AND measured add < 0.75",
+      "why_en": "You are {age} and your eyes get tired after {screen_hours} h of screens; the small boost at the bottom eases phone-to-far switching.",
+      "why_hi": "आपकी उम्र {age} है और {screen_hours} घंटे स्क्रीन के बाद आँखें थकती हैं; लेंस के नीचे का हल्का बूस्ट फ़ोन से दूर देखने में आराम देता है।",
+      "url": "https://www.zeiss.co.in/vision-care/need-new-lenses/digital-lenses.html"
+    },
+    {
+      "id": "progressive",
+      "name": "ZEISS Progressive lenses",
+      "who_for": "Middle-aged people who start having trouble focusing up close (ZEISS: common choice over 45); want one pair for all distances.",
+      "how_it_works": "Distance zone at top, intermediate in middle, near at bottom; no visible lines.",
+      "benefits": ["Far, middle and near in one pair", "No swapping or separate reading glasses", "No visible lines"],
+      "limits": ["Learning curve; must look through correct zone", "Side blur zones", "Needs precise fitting by optician", "Narrow intermediate zone for long screen work (see Office)"],
+      "designs_available": ["light2", "smartlife", "clearmind", "drivesafe"],
+      "trigger": "age >= 45 OR measured near add >= 0.75",
+      "why_en": "You need +{add} D extra for near; a progressive gives far, screen and reading in one pair.",
+      "why_hi": "पास के लिए आपको +{add} D अतिरिक्त चाहिए; प्रोग्रेसिव लेंस एक ही चश्मे में दूर, स्क्रीन और पढ़ना देता है।",
+      "url": "https://www.zeiss.co.in/vision-care/need-new-lenses/progressive-lenses.html"
+    },
+    {
+      "id": "office",
+      "role": "second_pair",
+      "name": "ZEISS Office lenses",
+      "who_for": "Most of the day at a computer / fixed work distances; eye strain even with current glasses; headaches or neck/shoulder pain from screen work (receptionists, accountants, designers).",
+      "how_it_works": "Personalised to workplace distances (examples: documents up to 100 cm, multiple screens up to 200 cm, room up to 3.2-4 m). Tech: Digital Inside (fewer head/eye movements), M.I.D (near-intermediate needs), FaceFit; optional BlueGuard, DuraVision.",
+      "benefits": ["Relaxed near + intermediate vision", "Natural head/neck posture", "Less eye, neck, back, shoulder strain"],
+      "limits": ["Work pair only; switch to regular glasses at home / for driving"],
+      "trigger": "desk/screen work hours >= 6 AND (age >= 40 OR neck pain/headache >= sometimes)",
+      "why_en": "You work {desk_hours} h at a screen and get {symptom}; an office pair keeps the screen sharp without tilting your head.",
+      "why_hi": "आप {desk_hours} घंटे स्क्रीन पर काम करते हैं और {symptom} होता है; ऑफिस लेंस सिर झुकाए बिना स्क्रीन साफ़ दिखाता है।",
+      "url": "https://www.zeiss.co.in/vision-care/need-new-lenses/office-lenses.html"
+    },
+    {
+      "id": "myopia_management",
+      "role": "refer",
+      "name": "ZEISS Myopia management lenses",
+      "who_for": "Children up to 12 with progressing myopia; under-7 myopes at higher risk of high myopia.",
+      "products": [
+        {"name": "MyoCare", "how": "C.A.R.E. ring zones (myopic defocus) alternating 50:50 with correction zones; clear centre; ClearFocus back surface", "claim": "Eye growth ~70% closer to non-myopic children, ages 7-12 (ARVO 2024 abstract)"},
+        {"name": "MyoCare S", "how": "Same C.A.R.E. concept", "claim": "~68% closer to normal growth, ages 7-12 (abstract)"},
+        {"name": "MyoKids", "how": "Lower zone manages accommodative lag during near work", "claim": "Potential reduction (COMET study basis)"},
+        {"name": "MyoVision / Pro / Ace", "how": "Large clear centre + peripheral zone reducing peripheral defocus", "claim": "No figure given"}
+      ],
+      "wearing": "Works only if worn as much as possible; 2 h+ outdoor time daily, breaks from near work, limited screens; annual eye exam.",
+      "limits": ["An eye care professional decides; mostly manufacturer-supported evidence"],
+      "trigger": "age < 18 AND any minus power (myopia) -> REFERRAL ONLY (tag CHILD_MYOPIA), never a lens choice; full check still runs and report is sent",
+      "why_en": "Your child's eyes are short-sighted; an optometrist can check if myopia-slowing lenses are needed.",
+      "why_hi": "आपके बच्चे की दूर की नज़र कमज़ोर है; ऑप्टोमेट्रिस्ट जाँच करेंगे कि नज़र बढ़ने से रोकने वाले लेंस चाहिए या नहीं।",
+      "url": "https://www.zeiss.co.in/vision-care/need-new-lenses/myopia-management-lenses.html"
+    }
+  ],
+  "designs": [
+    {"id": "clearview", "applies_to": ["single_vision"], "tier": "value", "what": "More clear area across the lens than conventional single vision; limited customisation; 1.60 index noted", "trigger": "budget = low"},
+    {"id": "light2", "applies_to": ["progressive"], "tier": "mid", "what": "Medium-wide fields, soft transitions; for first-time progressive wearers; fast adaptation", "trigger": "budget = low/mid OR first-time progressive"},
+    {"id": "smartlife", "applies_to": ["single_vision", "anti_fatigue", "progressive"], "tier": "premium", "what": "For connected, on-the-move lifestyles; clear at all distances and directions; customised to eyes, age, lifestyle", "trigger": "budget = mid/high AND digital/mobile-heavy lifestyle (default premium)"},
+    {"id": "clearmind", "applies_to": ["single_vision", "anti_fatigue", "progressive"], "tier": "top", "what": "For concentration in visually busy environments; very clear, optimised blur zones, reduces cognitive load; 1 in 2 progressive wearers adapted within an hour (ZEISS 2025 survey)", "trigger": "budget = high AND (busy visual work OR focus complaints)"},
+    {"id": "drivesafe", "applies_to": ["single_vision", "progressive"], "tier": "premium", "what": "All-day lens optimised for driving; Luminance Design for pupil size in low light (dusk, fog, rain); large distance zone, intermediate for dashboard/mirrors, smaller near zone; DuraVision DriveSafe coating: up to 64% less perceived glare (one ZEISS test)", "trigger": "drives daily/weekly AND (oncoming glare OR poor low-light vision >= sometimes)"},
+    {"id": "smartlife_young", "applies_to": ["single_vision"], "tier": "kids", "what": "Designed for children's eyes, frames and lifestyle; more clear area than adult lenses", "trigger": "age < 18 AND NOT myopic (myopic children -> referral only); label 'optometrist confirms'"}
+  ],
+  "materials": [
+    {"id": "uvprotect", "name": "ZEISS UVProtect", "default": true, "what": "Absorbs UV up to 400 nm in all clear organic ZEISS lenses since 2018, no extra cost", "why_en": "UV is linked to cataract and macular damage; up to 75% of UV exposure can happen on cloudy days.", "why_hi": "धूप की UV किरणें मोतियाबिंद से जुड़ी हैं; बादल वाले दिन भी UV लगती है।", "url": "https://www.zeiss.co.in/vision-care/need-new-lenses/uvprotect.html"},
+    {"id": "blueguard", "name": "ZEISS BlueGuard", "what": "Blue-light blocking built into lens material (not a coating); blocks up to 40% of harmful blue light; fewer purple reflections; works with any ZEISS design; already inside PhotoFusion X", "limits": "Not a cure; pair with 20-20-20 rule", "trigger": "screen hours >= 4 OR digital strain symptoms >= sometimes", "why_en": "You use screens {screen_hours} h a day and report {symptom}; BlueGuard cuts part of screen blue light with fewer reflections.", "why_hi": "आप रोज़ {screen_hours} घंटे स्क्रीन देखते हैं; ब्लूगार्ड स्क्रीन की नीली रोशनी का हिस्सा रोकता है।", "url": "https://www.zeiss.co.in/vision-care/need-new-lenses/blueguard.html"},
+    {"id": "photofusion_x", "name": "ZEISS PhotoFusion X", "what": "Self-tinting: darkens in UV (~15 s to glare protection), clears up to 2.5x faster than other brands; blocks up to 50% blue light indoors, 94% outdoors; full UV; many colours", "limits": "Not activated by headlights/streetlights - no help with night glare; darkness varies with temperature/UV", "trigger": "outdoor hours >= 2 AND wants one pair for indoor+outdoor (not instead of DriveSafe for night glare)", "why_en": "You are outdoors {outdoor_hours} h a day; one pair that darkens in sun and clears indoors.", "why_hi": "आप रोज़ {outdoor_hours} घंटे बाहर रहते हैं; यह लेंस धूप में गहरा और अंदर साफ़ हो जाता है।", "url": "https://www.zeiss.co.in/vision-care/need-new-lenses/photofusion-x.html"}
+  ],
+  "coatings": [
+    {"id": "dv_gold", "name": "DuraVision Plus Gold", "what": "Highest scratch resistance, fastest-cleaning top coat, subtle gold reflex", "trigger": "budget = high"},
+    {"id": "dv_platinum", "name": "DuraVision Platinum", "what": "Highly scratch-resistant, up to 50% fewer reflections, faint blue reflex", "trigger": "budget = mid/high (default premium)"},
+    {"id": "dv_antivirus_platinum_uv", "name": "DuraVision AntiVirus Platinum UV", "what": "Platinum-level anti-reflection/scratch resistance + antimicrobial surface + UV (shown in ZEISS My Vision Profile results)", "trigger": "budget = mid/high AND touches glasses often / public-facing work"},
+    {"id": "dv_silver", "name": "DuraVision Silver", "what": "Clear, up to 50% fewer reflections, slightly less hard than Platinum", "trigger": "budget = mid"},
+    {"id": "dv_chrome", "name": "DuraVision Chrome", "what": "Standard DuraVision features, faint green reflex, lower price", "trigger": "budget = low"},
+    {"id": "dv_kids", "name": "DuraVision Kids", "what": "Durable, easy-clean, affordable", "trigger": "age < 18"},
+    {"id": "dv_drivesafe", "name": "DuraVision Plus DriveSafe", "what": "Reflects wavelengths that cause headlight/streetlight glare; scratch-resistant", "trigger": "DriveSafe design chosen"},
+    {"id": "dv_blueprotect", "name": "DuraVision BlueProtect", "what": "Blue-light coating for computer use; ZEISS calls BlueGuard material the stronger option; redundant with BlueGuard", "trigger": "never together with BlueGuard"}
+  ],
+  "second_pair_sun": [
+    {"id": "sun_polarised", "what": "Cuts glare from road, water, snow; more contrast; full UV", "trigger": "drives in daytime OR water/outdoor sport OR field/farm work"},
+    {"id": "sun_adaptivesun", "what": "Photochromic sun tints (solid/gradient); can add polarisation; blue tint not for driving", "trigger": "changing light, wants sunglasses that adapt"},
+    {"id": "sun_tint", "what": "50+ solid/gradient tints, full UV to 400 nm", "trigger": "style / budget"},
+    {"id": "sun_mirror_flash", "what": "DuraVision Mirror (bright extreme outdoors) / Flash (subtle mirror)", "trigger": "very bright outdoor exposure"},
+    {"id": "sun_skylet", "what": "Absorbs up to 90% light; snow/water sports", "trigger": "water or snow sports"}
+  ],
+  "urls": {
+    "sunglass": "https://www.zeiss.co.in/vision-care/need-new-lenses/sunglass-lenses.html",
+    "drivesafe": "https://www.zeiss.com/vision-care/en/need-new-lenses/drivesafe-single-vision-lenses.html",
+    "duravision": "https://www.zeiss.com/vision-care/en/need-new-lenses/duravision-coatings.html",
+    "vision_center_lucknow": "https://www.zeiss.co.in/zeiss-vision-center/lucknow/cyber-heights/zeiss-vision-center-gomti-nagar-by-nsp-group.html"
+  }
+}

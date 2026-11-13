@@ -84,8 +84,8 @@ object S {
     )
     val consentWhereH = t("Where it stays", "जानकारी कहाँ रहती है")
     val consentWhere = t(
-        "Only on this phone. Nothing is uploaded.",
-        "सिर्फ़ इसी फ़ोन में। कुछ भी अपलोड नहीं होता।",
+        "On this phone, encrypted. Nothing else is uploaded.",
+        "इसी फ़ोन में, सुरक्षित (एन्क्रिप्टेड)। इसके अलावा कुछ भी अपलोड नहीं होता।",
     )
     val consentDeleteH = t("Deleting", "मिटाना")
     val consentDelete = t(

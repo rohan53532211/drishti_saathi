@@ -46,6 +46,7 @@ class StringsWordingTest {
         com.drishtisaathi.engine.ColourPref.entries.forEach { S.colour(it) }
         com.drishtisaathi.engine.LookPref.entries.forEach { S.look(it) }
         com.drishtisaathi.engine.ReadingFrequency.entries.forEach { S.readingFrequency(it) }
+        com.drishtisaathi.i18n.SProfile.touchAll()
         com.drishtisaathi.engine.ReasonCode.entries.forEach { S.reasonTemplate(it, true); S.reasonTemplate(it, false); S.reasonTemplate(it, true, assumed = true); S.reasonTemplate(it, false, uncalibrated = true) }
 
         assertTrue(S.all.size > 100)

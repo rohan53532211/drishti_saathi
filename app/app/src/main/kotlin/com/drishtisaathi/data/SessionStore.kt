@@ -66,6 +66,10 @@ data class Measurements(
     /** Power path quick estimate (phone estimate, approximate); null = not run. */
     val quick: com.drishtisaathi.engine.QuickEstimate? = null,
     val aiInterview: com.drishtisaathi.aivoice.AiInterviewRecord? = null,
+    /** Vision-profile survey answers (option codes and numbers only). */
+    val survey: com.drishtisaathi.engine.profile.SurveyAnswers = com.drishtisaathi.engine.profile.SurveyAnswers(),
+    /** Screening tests (grid, contrast, colour); null = not run. */
+    val screening: com.drishtisaathi.engine.profile.ScreeningResults? = null,
 )
 
 /**

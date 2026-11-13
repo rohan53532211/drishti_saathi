@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
  * running on code defaults.
  */
 
-private fun missingSection(name: String): Nothing =
+internal fun missingSection(name: String): Nothing =
     throw IllegalArgumentException("rules.json is missing the \"$name\" section (Track A engine config)")
 
 // =============================================================================================

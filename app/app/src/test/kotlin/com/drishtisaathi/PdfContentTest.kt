@@ -99,24 +99,24 @@ class PdfContentTest {
         assertTrue(PdfContent.customerCopy(state(myope), rules).none { it is Block.FrameRow })
     }
 
-    @Test fun `urgent referral - one warning at the top, then lens advice and frames for after the visit`() {
+    @Test fun `urgent referral - one red banner at the top, and no lens or frame is suggested (Phase A)`() {
         val urgent = myope.copy(redFlagFlashes = true)
         val st = state(urgent)
         assertTrue(st.result!!.frames.isNotEmpty())
         val shopBlocks = PdfContent.shopCopy(st, rules, ctx, Lang.EN)
         val shop = text(shopBlocks)
-        assertEquals(1, Regex(Regex.escape(com.drishtisaathi.i18n.SShop.urgentTop.en)).findAll(shop).count())
+        val P = com.drishtisaathi.i18n.SProfile
+        assertEquals(1, Regex(Regex.escape(P.seeDoctorToday.en)).findAll(shop).count())
         assertFalse(shop.contains(S.adviceWithheld.en))
-        assertTrue(shop.contains(S.lensPackage.en))
-        assertTrue(shop.contains(S.suggestedFrames.en))
-        assertTrue(shop.contains(com.drishtisaathi.i18n.SShop.afterDoctor.en))
+        assertFalse(shop.contains(S.lensPackage.en))
+        assertFalse(shop.contains(S.suggestedFrames.en))
+        assertTrue(shop.contains(P.noLensToday.en))
         assertEquals(0, shopBlocks.count { it is Block.Heading && it.text == S.referral.en })   // no second referral section
         val cust = text(PdfContent.customerCopy(st, rules))
-        assertTrue(cust.contains(com.drishtisaathi.i18n.SShop.urgentTop.hi))
         assertFalse(cust.contains(S.urgentBody.hi))                                               // no duplicate urgent section
-        assertEquals(1, Regex(Regex.escape(com.drishtisaathi.i18n.SShop.urgentTop.hi)).findAll(cust).count())
-        assertTrue(cust.contains(S.lensPackage.hi))
-        assertTrue(cust.contains(S.suggestedFrames.hi))
+        assertEquals(1, Regex(Regex.escape(P.seeDoctorToday.hi)).findAll(cust).count())
+        assertFalse(cust.contains(S.lensPackage.hi))
+        assertFalse(cust.contains(S.suggestedFrames.hi))
         assertFalse(cust.contains(" D "))                                                         // still no power numbers
     }
 

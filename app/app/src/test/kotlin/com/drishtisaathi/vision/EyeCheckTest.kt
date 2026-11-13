@@ -120,9 +120,9 @@ class EyeCheckTest {
         val lines = PowerPathText.quickLines(state).map { it.en }
         assertTrue(lines.toString(), lines.any { "−3.00 and −3.50" in it } && lines.any { "−2.25 and −2.75" in it })
         val texts = paras(PdfContent.shopCopy(state, rules, ctx, Lang.EN))
-        assertTrue(texts.indexOf(SShop.urgentTop.en) in 0..3)   // at the top
+        assertTrue(texts.indexOf(com.drishtisaathi.i18n.SProfile.seeDoctorToday.en) in 0..4)   // at the top
         assertFalse(SShop.phoneCheckNote.en in texts)
-        assertTrue(SShop.urgentTop.hi in paras(PdfContent.customerCopy(state, rules)))
+        assertTrue(com.drishtisaathi.i18n.SProfile.seeDoctorToday.hi in paras(PdfContent.customerCopy(state, rules)))
     }
 
     @Test fun `no red flag - the closing line recommends a complete eye check-up, on both PDFs`() {
@@ -180,8 +180,10 @@ class EyeCheckTest {
         assertTrue(result.frames.isNotEmpty())
         val state = UiState(answers = red, quick = q, result = result)
         val shop = PdfContent.shopCopy(state, rules, ctx, Lang.EN)
-        assertEquals(1, paras(shop).count { it == SShop.urgentTop.en })
-        assertTrue(SShop.afterDoctor.en in paras(shop))
+        // Phase A: the red banner once, the power for the optometrist only, and no lens or frame is suggested
+        assertEquals(1, paras(shop).count { it == com.drishtisaathi.i18n.SProfile.seeDoctorToday.en })
+        assertTrue(com.drishtisaathi.i18n.SProfile.forOptometristOnly.en in paras(shop))
+        assertFalse(com.drishtisaathi.i18n.S.lensPackage.en in shop.filterIsInstance<com.drishtisaathi.pdf.Block.Heading>().map { it.text })
     }
 
     @Test fun `skipped lifestyle questions say not answered instead of 0_0 h`() {
