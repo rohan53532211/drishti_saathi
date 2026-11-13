@@ -204,6 +204,15 @@ class Render3D(private val transparent: Boolean = true) {
         camera.lookAt(0.0, 0.0, 10_000.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
     }
 
+    /**
+     * The real camera: at the origin looking down −Z (y up), with a projection built from the camera intrinsics
+     * (engine ViewIntrinsics.projection) that maps camera space straight onto this view's pixels.
+     */
+    fun intrinsicsCamera(projection: DoubleArray, near: Double, far: Double) {
+        camera.setCustomProjection(projection, near, far)
+        camera.lookAt(0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0)
+    }
+
     /** Perspective camera looking at the origin from [distanceMm] along −Z (the front of a frame or avatar). */
     fun perspectiveFront(distanceMm: Double, fovDeg: Double = 30.0) {
         camera.setProjection(fovDeg, width.toDouble() / height, 10.0, 5000.0, Camera.Fov.VERTICAL)

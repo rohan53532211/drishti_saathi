@@ -58,6 +58,7 @@ object S3D {
     val scaleCard = tx("Scale from your card-measured PD", "कार्ड से नापी आँखों की दूरी से साइज़")
     val scaleFace = tx("Scale from your face width (approximate)", "चेहरे की चौड़ाई से साइज़ (लगभग)")
     val scaleDefault = tx("Scale from an average face (approximate)", "औसत चेहरे से साइज़ (लगभग)")
+    val alignCheck = tx("3D try-on alignment check", "3D ट्राई-ऑन की सही जगह की जाँच")
     val switchedTo2d = tx("Showing the simple try-on on this phone.", "इस फ़ोन पर सरल ट्राई-ऑन दिख रहा है।")
 
     // ---- avatar ----
@@ -128,7 +129,7 @@ object S3D {
         material, price, size, clearFilters, count, noMatch, online, offline, demoCatalog, viewerHint, sizesEstimated,
         sizesMeasured, estimated, sizeLine, materialLine, colourLine, tryLive, tryAvatar, loading, downloadFailed,
         favourite, favourited, liveTitle, fitText, fitGood, fitSlightlyNarrow, fitSlightlyWide, fitTooNarrow, fitTooWide,
-        scaleCard, scaleFace, scaleDefault, switchedTo2d, avatarTitle, avatarConsentTitle, avatarConsentBody, avatarAgree,
+        scaleCard, scaleFace, scaleDefault, alignCheck, switchedTo2d, avatarTitle, avatarConsentTitle, avatarConsentBody, avatarAgree,
         avatarNo, avatarCapture, avatarTakeFront, avatarHold, avatarTurnFace, avatarMaking, avatarFailed, avatarLabel,
         avatarHint, compare, pickSecond, favourites, deleteAvatar, retake,
     )

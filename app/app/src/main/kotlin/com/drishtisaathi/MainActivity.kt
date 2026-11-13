@@ -116,8 +116,8 @@ private object Routes {
     const val CATALOG3D = "catalog3d"
     const val VIEWER3D = "viewer3d/{id}"
     fun viewer3d(id: String) = "viewer3d/$id"
-    const val LIVE3D = "live3d?frame={frame}"
-    fun live3d(id: String?) = "live3d" + (id?.let { "?frame=$it" } ?: "")
+    const val LIVE3D = "live3d?frame={frame}&debug={debug}"
+    fun live3d(id: String?, debug: Boolean = false) = "live3d?debug=$debug" + (id?.let { "&frame=$it" } ?: "")
     const val AVATAR_CONSENT = "avatarConsent?frame={frame}"
     fun avatarConsent(id: String?) = "avatarConsent" + (id?.let { "?frame=$it" } ?: "")
     const val AVATAR_CAPTURE = "avatarCapture?frame={frame}"
@@ -255,6 +255,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 state.lang, vm::setLang,
                 onCamera = { nav.navigate(Routes.CAMERA_DEBUG) },
                 onPrecision = { precisionRun = true; vm.startNew(); nav.navigate(Routes.CONSENT) },
+                onAlign3D = { vm.loadCatalog3D(); nav.navigate(Routes.live3d(null, debug = true)) },
                 onBack = { nav.popBackStack() },
             )
         }
@@ -539,7 +540,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 )
             }
         }
-        composable(Routes.LIVE3D, arguments = frameArg) { entry ->
+        composable(Routes.LIVE3D, arguments = frameArg + navArgument("debug") { type = NavType.BoolType; defaultValue = false }) { entry ->
             val l = state.lang
             val all = vm.frames3d.collectAsStateWithLifecycle().value.first
             val favs by vm.favourites3d.collectAsStateWithLifecycle()
@@ -555,7 +556,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     l, vm::setLang, picks, start, tracker.frames,
                     cameraPreview = { CameraPreview(tracker, Modifier.fillMaxSize()) },
                     glb = vm::glb3D, thumb = vm::thumb3D,
-                    pdMm = state.face?.pdMm?.value, faceWidthMm = null,
+                    pdMm = state.face?.pdMm?.value, config = vm.rules.tryOn,
+                    debug = entry.arguments?.getBoolean("debug") ?: false,
                     fallback2D = {
                         TryOnScreen(
                             l, state.result?.frames.orEmpty(), tracker.frames,

@@ -66,12 +66,19 @@ import java.io.ByteArrayOutputStream
 import kotlin.math.abs
 
 /** MediaPipe canonical face-mesh triangles (assets/face_mesh_triangles.json, Apache-2.0). */
+/** MediaPipe canonical face model: topology (898 triangles) and the 468 canonical vertices (cm). */
 object FaceMeshAsset {
-    @Volatile private var cached: IntArray? = null
-    fun triangles(context: Context): IntArray = cached ?: synchronized(this) {
-        cached ?: Json.parseToJsonElement(context.assets.open("face_mesh_triangles.json").bufferedReader().use { it.readText() })
-            .jsonObject["triangles"]!!.jsonArray.map { it.jsonPrimitive.content.toInt() }.toIntArray().also { cached = it }
+    @Volatile private var cached: Pair<IntArray, FloatArray>? = null
+    private fun load(context: Context): Pair<IntArray, FloatArray> = cached ?: synchronized(this) {
+        cached ?: run {
+            val o = Json.parseToJsonElement(context.assets.open("face_mesh_triangles.json").bufferedReader().use { it.readText() }).jsonObject
+            val t = o["triangles"]!!.jsonArray.map { it.jsonPrimitive.content.toInt() }.toIntArray()
+            val v = o["vertices"]!!.jsonArray.map { it.jsonPrimitive.content.toFloat() }.toFloatArray()
+            (t to v).also { cached = it }
+        }
     }
+    fun triangles(context: Context): IntArray = load(context).first
+    fun vertices(context: Context): FloatArray = load(context).second
 }
 
 @Composable

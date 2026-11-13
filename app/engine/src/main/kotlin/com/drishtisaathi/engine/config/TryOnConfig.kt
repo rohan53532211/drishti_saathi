@@ -32,6 +32,16 @@ data class TryOnConfig(
     val smoothingAlpha: Double = 0.5,
     /** If the corners jump by more than this fraction of the frame width, smoothing restarts (new face or big move). */
     val smoothingResetFraction: Double = 0.35,
+    /** 3D try-on (canonical face space): pupils at this fraction of the lens height from the lens bottom. */
+    val pupilHeightRatio: Double = 0.55,
+    /** 3D try-on: moves the frame up (+) / down (−), mm. */
+    val verticalOffsetMm: Double = 0.0,
+    /** 3D try-on: the frame's back surface at the bridge sits this far in front of the nasion (landmark 168), mm. */
+    val bridgeForwardMm: Double = 11.0,
+    /** 3D try-on: temples reach the ear this far behind the nasion, mm. */
+    val earBehindNasionMm: Double = 95.0,
+    /** 3D try-on: the ear rest point is this far below the pupils, mm. */
+    val earBelowPupilMm: Double = 5.0,
 ) {
     init {
         require(frontOffsetMm in 0.0..40.0) { "tryOn.frontOffsetMm out of range" }
@@ -43,5 +53,10 @@ data class TryOnConfig(
         require(widthScale in 0.5..2.0) { "tryOn.widthScale out of range" }
         require(smoothingAlpha > 0.0 && smoothingAlpha <= 1.0) { "tryOn.smoothingAlpha must be in (0, 1]" }
         require(smoothingResetFraction > 0.0) { "tryOn.smoothingResetFraction must be positive" }
+        require(pupilHeightRatio in 0.3..0.8) { "tryOn.pupilHeightRatio out of range" }
+        require(verticalOffsetMm in -15.0..15.0) { "tryOn.verticalOffsetMm out of range" }
+        require(bridgeForwardMm in 0.0..25.0) { "tryOn.bridgeForwardMm out of range" }
+        require(earBehindNasionMm in 70.0..120.0) { "tryOn.earBehindNasionMm out of range" }
+        require(earBelowPupilMm in -10.0..25.0) { "tryOn.earBelowPupilMm out of range" }
     }
 }

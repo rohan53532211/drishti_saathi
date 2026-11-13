@@ -83,7 +83,7 @@ fun ShopToolsScreen(
 
 /** Diagnostics: the camera check and the full staff test protocol (precision mode). */
 @Composable
-fun DiagnosticsScreen(lang: Lang, onLang: (Lang) -> Unit, onCamera: () -> Unit, onPrecision: () -> Unit, onBack: () -> Unit) {
+fun DiagnosticsScreen(lang: Lang, onLang: (Lang) -> Unit, onCamera: () -> Unit, onPrecision: () -> Unit, onAlign3D: () -> Unit, onBack: () -> Unit) {
     val l = lang
     AppScaffold(l, onLang, title = SShop.diagnostics[l], onBack = onBack) { pad ->
         Column(
@@ -92,6 +92,7 @@ fun DiagnosticsScreen(lang: Lang, onLang: (Lang) -> Unit, onCamera: () -> Unit, 
         ) {
             BigButton(com.drishtisaathi.i18n.SFlow.cameraCheck[l], onCamera)
             BigButton(SShop.precisionMode[l], onPrecision)
+            BigButton(com.drishtisaathi.i18n.S3D.alignCheck[l], onAlign3D)
             Text(SShop.precisionNote[l], style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
         }
     }
