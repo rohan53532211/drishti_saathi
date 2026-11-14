@@ -49,6 +49,7 @@ import com.drishtisaathi.data.SavedFrames
 import com.drishtisaathi.data.SaveResult
 import com.drishtisaathi.data.RemoteReviewEntity
 import com.drishtisaathi.i18n.SBridge
+import com.drishtisaathi.i18n.SProfile
 import com.drishtisaathi.i18n.Txt
 import com.drishtisaathi.engine.PowerKnown
 import com.drishtisaathi.engine.QuickEstimate
@@ -235,7 +236,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     val bridgeSettings = BridgeSettings(app)
     private val remoteDao = db.remoteReviews()
-    private val appVersion: String = runCatching {
+    val appVersion: String = runCatching {
         app.packageManager.getPackageInfo(app.packageName, 0).versionName
     }.getOrNull() ?: "?"
 
@@ -285,7 +286,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun fetchReview(r: RemoteReviewEntity): RemoteReviewEntity {
         val cfg = bridgeSettings.config.value.copy(url = r.backendUrl)
         val rv = withContext(Dispatchers.IO) { BridgeClient(cfg).review(r.remoteId) }
-        val e = r.copy(status = rv.status, advice = rv.advice, needsInPersonExam = rv.needsInPersonExam,
+        val e = r.copy(status = rv.status, advice = rv.adviceWithPower { SProfile.confirmedByOptometrist.format(it).en }, needsInPersonExam = rv.needsInPersonExam,
             reviewedAt = rv.reviewedAt, checkedAt = System.currentTimeMillis())
         remoteDao.upsert(e)
         if (!r.reviewed && e.reviewed) {

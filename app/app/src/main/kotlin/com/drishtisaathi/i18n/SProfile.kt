@@ -228,6 +228,24 @@ object SProfile {
     val emptyHistoryBody = tx("Finished checks appear here. Start with a new customer from the home screen.", "पूरी हुई जाँचें यहाँ दिखेंगी। होम स्क्रीन से नया ग्राहक शुरू करें।")
     val loading = tx("Loading…", "लोड हो रहा है…")
 
+    // ---- Phase G: QR, share, confirmed power ----
+    val qrTitle = tx("QR summary", "QR सारांश")
+    val qrLink = tx("Scan to open this report on the optometrist's page.", "ऑप्टोमेट्रिस्ट के पेज पर यह रिपोर्ट खोलने के लिए स्कैन करें।")
+    val qrOffline = tx(
+        "Scan for the summary: profile, power ranges with the method, screening and lens family. No name, no photo, no phone number.",
+        "सारांश के लिए स्कैन करें: प्रोफ़ाइल, नंबर की रेंज और तरीका, स्क्रीनिंग और लेंस परिवार। कोई नाम, फ़ोटो या फ़ोन नंबर नहीं।",
+    )
+    val shareWhatsApp = tx("Share on WhatsApp", "WhatsApp पर भेजें")
+    val shareTitle = tx("Share the summary", "सारांश भेजें")
+    val shareConsent = tx(
+        "The customer agrees that this summary picture (no name, no photo) is shared.",
+        "ग्राहक सहमत है कि यह सारांश चित्र (बिना नाम, बिना फ़ोटो) भेजा जाए।",
+    )
+    val shareNow = tx("Share", "भेजें")
+    val shareFailed = tx("Could not make the picture", "चित्र नहीं बन पाया")
+    val confirmedByOptometrist = tx("Confirmed by the optometrist: %s", "ऑप्टोमेट्रिस्ट ने पक्का किया: %s")
+    val pdfButton = tx("PDF", "PDF")
+
     // ---- report queue / bridge chip ----
     val bridgeConnected = tx("Connected", "जुड़ा है")
     val bridgeOffline = tx("Offline – queued %d", "ऑफ़लाइन – %d कतार में")

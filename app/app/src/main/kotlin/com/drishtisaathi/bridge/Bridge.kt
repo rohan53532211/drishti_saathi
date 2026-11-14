@@ -191,8 +191,20 @@ object BridgeProfile {
     val advice: String? = null,
     val needsInPersonExam: Boolean? = null,
     val reviewedAt: Long? = null,
+    /** The power the optometrist confirmed or corrected, as written. */
+    val confirmedPower: ConfirmedPower? = null,
 ) {
     val reviewed: Boolean get() = status == "REVIEWED"
+
+    /** The advice with the confirmed power as its last line (stored and shown together, no extra column). */
+    fun adviceWithPower(label: (String) -> String): String? {
+        val p = confirmedPower?.line() ?: return advice
+        return listOfNotNull(advice, label(p)).joinToString("\n")
+    }
+}
+
+@Serializable data class ConfirmedPower(val right: String? = null, val left: String? = null, val add: String? = null) {
+    fun line(): String? = listOfNotNull(right?.let { "R $it" }, left?.let { "L $it" }, add?.let { "ADD $it" }).joinToString(" · ").ifBlank { null }
 }
 @Serializable data class BridgeHealth(val ok: Boolean, val tokenRequired: Boolean = false, val tokenOk: Boolean = true)
 

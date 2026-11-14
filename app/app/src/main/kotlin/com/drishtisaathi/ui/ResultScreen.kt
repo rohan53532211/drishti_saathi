@@ -64,6 +64,10 @@ fun ResultScreen(
     gate: com.drishtisaathi.engine.profile.SafetyGate = state.gate(rules),
     /** Phase E: the profile rings and the suggested lens family. */
     view: com.drishtisaathi.profile.ProfileView? = null,
+    /** Phase G: the QR card's text and whether it is the link to the optometrist's page. */
+    qr: Pair<String, Boolean>? = null,
+    /** Phase G: shares the summary picture (called after the consent checkbox). */
+    onShareImage: (() -> Unit)? = null,
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -134,7 +138,14 @@ fun ResultScreen(
                 savedFrames()
             }
 
+            // QR card, then the optometrist card ("Send to optometrist" is always on) and the share action
+            qr?.let { com.drishtisaathi.profile.QrCard(l, it.first, it.second) }
             remoteCard()
+            if (onShareImage != null) {
+                var askShare by remember { mutableStateOf(false) }
+                BigButton(com.drishtisaathi.i18n.SProfile.shareWhatsApp[l], { askShare = true })
+                if (askShare) com.drishtisaathi.profile.ShareConsentDialog(l, onShare = { askShare = false; onShareImage() }, onDismiss = { askShare = false })
+            }
 
             // ---- For the shop (folded: the customer may be looking at this screen) ----
             var shopOpen by remember { mutableStateOf(false) }

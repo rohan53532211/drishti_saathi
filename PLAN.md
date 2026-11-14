@@ -216,8 +216,8 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 | D | Survey upgrade (sections, skip logic, "Why we ask") | Done |
 | E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | Done |
 | F | Premium UI redesign (tokens, fonts, all screens) | Done (see the limits below) |
-| G | QR, WhatsApp share, PDF additions, backend page | Next |
-| H | All tests, APK, README, architecture doc | To do |
+| G | QR, WhatsApp share, PDF additions, backend page | Done |
+| H | All tests, APK, README, architecture doc | Next |
 
 ### Phase A: safety rules (done)
 - **Order of the check:** core questions → (red banner if a red flag) → vision-profile survey → camera distance + PD → power of each eye → screening tests → remaining questions → results. Before this branch the power came before the PD.
@@ -298,6 +298,19 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
   - The interview keeps its existing voice strip; the 72 dp mic is on the survey.
   - Nothing here has been seen on a phone yet: spacing at font scale 1.3 and the dark theme need a look on the S23 FE.
 - Tests: `DesignTokensTest`, `BundledFontTest`.
+
+### Phase G: outputs and bridge (done)
+- **QR** (ZXing core 3.5.3, Apache-2.0, encoding only): a QR card on the result screen.
+  - Report sent and backend reachable: the QR is the link `<server>/profiles/<id>`.
+  - Otherwise a compact JSON summary that needs no network: `caseId`, `ageBand`, `tag` (URGENT / CHILD_MYOPIA / ROUTINE), the 4 ring labels and scores, per-eye power range + method + lens used, PD, screening results, lens ids, `appVersion`. No name, photo or phone number; the exact age is not in it. About 600 bytes.
+- **WhatsApp share:** "Share on WhatsApp" opens a consent checkbox first, then shares a PNG of the summary (tag, rings, power ranges with the method, screening, lens family, the QR) to WhatsApp, or the phone's share sheet when WhatsApp is not installed. The file sits with the session's PDFs and is deleted with the session.
+- **Shop PDF:** the four rings drawn, the screening results under "Screening, not a diagnosis", the measurement method per eye, the lens cards with their reasons, and the referral block for red flags and child myopia.
+- **Backend 1.2** (`backend/app/main.py`, `static/index.html`):
+  - accepts `triage`, `visionProfile`, `screening`, `lens`, `survey` (older apps without them still work; the privacy rules cover them);
+  - tags every report URGENT / CHILD_MYOPIA / ROUTINE (an urgent referral level is always URGENT) and lists URGENT first, then child myopia, then routine, newest first inside each group;
+  - the optometrist page shows urgent cases in red with the red-flag reasons at the top, the rings, the phone measurement with its method, the screening lines with status dots, the grid with the squares the person tapped, and the lens suggestion with its reasons;
+  - the optometrist can confirm or correct the power (right, left, add) with the reply; the app shows it as the last line of the advice. Older databases get the new column at start.
+- Tests: `QrPayloadTest` (payload, QR read back, share lines, PDF rings, confirmed power), `backend/tests/test_vision_profile.py`.
 
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.

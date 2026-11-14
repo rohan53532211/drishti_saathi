@@ -1,4 +1,12 @@
 {
+    "triage": {
+        "tag": "ROUTINE",
+        "redFlags": [],
+        "redFlagReasons": [],
+        "emergency": false,
+        "childMyopia": false,
+        "lensSuggested": true
+    },
     "consent": {
         "consentAt": 1762934400000,
         "spoken": true,
@@ -97,16 +105,22 @@
                 "seD": -2.5,
                 "blurAtCm": 40.0,
                 "target": "WHITE",
-                "noMyopiaAtReach": false
+                "noMyopiaAtReach": false,
+                "highMyopia": false
             },
             "left": {
                 "seD": -2.25,
                 "blurAtCm": 44.0,
                 "target": "WHITE",
-                "noMyopiaAtReach": false
+                "noMyopiaAtReach": false,
+                "highMyopia": false
             },
             "possibleLongSight": false,
             "primary": true
+        },
+        "phoneRange": {
+            "right": "Your approximate power: between −2.25 and −2.75 D (read up to 40 cm; not a final glasses number, confirm with a trial lens)",
+            "left": "Your approximate power: between −2.00 and −2.50 D (read up to 44 cm; not a final glasses number, confirm with a trial lens)"
         }
     },
     "measurements": {
@@ -166,6 +180,13 @@
         "notes": [
             "PHONE_ESTIMATE_APPROXIMATE",
             "FIRST_TIME_WEARER"
+        ],
+        "suggestedFrames": [
+            "F25 · ₹1250",
+            "F24 · ₹1200",
+            "F04 · ₹900",
+            "F20 · ₹1000",
+            "F18 · ₹1500"
         ]
     }
 }

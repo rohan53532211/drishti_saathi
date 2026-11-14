@@ -525,9 +525,23 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         composable(Routes.RESULT) {
             val gate = androidx.compose.runtime.remember(state.answers, state.survey, state.quick, state.tests, state.screening) { vm.safety(state) }
+            val resultView = androidx.compose.runtime.remember(state.answers, state.survey, state.quick, state.tests, state.screening, state.result) { vm.profileView(state) }
+            val online by vm.bridgeOnline.collectAsStateWithLifecycle()
+            val resultContext = LocalContext.current
+            val qrText = androidx.compose.runtime.remember(resultView, state.remote, online, state.sessionId) {
+                com.drishtisaathi.profile.QrPayload.content(state, resultView, vm.rules, vm.appVersion, online)
+            }
             ResultScreen(
                 state, vm.rules, vm::setLang, gate = gate,
-                view = androidx.compose.runtime.remember(state.answers, state.survey, state.quick, state.tests, state.screening, state.result) { vm.profileView(state) },
+                view = resultView,
+                qr = qrText to (online && state.remote != null),
+                onShareImage = {
+                    val title = S.appName[state.lang] + " · " + com.drishtisaathi.profile.QrPayload.caseId(state)
+                    runCatching {
+                        val lines = com.drishtisaathi.profile.QrPayload.shareLines(state, resultView, vm.rules).map { it[state.lang] }
+                        com.drishtisaathi.profile.ShareImage.share(resultContext, com.drishtisaathi.profile.ShareImage.render(resultContext, title, lines, qrText), state.sessionId, title)
+                    }.onFailure { Toast.makeText(resultContext, com.drishtisaathi.i18n.SProfile.shareFailed[state.lang], Toast.LENGTH_LONG).show() }
+                },
                 onSaveVerification = vm::saveVerification,
                 onDelete = { vm.deleteCurrentSession { goHome() } },
                 onDone = { goHome() },

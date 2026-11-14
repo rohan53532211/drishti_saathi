@@ -79,5 +79,8 @@ dependencies {
     implementation(libs.filament.android)
     implementation(libs.gltfio.android)
 
+    // QR code on the result screen and the shared summary (ZXing core, Apache-2.0; encoding only).
+    implementation(libs.zxing.core)
+
     testImplementation(libs.junit)
 }

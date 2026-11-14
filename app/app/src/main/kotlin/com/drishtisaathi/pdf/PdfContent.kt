@@ -25,11 +25,16 @@ sealed class Block {
     data object Rule : Block()
     /** A saved frame: thumbnail (looked up by [frameId] when the exporter has one), name and one detail line. */
     data class FrameRow(val frameId: String, val name: String, val line: String) : Block()
+    /** The four profile rings: title, label, score 0–100 (negative = not answered) and colour (RGB). */
+    data class Rings(val rings: List<RingSpec>) : Block()
+    data class RingSpec(val title: String, val label: String, val score: Int, val rgb: Int)
 }
 
 enum class Tone { NORMAL, MUTED, URGENT, ROUTINE, ACCENT }
 
 object PdfContent {
+    /** The section colours of the rings (the design tokens: work, digital, mobility, leisure). */
+    val RING_RGB = mapOf("WORK" to 0x2F80ED, "DIGITAL" to 0xA3D33A, "MOBILITY" to 0x6B7785, "LEISURE" to 0xF2A93B)
 
     private fun date(ms: Long?) = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US).format(Date(ms ?: System.currentTimeMillis()))
 
@@ -119,6 +124,10 @@ object PdfContent {
         // The vision profile rings and the suggested lens family with its reasons.
         if (view != null) {
             out += Block.Heading(P.profileTitle[l])
+            out += Block.Rings(view.profile.rings.map { (id, r) ->
+                Block.RingSpec(com.drishtisaathi.profile.LensText.ringTitle(id)[l], (if (r.known) P.ringLabel(r.label) else P.ringNotAnswered)[l],
+                    if (r.known) r.score else -1, RING_RGB.getValue(id))
+            })
             com.drishtisaathi.profile.LensText.ringLines(view.profile).forEach { out += Block.Bullet(it[l]) }
             if (view.plan.allowed) {
                 out += Block.Heading(P.lensLabel[l])
