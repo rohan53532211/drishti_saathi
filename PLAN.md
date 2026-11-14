@@ -368,6 +368,24 @@ Patient registers in the app, takes the test, asks for a consultation; a verifie
 - Tests: `TeleTextTest` (7). App total 386, engine 383.
 - **Not tried on a phone yet:** the patient screens were compiled and unit-tested only.
 
+### Teleconsult phase 4: demo data and finish (done, 15 Nov 2026)
+- `python -m app.seed_demo` (`--reset` deletes only the demo rows and makes them again): 2 approved optometrists, 1 pending, 3 patients, all named DEMO, with one URGENT, one CHILD_MYOPIA and one ROUTINE request. The admin comes from `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+- `README.md` and `backend/README.md`: how to run, the URLs (`/portal`, `/portal/admin`), the demo logins (placeholders from `.env.example`), the demo steps, and what production needs (HTTPS hosting, real OTP login, payment integration).
+- Checked end to end against the running backend: the portal in Chrome (queue, accept, chat, prescription, admin), and the app's own client code (register, log in, list optometrists, send a real report, chat, close, delete the account).
+- Tests: engine 383, app 386, backend 97 = 866, all passing.
+- Debug APK: `D:\drishti-data\drishti-teleconsult.apk` (not in git); pre-release v1.2.
+
+### Teleconsult: open items
+1. **The patient screens have not been tried on a phone.** Check first: register and log in on the phone's keyboard, the "Consult an optometrist" card on the result, the chat with the keyboard open, "Join video call" (Jitsi app or browser), the PDF opening in a viewer, Hindi layout, dark theme.
+2. Login is a mobile number and a password: no OTP, no password reset, no limit on wrong attempts. The login token lasts 7 days and cannot be withdrawn early.
+3. Plain http on the LAN. Production needs HTTPS hosting, real OTP login and payment integration (the fee is display only, `payment_status = "not_required (demo)"`).
+4. An admin approves by reading the registration number; nothing checks it against a council register.
+5. The app has no notifications for teleconsult: updates arrive by polling while a consultation screen is open (15 s; chat 5 s).
+6. The app sends text only in the chat (it shows pictures the optometrist sends). The patient cannot edit the profile in the app after registering (the API allows it).
+7. Video uses the public `meet.jit.si` service: the room name is random but anyone with the link can join, and the public service may ask the first person to sign in as the host.
+8. The e-prescription PDF is in English; Hindi notes are printed with the Devanagari font but without proper conjunct shaping.
+9. One shared SQLite file, no audit log, no retention rule; a DPDP Act review is needed before real patients.
+
 ### Vision profile branch: open items
 1. **Tried once on a phone (15 Nov), fixes above.** Still to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
 2. Colour-plate palettes, contrast steps and the "Normal at 3 %" limit are our own starting values: an optometrist should review them. A phone display cannot guarantee low contrast levels.

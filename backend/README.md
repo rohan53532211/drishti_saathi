@@ -196,6 +196,23 @@ A TTS failure is not an error: the question text comes back with `audio: null` a
 
 If the backend fails twice in a row, the phone shows "Voice AI unavailable, continuing with the standard interview" and keeps the answers so far. It does the same at once for a missing key, a wrong token or no server.
 
+## Teleconsult (`app/teleconsult.py`, `/portal`)
+Accounts, consultations, chat and the advice / e-prescription PDF. These endpoints are under `/api` and use their own login (`Authorization: Bearer <JWT>`), not the bridge token. How to run and the demo logins: the main `README.md`.
+
+| Method | Path | Who |
+|---|---|---|
+| `POST` | `/api/auth/register/patient`, `/api/auth/register/optometrist`, `/api/auth/login` | anyone |
+| `GET` `PATCH` | `/api/me` | any account (`DELETE /api/me`: patient, removes all their data) |
+| `GET` | `/api/optometrists` | patient: approved and available optometrists |
+| `GET` `POST` | `/api/admin/optometrists`, `/api/admin/optometrists/{id}/approve` or `/reject` | admin |
+| `POST` `GET` | `/api/consultations`, `/api/consultations/{id}` | patient (own), approved optometrist (open queue and own cases) |
+| `POST` | `/api/consultations/{id}/accept`, `/video`, `/prescription` | approved optometrist |
+| `GET` `POST` | `/api/consultations/{id}/messages` | the patient and the optometrist of the case |
+| `GET` | `/api/consultations/{id}/prescription`, `/prescription.pdf` | the patient and the optometrist of the case |
+| `POST` | `/api/consultations/{id}/close` | the patient and the optometrist of the case |
+
+Settings in `.env`: `ADMIN_EMAIL`, `ADMIN_PASSWORD` (the one admin, made at start-up), `JWT_SECRET` (optional; else a random key is kept in the database), `DEMO_PASSWORD` (for `python -m app.seed_demo`). Tests: `tests/test_teleconsult.py`.
+
 ## Status
 
 This is a prototype for demos:

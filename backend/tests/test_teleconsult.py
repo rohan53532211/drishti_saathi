@@ -384,6 +384,15 @@ def test_seed_script_makes_marked_demo_accounts_once(client, db_path):
     patient = login(client, {"role": "patient", "identifier": "9000000203", "password": "demo-pass-123"})
     assert len(client.get("/api/consultations", headers=patient).json()) == 1
     assert len(client.get("/api/optometrists", headers=patient).json()) == 2
+    # --reset removes only the demo rows (and what hangs on them) and makes them again
+    real, _ = new_patient(client)
+    cid = request_case(client, real)["id"]
+    client.post(f"/api/consultations/{queue[2]['id']}/accept", headers=optom)
+    assert seed_demo.seed(db_path, "demo-pass-123", reset=True) == {"optometrists": 3, "patients": 3, "consultations": 3}
+    optom = login(client, {"role": "optometrist", "identifier": "9000000101", "password": "demo-pass-123"})
+    after = client.get("/api/consultations", headers=optom).json()
+    assert sorted(c["status"] for c in after) == ["REQUESTED"] * 4 and cid in [c["id"] for c in after]
+    assert client.get("/api/me", headers=real).json()["name"] == "Asha Devi"
     # the sample reports pass the same privacy check as real ones
     from app.main import privacy_problems
     assert all(privacy_problems(seed_demo.report(k, 30)) == [] for k in ("URGENT", "CHILD_MYOPIA", "ROUTINE"))

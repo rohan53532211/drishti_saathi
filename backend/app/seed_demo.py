@@ -1,11 +1,12 @@
-"""Demo data for the teleconsult portal. Run from backend/:  python -m app.seed_demo
+"""Demo data for the teleconsult portal. Run from backend/:  python -m app.seed_demo   (add --reset to start again)
 
 Creates (only what is missing; running it twice changes nothing):
 - 2 approved optometrists and 1 pending one, 3 patients: every name is marked DEMO and the rows carry demo = 1;
 - 3 consultations waiting in the queue: one URGENT, one CHILD_MYOPIA, one ROUTINE.
 
 All demo accounts get the password in DEMO_PASSWORD (backend/.env; never committed). The admin account is not made
-here: it comes from ADMIN_EMAIL / ADMIN_PASSWORD when the server starts. The phone numbers are placeholders; set
+here: it comes from ADMIN_EMAIL / ADMIN_PASSWORD when the server starts. --reset first deletes every demo account
+(rows with demo = 1) with its consultations, chats and prescriptions; real accounts are never touched. The phone numbers are placeholders; set
 DEMO_PATIENT_PHONE / DEMO_OPTOMETRIST_PHONE to your own numbers if you want to try the WhatsApp buttons.
 """
 from __future__ import annotations
@@ -121,13 +122,16 @@ def report(kind: str, age: int) -> dict:
     }
 
 
-def seed(db_file: str, password: str) -> dict[str, int]:
+def seed(db_file: str, password: str, reset: bool = False) -> dict[str, int]:
     con = sqlite3.connect(db_file)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
     made = {"optometrists": 0, "patients": 0, "consultations": 0}
     try:
         con.executescript(tc.SCHEMA)
+        if reset:
+            # demo patients take their consultations, chats and prescriptions with them (cascade)
+            con.execute("DELETE FROM tc_users WHERE demo = 1")
         hashed = tc.hash_password(password)
         t = tc.now_ms()
         opt_phone, pat_phone = os.environ.get("DEMO_OPTOMETRIST_PHONE"), os.environ.get("DEMO_PATIENT_PHONE")
@@ -168,7 +172,7 @@ def main() -> int:
         print("Set DEMO_PASSWORD (8 or more characters) in backend/.env first: every demo account gets this password.")
         return 1
     db_file = os.environ.get("BRIDGE_DB", str(Path(__file__).resolve().parent.parent / "bridge.db"))
-    made = seed(db_file, password)
+    made = seed(db_file, password, reset="--reset" in sys.argv[1:])
     print(f"Demo data in {db_file}: {made['optometrists']} optometrists, {made['patients']} patients, {made['consultations']} consultations added.")
     print("Optometrist logins (password = DEMO_PASSWORD): " + ", ".join(o["phone"] + (" (pending)" if o["status"] == "PENDING" else "") for o in OPTOMETRISTS))
     print("Patient logins (password = DEMO_PASSWORD): " + ", ".join(p["phone"] for p in PATIENTS))
