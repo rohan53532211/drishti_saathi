@@ -217,7 +217,7 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 | E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | Done |
 | F | Premium UI redesign (tokens, fonts, all screens) | Done (see the limits below) |
 | G | QR, WhatsApp share, PDF additions, backend page | Done |
-| H | All tests, APK, README, architecture doc | Next |
+| H | All tests, APK, README, architecture doc | Done |
 
 ### Phase A: safety rules (done)
 - **Order of the check:** core questions → (red banner if a red flag) → vision-profile survey → camera distance + PD → power of each eye → screening tests → remaining questions → results. Before this branch the power came before the PD.
@@ -311,6 +311,22 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
   - the optometrist page shows urgent cases in red with the red-flag reasons at the top, the rings, the phone measurement with its method, the screening lines with status dots, the grid with the squares the person tapped, and the lens suggestion with its reasons;
   - the optometrist can confirm or correct the power (right, left, add) with the reply; the app shows it as the last line of the advice. Older databases get the new column at start.
 - Tests: `QrPayloadTest` (payload, QR read back, share lines, PDF rings, confirmed power), `backend/tests/test_vision_profile.py`.
+
+### Phase H: finish (done, 14 Nov 2026)
+- Tests: engine 375, app 370, backend 83, all passing (`--no-daemon --max-workers=2 -Xmx2g`).
+- Debug APK: `D:\drishti-data\drishti-vision-profile.apk` (85.7 MB, not in git).
+- `README.md` (features, safety rules, lens-assisted mode, screening tests, new flow) and `docs/ARCHITECTURE.md` (section 6) updated.
+
+### Vision profile branch: open items
+1. **Nothing on this branch has been tried on a phone.** First things to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
+2. Colour-plate palettes, contrast steps and the "Normal at 3 %" limit are our own starting values: an optometrist should review them. A phone display cannot guarantee low contrast levels.
+3. A phone screen is narrower than 10 cm, so the grid shows fewer columns than 20 (the rows are complete).
+4. Lens triggers are our own rules. Lens product descriptions on the cards are English only (the reasons are in Hindi too).
+5. Survey numbers (hours) are tap only; voice works for the choices.
+6. The profile survey is not editable from "Edit answers" after the results.
+7. The report is sent under the session's consent. Before real use this needs the same review as the bridge itself (DPDP, per-optometrist login).
+8. Icons are drawn in code; Material Symbols Rounded is not bundled. Older screens were restyled through shared components, not redesigned one by one.
+9. On this PC Gradle is sometimes refused access to its own build-output folders; clearing the named folder and running again works.
 
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.

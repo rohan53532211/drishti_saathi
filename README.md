@@ -1,6 +1,6 @@
 # Drishti Saathi
 
-**Drishti Saathi** is a phone-only helper for small optical shops in India. A voice-guided Hindi/English interview, a compulsory camera-measured reading eye check (random letters for far, a random sentence for near, the power shown as a ±0.25 D range) and a face scan give the staff a starting trial lens, referral flags, a lens package and ranked frames with live try-on, in about 5 minutes on one phone. Results go into a shop PDF and a Hindi customer PDF, and, with consent, to a remote optometrist who can reply from a browser. No name or photo ever leaves the phone. It is a starting point for the shop's trial-lens test, not a replacement for it.
+**Drishti Saathi** is a phone-only helper for small optical shops in India. On one phone, in about 10 minutes, it runs a Hindi/English voice survey, measures the power of each eye with the camera (through a known lens for strong powers), runs screening tests (grid, contrast, colour, E test, clock dial), and gives the staff a vision profile, a starting trial lens, a suggested ZEISS lens family with the customer's own reasons, and ranked frames with live try-on. Warning signs come first: a red flag stops every lens suggestion and sends the customer to an eye doctor the same day. Every report goes to the shop's optometrist, who can confirm the power and reply from a browser. No name or photo ever leaves the phone. It is a starting point for the shop's trial-lens test, not a replacement for it.
 
 ### Download the APK
 
@@ -13,13 +13,14 @@ Get **DrishtiSaathi-v1.0.apk** from [Releases](https://github.com/rohan53532211/
 3. Tap **Install**, then open **Drishti Saathi**. Allow camera and microphone when asked.
 4. First launch opens **Phone setup** (bank-card screen size, quick camera test). You can skip it for now.
 
-### 5-step demo
+### 6-step demo
 
 1. **Demo mode:** Home → **Shop tools** → **Demo mode: sample customers** → pick the Student, Shopkeeper or Driver. The full results open at once (every screen marked DEMO).
-2. **Real customer:** Home → **Start new customer** → consent → language → answer the questions by voice or tap.
-3. **Eye check (everyone):** glasses off, cover one eye, start close and move the phone away; tap **Can't read clearly** (or say "dhundhla") when you can no longer read the letters. Then, for near problems or 38+, both eyes: hold far, move closer, tap when the sentence blurs.
-4. **Results:** power range per eye, reading add range (38+), referral at the top if urgent, lens package, frames, try-on; share the shop and customer PDFs.
-5. **Optometrist bridge:** start the backend (below), set its URL in **Shop tools → Optometrist bridge settings**, tap **Send to optometrist** on the results, open the same URL in a browser as the optometrist, reply, and watch the reply appear on the phone with its case number.
+2. **Real customer:** Home → **Start new customer** → consent (read aloud) → language → the core questions and the vision-profile survey, by voice or tap.
+3. **Camera distance + PD,** then the **power of each eye:** glasses off, cover one eye, start close and move the phone away; tap **Can't read clearly** (or say "dhundhla"). From −3.75 D the app asks staff to hold a known minus lens and repeats the test through it.
+4. **Screening tests:** grid at 30 cm, contrast letters, colour plates, E test, clock dial. Each has Skip.
+5. **Results:** urgent banner (if any), "Your Vision Profile" rings, measurements with the method, the lens card with "Why for you", second pairs, frames and try-on, QR, **Share on WhatsApp**, PDFs.
+6. **Optometrist bridge:** start the backend (below) and set its URL in **Shop tools → Optometrist bridge settings**. Reports are sent by themselves (queued while offline). Open the same URL in a browser as the optometrist: urgent cases are at the top in red; confirm the power, reply, and watch the reply appear on the phone.
 
 ### Screenshots
 
@@ -45,22 +46,26 @@ The optometrist page is `http://<laptop IP>:8000/`. For the AI voice interview, 
 An Android app for small optical shops. It does a voice-guided, bilingual (Hindi/English) pre-consultation on one phone before the shop's own trial-lens test.
 
 The app:
-- interviews the customer
-- measures face width and PD with the front camera
-- runs simple screen tests: far point, near point, Amsler grid
+- asks the core questions and a vision-profile survey (voice or tap, Hindi or English)
+- checks for warning signs first and sends anyone with one to an eye doctor the same day
+- measures PD and face width with the front camera
+- measures the power of each eye by blur distance, through a known lens for strong powers
+- runs screening tests: Amsler grid, contrast, colour plates, tumbling E, clock dial
+- shows a vision profile (work, digital, mobility, leisure) and a suggested ZEISS lens family with reasons from the customer's own answers
 - gives an **estimated band** and a **starting trial lens** for the staff
-- flags anyone who should be referred to an eye doctor
-- ranks frames for the face and budget, with a live try-on
-- produces a shop PDF and a Hindi customer PDF
-- can send the profile to a remote optometrist, with the customer's consent, and show the reply (`backend/`)
+- ranks frames for the face and budget, with live 2D and 3D try-on
+- produces a shop PDF, a Hindi customer PDF, a QR summary and a picture to share on WhatsApp
+- sends every report to the shop's optometrist and shows the reply (`backend/`)
 
 > यह चिकित्सीय निदान या पर्चा नहीं है / Not a medical diagnosis or prescription.
 > The result is a starting point for the shop's trial-lens test, not a replacement for it.
 
-**Privacy:** everything stays on the phone.
+**Privacy:**
 - Camera frames are processed in memory and never saved.
-- Nothing is uploaded without spoken and tapped consent, and uploads never include the customer's name or photo. There are two optional uploads, each with its own consent screen. The Remote Optometrist Bridge sends the profile; its server rejects names, photos and contact fields too. The Voice interview (AI) sends the customer's spoken answers to the shop's backend, which transcribes them with Sarvam AI. The Sarvam key stays on the backend; the transcript stays in the shop (staff view and shop PDF).
-- Any session can be deleted.
+- **The report of every check is sent to the shop's optometrist** (the Remote Optometrist Bridge, `backend/`). The consent at the start says so and is read aloud. The report holds answers and measurements only: never a name, a photo or a phone number, and the server rejects those fields too. While the phone is offline or no server is set, the report waits in a queue and is sent when the backend connects.
+- The Voice interview (AI) is optional and has its own consent screen. It sends the customer's spoken answers to the shop's backend, which transcribes them with Sarvam AI. The Sarvam key stays on the backend; the transcript stays in the shop (staff view and shop PDF).
+- The WhatsApp picture is shared only after a consent checkbox.
+- Any session can be deleted; its server copy, PDFs and shared picture go with it.
 - Stored sessions are encrypted (SQLCipher, with the key protected by the Android Keystore), and backups are turned off.
 
 `PROJECT_BRIEF.md` is the spec. `PLAN.md` holds the build status, the decisions made since the brief, and the open items.
@@ -100,20 +105,28 @@ The script writes the transparent PNGs that the try-on loads, plus their measure
 
 ## Customer flow
 
-Home has two big buttons, **Start new customer** and **Past sessions**, and a small **Shop tools** link. There is no staff switch.
+Home has a hero card **Start new customer**, three tiles (**Past sessions**, **Shop tools**, **Frames**) and the optometrist bridge chip ("Connected" or "Offline – queued N").
 
-1. Consent, then the language (Hindi or English).
-2. Questions: the AI voice interview when the backend answers, otherwise the scripted questions. Red flags come right after the main problem; the power question ends this part. No question numbers. Texts, follow-up rules and voice keywords are in `app/app/src/main/assets/anamnesis_questions.json`; the backend reads its interview topics from the same file.
-3. Power: known → enter it, then the eye check anyway (both are shown). Not sure / No → the eye check, at once. The eye check is compulsory for everyone, also after a red flag.
-4. Eye check, one test style only (reading). Far, right eye then left, other eye covered: 5 random Sloan letters (C D H K N O R S V Z), bold, spacing = 1 letter width, in their own grey panel (≥ 35% of the screen), distance-locked at 20/30 (`farPoint.letterArcmin` 7.5′, never under `farPoint.minLetterPx` 18 px); the letters stay the same while the phone moves, and a new random set comes only on the small "New" refresh button right under the letter panel (or saying "badlo"), also in Precision mode; "Can't read clearly" freezes the distance d → power range centre −1/d rounded to the nearest 0.25 D, shown ± 0.25 D (30 cm → −3.00 to −3.50 D). Near, both eyes, for NEAR / BOTH or 38+: a new random sentence each attempt (`assets/reading_sentences.json`, chosen language) in small print; 38+ gives a reading add range (1/WD − A/2 ± 0.25 D); under 38 no plus number, the near point is compared with the age-expected one. The range centre feeds lens and frame suggestions. Each step has a header, Skip, a short result and Do it again. "Straight lines look bent" = yes refers (there is no grid in the eye check).
-5. Face measurement for frame fit (optional card on the forehead, can be skipped).
-6. The remaining lifestyle and frame questions (only unanswered ones).
-7. Results: vision profile, power and source, referral, lens package, frames, try-on and compare. Staff details are folded under **For the shop** (notes, measurements, transcript, verification, **Edit answers**).
-8. Send to optometrist, share PDFs, **Finish**.
+1. **Consent** (read aloud; it covers the report to the optometrist), then the language.
+2. **Core questions:** the AI voice interview when the backend answers, otherwise the scripted questions. The red-flag question stays question 3. Texts, follow-up rules, voice keywords, the survey and the backend's interview topics are all in `app/app/src/main/assets/anamnesis_questions.json`.
+3. **Red banner, if a red flag was reported:** "Please see an eye doctor today" with the reasons, spoken. The check continues behind it.
+4. **Vision-profile survey:** seven colour-coded sections, one question per screen, "Why we ask?" on every question. Blocks that don't apply are skipped. After a red flag it first asks which signs.
+5. **Camera distance + PD:** face measurement (optional card on the forehead).
+6. **Power of each eye:** known power → enter it, then the eye check anyway. Far, right eye then left, other eye covered: 5 random Sloan letters, distance-locked; "Can't read clearly" (or "dhundhla") freezes the distance d → power range centre −1/d, shown ± 0.25 D. Near, both eyes, for near problems or 38+: a random sentence; 38+ gives a reading add range.
+   - **Lens-assisted mode:** from −3.75 D the blur point is closer than about 27 cm, where 1 cm is about 0.18 D. Staff hold a known minus lens about 2 D weaker (trial lens or the customer's old glasses), type its power on a number pad, and the test is repeated through it. Total = lens + residual, with a vertex correction from 4 D. "Use a weaker lens" when the letters never blur. Stronger than −8 D adds "High myopia – optometrist must confirm; eye-health check advised". Every output states the method, e.g. "Measured through −2.00 D lens, residual −2.25 D, total −4.25 D (range −4.00 to −4.50)".
+7. **Screening tests** (one eye at a time, live distance pill, full brightness; staff turn off Night light): Amsler grid at 27–33 cm with tap-to-mark, contrast letters (100 % down to 1.5 %), colour plates (our own generated dot plates with a control plate), then the tumbling-E test and the clock dial. All results are labelled "Screening, not a diagnosis".
+8. The remaining frame and budget questions (only unanswered ones).
+9. **Results:** urgent banner (if any) → "Your Vision Profile" rings → measurements (power per eye with range and method, PD, trial-lens start, screening) → lens card ("Suggested ZEISS lens family – optician confirms") with "Why for you" → second pairs → frames, try-on, compare → QR → optometrist card, **Share on WhatsApp**, PDFs. Staff details are folded under **For the shop**.
 
-An urgent red flag no longer ends the flow early: the eye check, face scan and lifestyle questions still run; the results (and both PDFs) open with one red card "Please see an eye doctor today" and its reasons, then the eye check, lens package and frames marked "Suggestions for after your eye doctor visit". Skipped lifestyle questions show "not answered", not 0.0 h. Everyone else gets the closing line recommending a complete eye check-up with an optometrist.
+### Safety rules
 
-**Shop tools:** Phone setup (one time: bank-card screen size and a quick camera test; it opens by itself on first launch, "Skip for now" leaves a reminder on home), Demo mode, Optometrist bridge settings, Device checks (camera check, and Precision mode: full eye test = the same reading test, far for both eyes and near, ending on the same results screen with PDFs, saved as a session).
+- **Everyone gets the check, and the report always goes to the optometrist.**
+- **Red flags:** sudden loss of vision, eye pain or redness, new flashes or floaters, a curtain or shadow, double vision, wavy or missing lines on the grid. With a red flag: the red banner first, the check continues, **no lens or frame is suggested**, the power is labelled "For the optometrist only", and the report is marked URGENT with the reasons at the top.
+- **Emergency signs** (sudden vision loss, curtain or shadow, new flashes): short path only, the power of each eye and the grid (about 2 minutes), then the urgent referral.
+- **Under 18 with any minus power:** the power is measured, no lens is chosen, "Get your child checked by an optometrist (myopia control)", report tag CHILD_MYOPIA. Under 18 without myopia may get a children's lens family, labelled "optometrist confirms".
+- Rules and thresholds: `rules.json` → `safety`, `lensAssisted`, `screening`, `visionProfile`, `lensEngine`. Products and their texts: `lens_catalog.json`.
+
+**Shop tools:** Phone setup (one time: bank-card screen size and a quick camera test), Demo mode, Optometrist bridge settings, Frame catalogue, Device checks (camera check, Precision mode, 3D alignment).
 
 ## Demo mode
 
@@ -131,4 +144,10 @@ Every demo screen and PDF is marked **DEMO**. The sample customers are not real 
 
 ## Status
 
-This is a Phase 1 prototype. The clinical numbers in `rules.json` still need an optometrist's review, and the Hindi needs a native-speaker proofread, before any use in a shop. See `PLAN.md`.
+This is a hackathon prototype. Before any use in a shop:
+- every clinical number in `rules.json` needs an optometrist's review, and the Hindi needs a native-speaker proofread;
+- the colour plates and the contrast steps are our own and are not clinically validated; a phone screen cannot show the full 10 cm grid (whole columns are left out at the sides);
+- the lens triggers are Drishti Saathi's own rules, not ZEISS's; the product descriptions on the lens cards are in English;
+- the vision-profile branch (survey, lens-assisted mode, screening tests, new screens) has unit tests but has not been tried on a phone yet.
+
+See `PLAN.md` for the build status and the open items.
