@@ -70,10 +70,19 @@ class ProfileIn(BaseModel):
     survey: Optional[dict[str, Any]] = None
 
 
+class ConfirmedPower(BaseModel):
+    """The power the optometrist confirms or corrects, as written (e.g. "-4.25 / -0.50 x 180"). All optional."""
+    model_config = ConfigDict(extra="forbid")
+    right: Optional[str] = Field(default=None, max_length=40)
+    left: Optional[str] = Field(default=None, max_length=40)
+    add: Optional[str] = Field(default=None, max_length=20)
+
+
 class ReviewIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     advice: str = Field(min_length=1, max_length=4000)
     needsInPersonExam: bool
+    confirmedPower: Optional[ConfirmedPower] = None
 
 
 TAGS = ("URGENT", "CHILD_MYOPIA", "ROUTINE")
@@ -146,8 +155,11 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
 
     with db() as con:
         con.executescript(SCHEMA)
+        # v1.2: the optometrist's confirmed power (JSON); older databases get the column
+        if "confirmed" not in [r["name"] for r in con.execute("PRAGMA table_info(reviews)").fetchall()]:
+            con.execute("ALTER TABLE reviews ADD COLUMN confirmed TEXT")
 
-    app = FastAPI(title="Drishti Saathi Remote Optometrist Bridge", version="1.1")
+    app = FastAPI(title="Drishti Saathi Remote Optometrist Bridge", version="1.2")
     voice = anamnesis.AnamnesisService(sarvam or SarvamClient())
 
     def check_token(x_bridge_token: Optional[str] = Header(default=None)) -> None:
@@ -161,8 +173,11 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
         r = con.execute("SELECT * FROM reviews WHERE profile_id = ?", (pid,)).fetchone()
         if r is None:
             return {"status": "WAITING"}
-        return {"status": "REVIEWED", "advice": r["advice"], "needsInPersonExam": bool(r["needs_in_person"]),
-                "reviewedAt": r["reviewed_at"]}
+        out = {"status": "REVIEWED", "advice": r["advice"], "needsInPersonExam": bool(r["needs_in_person"]),
+               "reviewedAt": r["reviewed_at"]}
+        if r["confirmed"]:
+            out["confirmedPower"] = json.loads(r["confirmed"])
+        return out
 
     def get_row(con: sqlite3.Connection, pid: str) -> sqlite3.Row:
         row = con.execute("SELECT * FROM profiles WHERE id = ?", (pid,)).fetchone()
@@ -225,6 +240,7 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
                     "needsInPersonExam": rv.get("needsInPersonExam"),
                     "tag": tag_of(p),
                     "redFlagReasons": (p.get("triage") or {}).get("redFlagReasons") or [],
+                    "lensIds": (p.get("lens") or {}).get("ids") or [],
                 })
             # URGENT first, then CHILD_MYOPIA, then ROUTINE; the newest first inside each group
             out.sort(key=lambda x: (TAGS.index(x["tag"]), -x["receivedAt"]))
@@ -250,11 +266,13 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
     def post_review(pid: str, review: ReviewIn) -> dict[str, Any]:
         with db() as con:
             get_row(con, pid)
+            cp = review.confirmedPower
+            confirmed = {k: v.strip() for k, v in (cp.model_dump() if cp else {}).items() if v and v.strip()}
             con.execute(
-                "INSERT INTO reviews (profile_id, advice, needs_in_person, reviewed_at) VALUES (?, ?, ?, ?) "
+                "INSERT INTO reviews (profile_id, advice, needs_in_person, reviewed_at, confirmed) VALUES (?, ?, ?, ?, ?) "
                 "ON CONFLICT(profile_id) DO UPDATE SET advice = excluded.advice, "
-                "needs_in_person = excluded.needs_in_person, reviewed_at = excluded.reviewed_at",
-                (pid, review.advice.strip(), int(review.needsInPersonExam), now_ms()),
+                "needs_in_person = excluded.needs_in_person, reviewed_at = excluded.reviewed_at, confirmed = excluded.confirmed",
+                (pid, review.advice.strip(), int(review.needsInPersonExam), now_ms(), json.dumps(confirmed) if confirmed else None),
             )
             return review_of(con, pid)
 
