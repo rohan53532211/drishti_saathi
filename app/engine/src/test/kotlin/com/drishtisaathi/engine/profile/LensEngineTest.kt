@@ -279,7 +279,7 @@ class LensEngineTest {
         fun digital(h: Double) = VisionProfile.from(ProfileInputs(screenHours = h), vp).digital.label
         assertEquals(listOf("LIGHT", "CONNECTED", "CONNECTED", "DIGITAL_NATIVE"), listOf(2.9, 3.0, 6.0, 6.5).map(::digital))
         assertEquals("WEEKLY", VisionProfile.from(ProfileInputs(drive = DriveFrequency.WEEKLY), vp).mobility.label)
-        assertEquals("MEDIUM", VisionProfile.from(ProfileInputs(outdoorHours = 2.0), vp).leisure.label)
+        assertEquals("MEDIUM", VisionProfile.from(ProfileInputs(outdoorHours = 3.0), vp).leisure.label)
         assertEquals("BALANCED", VisionProfile.from(ProfileInputs(workActivities = setOf("MEETINGS")), vp).work.label)
 
         // nothing answered: neutral rings marked as not known

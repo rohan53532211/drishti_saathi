@@ -417,7 +417,7 @@
   },
 
   "lensAssisted": {
-    "_comment": "Phase B over-refraction. Power = -1/d: for a strong eye the blur point is very close and 1 cm is about 0.18 D at -4.25 D. From triggerSeD (blur point under about 27 cm) staff hold a known minus lens about suggestOffsetD weaker (rounded towards the weaker lens to suggestStepD: -4.25 -> -2.00, -6.00 -> -4.00) and the test is repeated through it. Total = lens (vertex-corrected from vertexFromAbsD for a vertexDistanceM hold) + residual. No blur point within maxReachM = lens too strong, use a weaker one. From highMyopiaBeyondSeD the optometrist must confirm.",
+    "_comment": "Phase B over-refraction. Power = -1/d: for a strong eye the blur point is very close and 1 cm is about 0.18 D at -4.25 D. From triggerSeD (blur point under about 27 cm) staff hold a known minus lens about suggestOffsetD weaker (rounded towards the weaker lens to suggestStepD: -4.25 -> -2.00, -6.00 -> -4.00) and the test is repeated through it. Total = lens (vertex-corrected from vertexFromAbsD for a vertexDistanceM hold) + residual. No blur point within maxReachM = lens too strong, use a weaker one. From highMyopiaBeyondSeD the optometrist must confirm. If the residual through the lens is still at or beyond repeatIfResidualFromSeD the lens was too weak: staff are asked for a stronger lens (about suggestOffsetD weaker than the new total, at least one suggestStepD stronger than the lens held) and the test is repeated, at most maxStrongerRepeats times.",
     "triggerSeD": -3.75,
     "suggestOffsetD": 2.0,
     "suggestStepD": 0.5,
@@ -427,17 +427,20 @@
     "maxReachM": 0.60,
     "highMyopiaBeyondSeD": -8.0,
     "maxLensAbsD": 20.0,
-    "rangeHalfWidthD": 0.25
+    "rangeHalfWidthD": 0.25,
+    "repeatIfResidualFromSeD": -3.75,
+    "maxStrongerRepeats": 1
   },
 
   "screening": {
-    "_comment": "Phase C screening tests (one eye at a time, camera distance gate, full brightness). Screening, not a diagnosis. Amsler: squareMm squares, squares x squares, at distanceMm (a 10 cm grid at 30 cm; on a narrower screen whole columns are left out and the report says so). Contrast: letters of letterLogMar, steps in percent, passCorrect of trialsPerStep to pass a step; Normal when the lowest step passed is at or below normalMaxPercent. Colour: our own generated dot plates; palettes are RGB hex (figure colours, background colours).",
+    "_comment": "Phase C screening tests (one eye at a time, camera distance gate, full brightness). Screening, not a diagnosis. Amsler: squareMm squares, squares x squares, at distanceMm (a 10 cm grid at 30 cm; on a narrower screen whole columns are left out and the report says so). Contrast: letters of letterLogMar, steps in percent, passCorrect of trialsPerStep to pass a step; Normal when the lowest step passed is at or below normalMaxPercent. Colour: our own generated dot plates; palettes are RGB hex (figure colours, background colours). The first step (100 %) is the validity check: if it is failed the result is 'Test not valid - repeat with glasses/trial lens on', never Reduced and never a cataract note. An eye with a power of wearCorrectionFromAbsD or more is told to wear its correction first.",
     "amsler": { "distanceMm": 300.0, "minMm": 270.0, "maxMm": 330.0, "squareMm": 5.0, "squares": 20, "minColumns": 8 },
     "contrast": {
       "letterLogMar": 0.5, "minMm": 300.0, "maxMm": 500.0,
       "stepsPercent": [100.0, 50.0, 25.0, 12.5, 6.0, 3.0, 1.5],
       "trialsPerStep": 3, "passCorrect": 2, "choices": 4,
-      "normalMaxPercent": 3.0, "eyeHealthNoteFromAge": 50
+      "normalMaxPercent": 3.0, "eyeHealthNoteFromAge": 50,
+      "wearCorrectionFromAbsD": 1.0
     },
     "colour": {
       "controlPlates": 1, "redGreenPlates": 5, "blueYellowPlates": 2,
@@ -452,7 +455,7 @@
   },
 
   "visionProfile": {
-    "_comment": "Phase E profile rings (score 0-100 and a label). Work: share of near work from the activities (weights 0 = distance, 1 = near). Digital: screen hours a day. Mobility: how often the person drives or rides. Leisure: outdoor hours plus an activity bonus. Starting values: review with pilot data.",
+    "_comment": "Phase E profile rings (score 0-100 and a label). Work: share of near work from the activities (weights 0 = distance, 1 = near). Digital: screen hours a day. Mobility: how often the person drives or rides. Leisure: outdoor hours plus an activity bonus. Starting values: review with pilot data. Leisure: The label comes from the ring's own score (hours / fullScaleHours x 100 + activity bonus): Low below mediumFromScore, High from highFromScore.",
     "work": {
       "nearWeights": { "DESKTOP": 0.75, "MEETINGS": 0.45, "READING_WRITING": 1.0, "FINE_HANDWORK": 1.0, "FIELD_FARM": 0.10 },
       "defaultScore": 50, "nearFocusedFrom": 60, "distanceFocusedBelow": 40
@@ -460,7 +463,7 @@
     "digital": { "connectedFromHours": 3.0, "nativeAboveHours": 6.0, "fullScaleHours": 10.0 },
     "mobility": { "scores": { "NEVER": 5, "MONTHLY": 30, "WEEKLY": 65, "DAILY": 100 }, "sensitiveFrom": "SOMETIMES" },
     "leisure": {
-      "mediumFromHours": 1.0, "highFromHours": 3.0, "fullScaleHours": 6.0,
+      "mediumFromScore": 34, "highFromScore": 67, "fullScaleHours": 6.0,
       "activityBonus": { "OUTDOOR_SPORT": 15, "WATER": 15, "FARMING_FIELD": 20, "CITY": 0 }
     }
   },

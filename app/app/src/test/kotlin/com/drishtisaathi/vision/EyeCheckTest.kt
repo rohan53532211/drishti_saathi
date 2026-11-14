@@ -120,7 +120,7 @@ class EyeCheckTest {
         val lines = PowerPathText.quickLines(state).map { it.en }
         assertTrue(lines.toString(), lines.any { "−3.00 and −3.50" in it } && lines.any { "−2.25 and −2.75" in it })
         val texts = paras(PdfContent.shopCopy(state, rules, ctx, Lang.EN))
-        assertTrue(texts.indexOf(com.drishtisaathi.i18n.SProfile.seeDoctorToday.en) in 0..4)   // at the top
+        assertTrue(texts.indexOf(com.drishtisaathi.i18n.SProfile.seeDoctorToday.en) in 0..6)   // at the top
         assertFalse(SShop.phoneCheckNote.en in texts)
         assertTrue(com.drishtisaathi.i18n.SProfile.seeDoctorToday.hi in paras(PdfContent.customerCopy(state, rules)))
     }

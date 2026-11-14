@@ -30,6 +30,20 @@ object QrPayload {
         else -> "60+"
     }
 
+    /**
+     * The report header: the date of the check, the age band (never the exact age) and the language of the session.
+     */
+    fun headerLine(state: UiState): Txt {
+        val date = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.US).format(java.util.Date(state.createdAt ?: System.currentTimeMillis()))
+        val band = ageBand(state.answers.age)
+        val lang = if (state.lang == com.drishtisaathi.i18n.Lang.HI) SProfile.langHindi else SProfile.langEnglish
+        fun age(t: Txt) = if (band == "?") t else Txt(band, band)
+        return Txt(
+            SProfile.reportHeader.en.format(date, age(SProfile.ageNotGiven).en, lang.en),
+            SProfile.reportHeader.hi.format(date, age(SProfile.ageNotGiven).hi, lang.hi),
+        )
+    }
+
     /** The server's short case number once sent, else a local one from the session id. */
     fun caseId(state: UiState): String = state.remote?.caseId ?: "S${state.sessionId ?: 0}"
 
@@ -37,14 +51,18 @@ object QrPayload {
         put("caseId", caseId(state))
         put("ageBand", ageBand(state.answers.age))
         put("tag", view.gate.tag.name)
+        put("lang", state.lang.name)
+        if (view.gate.emergency) put("path", "SHORT_EMERGENCY")
         put("rings", buildJsonObject {
             view.profile.rings.forEach { (id, r) ->
                 put(id.lowercase(), JsonArray(listOf(JsonPrimitive(if (r.known) SProfile.ringLabel(r.label).en else "?"), JsonPrimitive(r.score))))
             }
         })
-        put("eyes", JsonArray(state.quick?.eyes.orEmpty().map { (eye, e) ->
+        // both eyes, always: an eye without a reading carries the reason instead of being left out
+        put("eyes", JsonArray((state.quick ?: com.drishtisaathi.engine.QuickEstimate()).bothEyes.map { (eye, e, why) ->
             buildJsonObject {
                 put("eye", if (eye == Eye.RIGHT) "R" else "L")
+                if (e == null) { put("notMeasured", (why ?: com.drishtisaathi.engine.NotMeasured.NOT_DONE).name); return@buildJsonObject }
                 val se = e.seD
                 if (se == null || e.noMyopiaAtReach) put("clearAtReach", true) else {
                     val r = PowerRange.around(se)
@@ -59,7 +77,7 @@ object QrPayload {
             put("screening", buildJsonObject {
                 if (s.amsler.isNotEmpty()) put("grid", JsonArray(s.amsler.map { JsonPrimitive((if (it.eye == Eye.RIGHT) "R:" else "L:") + (if (it.distortion) "DISTORTION" else "OK")) }))
                 if (s.contrast.isNotEmpty()) put("contrast", JsonArray(s.contrast.map {
-                    JsonPrimitive((if (it.eye == Eye.RIGHT) "R:" else "L:") + (it.lowestPassedPercent?.toString() ?: "none") + (if (it.reduced) ":REDUCED" else ":NORMAL"))
+                    JsonPrimitive((if (it.eye == Eye.RIGHT) "R:" else "L:") + (it.lowestPassedPercent?.toString() ?: "none") + (if (it.invalid) ":INVALID" else if (it.reduced) ":REDUCED" else ":NORMAL"))
                 }))
                 s.colour?.let { put("colour", it.outcome.name) }
                 if (s.eTest.any { it.belowLimit }) put("eTest", "BELOW_LIMIT")
@@ -80,17 +98,24 @@ object QrPayload {
 
     /** The lines of the summary picture shared on WhatsApp: tag, rings, power ranges with the method, screening, lens. */
     fun shareLines(state: UiState, view: ProfileView, rules: RulesConfig): List<Txt> = buildList {
-        add(SProfile.reportTagLine.format(SProfile.tag(view.gate.tag)[state.lang]))
-        if (view.gate.urgent) { add(SProfile.seeDoctorToday); view.gate.redFlags.forEach { add(SProfile.redFlag(it)) } }
-        if (view.gate.childMyopia) add(SProfile.childMyopiaTitle)
-        addAll(LensText.ringLines(view.profile))
-        addAll(com.drishtisaathi.ui.PowerPathText.quickLines(state))
-        ScreeningText.lines(state, rules).filter { it.status != ScreenLine.Status.NOT_DONE }.forEach { add(it.text) }
+        val gate = view.gate
+        add(headerLine(state))
+        if (gate.emergency) add(SProfile.shortPathHeader)
+        add(SProfile.reportTagLine.format(SProfile.tag(gate.tag)[state.lang]))
+        if (gate.urgent) { add(SProfile.seeDoctorToday); addAll(SProfile.redFlagLines(gate)) }
+        if (gate.childMyopia) add(SProfile.childMyopiaTitle)
+        addAll(LensText.ringLines(view.profile, gate.emergency))
+        // URGENT and CHILD MYOPIA: "For the optometrist only: R …", never "Your approximate power"
+        addAll(com.drishtisaathi.ui.PowerPathText.quickLines(state, gate.powerForOptometristOnly))
+        // the screening results keep their own label, directly above them
+        val screening = ScreeningText.lines(state, rules).filter { it.status != ScreenLine.Status.NOT_DONE }
+        if (screening.isNotEmpty()) { add(SProfile.screeningLabel); screening.forEach { add(it.text) } }
         if (view.plan.allowed) {
             add(SProfile.lensLabel)
             view.plan.all.forEach { add(Txt(it.name, it.name)) }
         }
-        add(Txt(SProfile.screeningLabel.en + " · " + com.drishtisaathi.i18n.S.disclaimer.en, SProfile.screeningLabel.hi + " · " + com.drishtisaathi.i18n.S.disclaimer.hi))
+        // the disclaimer, once
+        add(com.drishtisaathi.i18n.S.disclaimer)
     }
 
     @Suppress("unused") private val colourNames = ColourOutcome.entries

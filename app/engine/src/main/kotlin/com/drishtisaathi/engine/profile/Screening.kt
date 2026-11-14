@@ -77,7 +77,15 @@ data class ContrastEyeResult(
     /** Lowest contrast step passed (percent); null when even the first step failed. */
     val lowestPassedPercent: Double?,
     val reduced: Boolean,
-)
+) {
+    /**
+     * Even the full-contrast (100 %) letters were not read: the letters were out of focus or too small, so this says
+     * nothing about contrast. The test is not valid and is repeated with the glasses or the trial lens on.
+     */
+    val invalid: Boolean get() = lowestPassedPercent == null
+    /** Reduced contrast from a valid test only (also for results stored before [invalid] existed). */
+    val reducedValid: Boolean get() = reduced && !invalid
+}
 
 /**
  * One eye's contrast run: fixed letter size, contrast falls step by step; a step is passed with
@@ -112,8 +120,12 @@ data class ContrastRun(
 }
 
 object Contrast {
+    /** Reduced = a valid test whose lowest passed step is above the normal limit. No step passed = not valid, not reduced. */
     fun reduced(lowestPassedPercent: Double?, cfg: ContrastConfig): Boolean =
-        lowestPassedPercent == null || lowestPassedPercent > cfg.normalMaxPercent
+        lowestPassedPercent != null && lowestPassedPercent > cfg.normalMaxPercent
+
+    /** The tested eye's power (measured or known) is strong enough that the correction must be worn for this test. */
+    fun needsCorrection(seD: Double?, cfg: ContrastConfig): Boolean = seD != null && kotlin.math.abs(seD) >= cfg.wearCorrectionFromAbsD
 
     /**
      * Grey level (0–255) of a letter on a white screen for a Weber contrast of [percent]: the letter's luminance is
@@ -265,7 +277,9 @@ data class ScreeningResults(
     val skipped: List<String> = emptyList(),
 ) {
     val amslerAbnormal: Boolean get() = amsler.any { it.distortion }
-    val contrastReduced: Boolean get() = contrast.any { it.reduced }
+    val contrastReduced: Boolean get() = contrast.any { it.reducedValid }
+    /** The eyes whose grid showed wavy or missing lines. */
+    val amslerEyes: List<Eye> get() = Eye.entries.filter { e -> amsler.any { it.eye == e && it.distortion } }
 
     /**
      * What the rules engine needs from the screening stage: the grid (urgent when abnormal), the E test's "below the
