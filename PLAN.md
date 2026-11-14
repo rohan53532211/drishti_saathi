@@ -357,6 +357,17 @@ Patient registers in the app, takes the test, asks for a consultation; a verifie
 - Tried in Chrome against the running backend: queue, accept, chat, prescription, admin page. All text is inserted as text nodes (no HTML from patients or chat).
 - Backend tests: 97.
 
+### Teleconsult phase 3: patient side in the Android app (done)
+- New package `com.drishtisaathi.teleconsult` (`TeleApi.kt`, `TeleScreens.kt`) and strings in `i18n/STele.kt` (Hindi + English). The server address is the one in the optometrist bridge settings; the patient's login token is kept in app preferences (backups are off).
+- **Home → Patient mode:** register (name, mobile, password, age, gender, language, the consent box is required) or log in; profile; "Take the eye test"; "My consultations"; log out; "Delete my account and data".
+- **Result screen → "Consult an optometrist":** approved, available optometrists (name, qualification, clinic and city, languages, registration number, fee) or "Any available" → the request goes out with the session's own optometrist report (no name, photo or phone inside it; the name comes from the account).
+- **My consultations:** status of each, refreshed every 15 s. One consultation: chat (every 5 s), "Join video call" (the Jitsi link opens in the Jitsi app or the browser), WhatsApp to the optometrist only if they allowed it, the advice in words and as a PDF (opened through the FileProvider), close / cancel.
+- **Urgent reports:** "Please see an eye doctor today" comes first on the result card, the choice screen and the consultation, followed by "A teleconsult never replaces an urgent visit."
+- Wording: in the app the optometrist's document is called "advice" (the Section 6 word list still applies; `StringsWordingTest` covers `STele`). Only `https://meet.jit.si/` and `https://wa.me/` links from the server are opened.
+- The shop / staff flow is unchanged: Patient mode is one extra card on Home and one extra card on the result screen.
+- Tests: `TeleTextTest` (7). App total 386, engine 383.
+- **Not tried on a phone yet:** the patient screens were compiled and unit-tested only.
+
 ### Vision profile branch: open items
 1. **Tried once on a phone (15 Nov), fixes above.** Still to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
 2. Colour-plate palettes, contrast steps and the "Normal at 3 %" limit are our own starting values: an optometrist should review them. A phone display cannot guarantee low contrast levels.
