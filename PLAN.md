@@ -215,8 +215,8 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 | C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Done |
 | D | Survey upgrade (sections, skip logic, "Why we ask") | Done |
 | E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | Done |
-| F | Premium UI redesign (tokens, fonts, all screens) | Next: tokens, survey, screening and profile cards written; theme, fonts, home, result layout, old screens to do |
-| G | QR, WhatsApp share, PDF additions, backend page | To do |
+| F | Premium UI redesign (tokens, fonts, all screens) | Done (see the limits below) |
+| G | QR, WhatsApp share, PDF additions, backend page | Next |
 | H | All tests, APK, README, architecture doc | To do |
 
 ### Phase A: safety rules (done)
@@ -280,6 +280,24 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 - Each suggestion has the product name, what it does (catalogue text, English), 1–2 "Why for you" lines from this customer's answers (Hindi and English) and the ZEISS link. Label: "Suggested ZEISS lens family – optician confirms".
 - The result screen shows the rings card and the lens cards; the shop PDF and the optometrist report carry the rings, lens ids and reasons. Red flag or child myopia: rings stay, lens cards are replaced by the referral card.
 - Tests: `LensEngineTest` (one per trigger and exclusion, 5 personas: 25-year student, 35-year IT worker, 52-year shopkeeper who drives at night, 60-year farmer, 10-year child with −2.00), `ProfileViewTest`.
+
+### Phase F: UI redesign (done)
+- **Tokens** (`ui/Tokens.kt`, `ui/Theme.kt`): the colours from the brief (background #F7F9FC, surface #FFFFFF, hairline #E3E8EF, ink #0B1B2B, secondary ink #5A6B7D, primary #1A5CFF, success #1E9E6A, warning #E8A317, urgent #D93838; section colours Work #2F80ED, Digital #A3D33A, Mobility #6B7785, Leisure #F2A93B) and a full dark set. The app follows the phone's light / dark setting.
+  - Added for contrast: darker "ink" versions of success, warning and urgent for text on their soft tints. A test checks every text pair for 4.5:1 in both themes.
+  - The vision tests (power check, screening) always run in the light theme: black targets on white at full brightness.
+- **Fonts:** Inter (Latin) + Noto Sans Devanagari (Hindi), both OFL, merged into one TTF per weight (`res/font/inter_deva_*.ttf`, built by `tools/build_fonts.py`), because Compose does not fall back glyph by glyph inside one font family. Tabular figures are on everywhere. The glyph-coverage test still passes.
+- **Type and shape:** display 32 sp semibold, title 24 sp, body 18 sp, label 15 sp; cards 24 dp, buttons 16 dp, pill chips, hairline borders, a soft shadow only on hero cards, 24 dp screen padding.
+- **Home:** hero card "Start new customer", three tiles (Past sessions, Shop tools, Frames), bridge chip "Connected" / "Offline – queued N" (tap = try to send now; checked every 20 s while Home is open).
+- **Guided flow:** segmented progress bar and "Step n of m" in the interview and the survey; the survey has full-colour section intros, large answer cards with a haptic tick, labelled Never / Sometimes / Often sliders, a "Why we ask?" chip that opens a sheet and speaks, and a 72 dp floating mic with a pulsing ring. Steps slide and fade in 250 ms.
+- **Test screens:** system bars hidden, live distance pill (green inside the range, amber outside), 3-2-1 countdown, a drawn-in tick after each screening test.
+- **Result screen, top to bottom:** urgent banner (if any) → "Your Vision Profile" rings (900 ms draw-in) → Measurements card (power per eye in large numerals, range, method, PD, trial-lens start, screening with status dots) → lens card with a drawn lens (blue tint for BlueGuard, grey gradient for PhotoFusion X, amber edge for DriveSafe) and "Why for you" bullets → second-pair cards → frames → optometrist card → actions. The older detailed cards (functional profile, trial-lens bands, generic lens package) moved into "For the shop". Red flag or child myopia: the referral card replaces the lens cards.
+- **All older screens** take the new look through the shared scaffold, buttons and cards and the theme colours; their logic is unchanged.
+- **Limits:**
+  - Icons are drawn in code (mic, lens, tick, dots); the Material Symbols Rounded font is not bundled.
+  - The older screens were restyled through the shared components, not redesigned one by one; skeleton loaders were not added (the empty history has a friendly card).
+  - The interview keeps its existing voice strip; the 72 dp mic is on the survey.
+  - Nothing here has been seen on a phone yet: spacing at font scale 1.3 and the dark theme need a look on the S23 FE.
+- Tests: `DesignTokensTest`, `BundledFontTest`.
 
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.

@@ -403,7 +403,7 @@ private fun GuideArrow(pointLeft: Boolean, modifier: Modifier) {
             close()
         }
         drawPath(p, Color.White.copy(alpha = 0.75f))
-        drawPath(p, Teal, style = Stroke(4f))
+        drawPath(p, com.drishtisaathi.ui.LightColors.primary, style = Stroke(4f))
     }
 }
 
@@ -427,7 +427,7 @@ private fun YawIndicator(yawDeg: Double?, step: AvatarStep, gate: AvatarCaptureG
         yawDeg?.let {
             val c = Offset(x(it), h / 2)
             drawCircle(if (ok) Color(0xFF2ECC71) else Color.White, h * 0.3f, c)
-            if (ok) drawArc(Teal, -90f, (360 * held).toFloat(), false, Offset(c.x - h * 0.4f, c.y - h * 0.4f),
+            if (ok) drawArc(com.drishtisaathi.ui.LightColors.primary, -90f, (360 * held).toFloat(), false, Offset(c.x - h * 0.4f, c.y - h * 0.4f),
                 androidx.compose.ui.geometry.Size(h * 0.8f, h * 0.8f), style = Stroke(5f))
         }
     }

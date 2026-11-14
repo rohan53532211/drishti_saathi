@@ -119,7 +119,7 @@ fun RemoteReviewCard(
             notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    SectionCard(SBridge.cardTitle[l], container = if (r?.needsInPersonExam == true) UrgentBg else androidx.compose.ui.graphics.Color.White) {
+    SectionCard(SBridge.cardTitle[l], container = if (r?.needsInPersonExam == true) UrgentBg else androidx.compose.ui.graphics.Color.Unspecified) {
         when {
             r == null -> {
                 if (queued) Text(com.drishtisaathi.i18n.SProfile.reportQueued[l], style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)

@@ -220,6 +220,14 @@ object SProfile {
     }
     val reasonCodes: Set<String> get() = REASON.keys
 
+    // ---- Phase F: home ----
+    val homeHeroLine = tx("Voice survey, eye check, screening and a lens suggestion in about 10 minutes.", "बोलकर सवाल, आँख जाँच, स्क्रीनिंग और लेंस का सुझाव, लगभग 10 मिनट में।")
+    val homeHeroCta = tx("Begin", "शुरू करें")
+    val homeFrames = tx("Frames", "फ़्रेम")
+    val emptyHistoryTitle = tx("No sessions yet", "अभी कोई सेशन नहीं")
+    val emptyHistoryBody = tx("Finished checks appear here. Start with a new customer from the home screen.", "पूरी हुई जाँचें यहाँ दिखेंगी। होम स्क्रीन से नया ग्राहक शुरू करें।")
+    val loading = tx("Loading…", "लोड हो रहा है…")
+
     // ---- report queue / bridge chip ----
     val bridgeConnected = tx("Connected", "जुड़ा है")
     val bridgeOffline = tx("Offline – queued %d", "ऑफ़लाइन – %d कतार में")

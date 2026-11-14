@@ -50,7 +50,9 @@ fun HistoryScreen(
 
     AppScaffold(l, onLang, title = S.history[l], onBack = onBack) { pad ->
         if (sessions.isEmpty()) {
-            Column(Modifier.padding(pad).padding(24.dp)) { Text(S.noHistory[l], style = MaterialTheme.typography.bodyLarge) }
+            Column(Modifier.padding(pad).padding(24.dp)) { SectionCard(com.drishtisaathi.i18n.SProfile.emptyHistoryTitle[l]) {
+                    Text(com.drishtisaathi.i18n.SProfile.emptyHistoryBody[l], style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.secondary)
+                } }
         } else {
             LazyColumn(
                 Modifier.padding(pad).fillMaxSize(),

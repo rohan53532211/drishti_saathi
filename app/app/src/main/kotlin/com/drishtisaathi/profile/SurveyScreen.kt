@@ -420,7 +420,7 @@ fun MicFab(voice: VoiceController, lang: Lang, modifier: Modifier = Modifier) {
             Text(SProfile.listening[lang], color = c.ink, style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
         }
-        st.message?.let { Text(it[lang], color = c.urgent, style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(220.dp)) }
+        st.message?.let { Text(it[lang], color = c.urgentInk, style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(220.dp)) }
         Box(contentAlignment = Alignment.Center) {
             if (on) Box(Modifier.size(72.dp).scale(pulse).background(c.primary.copy(alpha = 0.18f), CircleShape))
             Surface(

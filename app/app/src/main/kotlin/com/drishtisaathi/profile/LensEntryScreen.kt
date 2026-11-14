@@ -72,7 +72,7 @@ fun LensEntryScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(title[lang], style = MaterialTheme.typography.headlineSmall, color = c.ink, fontWeight = FontWeight.SemiBold)
-        if (tooStrong) Text(SProfile.lensTooStrong[lang], color = c.urgent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+        if (tooStrong) Text(SProfile.lensTooStrong[lang], color = c.urgentInk, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.fillMaxWidth().background(c.urgentSoft, DS.button).padding(16.dp))
         else Text(SProfile.lensModeWhy[lang], style = MaterialTheme.typography.bodyLarge, color = c.inkSecondary)
         Text(SProfile.lensFirstPass.format(fmtD(firstPassSeD))[lang], style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)

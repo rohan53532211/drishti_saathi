@@ -6,7 +6,7 @@ import java.io.File
 import java.nio.ByteBuffer
 
 /**
- * The app ships its own merged Noto font (tools/build_fonts.py). Every character the app can show (Kotlin sources,
+ * The app ships its own merged font, Inter + Noto Sans Devanagari (tools/build_fonts.py). Every character the app can show (Kotlin sources,
  * JSON assets: strings, frame names, voice lexicon) must have a glyph in every weight, or Android would quietly fall
  * back to the phone's own font for it. Emoji are left to the phone's emoji font.
  */
@@ -63,20 +63,20 @@ class BundledFontTest {
         val used = usedCodePoints()
         assertTrue("expected Devanagari in the sources", used.any { it in 0x0900..0x097F })
         weights.forEach { w ->
-            val f = File("src/main/res/font/noto_$w.ttf")
+            val f = File("src/main/res/font/inter_deva_$w.ttf")
             assertTrue("$f missing", f.isFile)
             val have = cmap(f)
             val missing = (used - have).sorted().map { "U+%04X".format(it) }
-            assertTrue("noto_$w lacks $missing", missing.isEmpty())
+            assertTrue("inter_deva_$w lacks $missing", missing.isEmpty())
         }
     }
 
     @Test fun `theme and PDF use the bundled font`() {
         val theme = File("src/main/kotlin/com/drishtisaathi/ui/Theme.kt").readText()
-        assertTrue(theme.contains(".withFamily(NotoFamily)"))
-        weights.forEach { assertTrue(theme.contains("R.font.noto_$it")) }
+        assertTrue(theme.contains("fontFamily = AppFamily") && theme.contains("fontFeatureSettings = TNUM"))
+        weights.forEach { assertTrue(theme.contains("R.font.inter_deva_$it")) }
         val pdf = File("src/main/kotlin/com/drishtisaathi/pdf/PdfExporter.kt").readText()
-        assertTrue(pdf.contains("R.font.noto_regular") && pdf.contains("R.font.noto_bold"))
+        assertTrue(pdf.contains("R.font.inter_deva_regular") && pdf.contains("R.font.inter_deva_bold"))
         assertTrue(!pdf.contains("else Typeface.DEFAULT\n"))
         assertTrue(File("src/main/assets/licenses/OFL-NotoSans.txt").readText().contains("SIL Open Font License"))
     }

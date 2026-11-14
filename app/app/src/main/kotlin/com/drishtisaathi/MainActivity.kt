@@ -262,7 +262,13 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onShopTools = { vm.avatarStaffDefault = true; nav.navigate(Routes.SHOP_TOOLS) },
                 setupDone = setupDone,
                 onSetup = { nav.navigate(Routes.PHONE_SETUP) },
+                onFrames = { vm.avatarStaffDefault = true; vm.loadCatalog3D(); nav.navigate(Routes.FRAME_CATALOGUE) },
+                bridgeOnline = vm.bridgeOnline.collectAsStateWithLifecycle().value,
+                queued = vm.reportQueue.pending.collectAsStateWithLifecycle().value,
+                onBridgeChip = { vm.flushReports() },
             )
+            // while Home is open: check the backend and send queued reports every 20 s
+            androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { vm.flushReports(); kotlinx.coroutines.delay(20_000) } }
         }
         composable(Routes.SHOP_TOOLS) {
             ShopToolsScreen(
@@ -411,14 +417,14 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             val l = state.lang
             val emergency = androidx.compose.runtime.remember { vm.safety().emergency }
             var finished by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-            if (!finished) com.drishtisaathi.profile.CameraScreeningFlow(
+            if (!finished) com.drishtisaathi.ui.LightTheme { com.drishtisaathi.profile.CameraScreeningFlow(
                 l, vm.rules, vm.calibration, state.answers, state.quick, emergency,
                 onDone = { r -> finished = true; vm.setScreening(r); afterScreening() },
                 onSkip = { finished = true; vm.setScreening(null); afterScreening() },
                 modifier = Modifier.fillMaxSize(), voice = voice,
                 speak = { voice.instructionSpeaker.speak(it, l) },
                 allowDemoWithoutCamera = state.demo || state.precision,
-            )
+            ) }
         }
         composable(Routes.OLD_NUMBERS) {
             OldNumbersScreen(
@@ -449,7 +455,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             val l = state.lang
             val primary = entry.arguments?.getBoolean("primary") ?: true
             val plan = androidx.compose.runtime.remember { vm.eyeCheckPlan() }
-            StepFrame(l, vm::setLang, SShop.eyeCheckTitle[l], onBack = { nav.popBackStack() }) {
+            com.drishtisaathi.profile.ImmersiveMode()
+            com.drishtisaathi.ui.LightTheme { StepFrame(l, vm::setLang, SShop.eyeCheckTitle[l], onBack = { nav.popBackStack() }) {
                 CameraQuickEstimateFlow(
                     l, vm.rules, vm.calibration, plan, state.answers, primary,
                     onDone = { q -> vm.setQuick(q); finishPowerPath() },
@@ -464,7 +471,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     // learning loop: in lens-assisted mode the phone-model correction applies to the residual only
                     deviceFit = vm.deviceFit.collectAsStateWithLifecycle().value.takeIf { !state.demo && vm.rules.deviceCorrection.enabled },
                 )
-            }
+            } }
         }
         composable(Routes.EDIT) {
             ConfirmScreen(

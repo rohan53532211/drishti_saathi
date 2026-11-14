@@ -34,6 +34,7 @@ import com.drishtisaathi.i18n.SFlow
 import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.i18n.SShop
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import com.drishtisaathi.profile.gate
 
 /** M6: one screen with profile, bands + confidence, starting trial lens, lens package, frames, referral status. */
@@ -72,8 +73,8 @@ fun ResultScreen(
 
     AppScaffold(l, onLang, title = title, onBack = onBack) { pad ->
         Column(
-            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Order: functional vision profile, power and its source, referral, lens package, frames.
             // An urgent referral goes first.
@@ -86,30 +87,13 @@ fun ResultScreen(
                     Text("• " + S.referralReason(it, rules)[l], style = MaterialTheme.typography.bodyLarge, color = UrgentRed)
                 }
             }
-            // The eye check runs for everyone: its ranges show even when lens advice is withheld.
-            // With a red flag the power is for the optometrist only.
-            val eyeLines = PowerPathText.quickLines(state)
-            if (eyeLines.isNotEmpty()) SectionCard(SShop.eyeCheckTitle[l]) {
-                if (gate.powerForOptometristOnly) Text(com.drishtisaathi.i18n.SProfile.forOptometristOnly[l],
-                    style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = UrgentRed)
-                eyeLines.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyLarge) }
-            }
-            // Screening tests (grid, contrast, colour, E test, clock dial): results with status dots.
-            val screenLines = com.drishtisaathi.profile.ScreeningText.lines(state, rules)
-            if (screenLines.isNotEmpty()) SectionCard(com.drishtisaathi.i18n.SProfile.screeningTitle[l]) {
-                Text(com.drishtisaathi.i18n.SProfile.screeningLabel[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                screenLines.forEach { com.drishtisaathi.profile.ScreenLineRow(it, l) }
-            }
-            // A red flag or child myopia: the referral card replaces every lens and frame suggestion.
+            // "Your Vision Profile": the rings.
+            view?.let { com.drishtisaathi.profile.VisionProfileCard(l, it.profile) }
+            // Measurements: power per eye in large numerals with its range and method, PD, trial-lens start, screening.
+            MeasurementsCard(state, rules, gate)
+            // A red flag or child myopia: the referral card replaces every lens and frame suggestion; else the lens cards.
             if (!gate.lensAllowed) com.drishtisaathi.profile.ReferralCard(l, gate)
-            // "Your Vision Profile" rings, then the lens cards (hidden after a red flag or for child myopia).
-            view?.let {
-                com.drishtisaathi.profile.VisionProfileCard(l, it.profile)
-                com.drishtisaathi.profile.LensCards(l, it.plan)
-            }
-            SectionCard(SAnamnesis.profileTitle[l]) {
-                PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
-            }
+            else view?.let { com.drishtisaathi.profile.LensCards(l, it.plan) }
 
             val adv = a.advice.takeIf { gate.lensAllowed }
             if (!gate.lensAllowed) {
@@ -118,53 +102,7 @@ fun ResultScreen(
                 SectionCard(S.lensPackage[l]) { Text(S.adviceWithheld[l], fontWeight = FontWeight.SemiBold) }
                 if (!urgent) ReferralBlock(a.referral, rules, l)
             } else {
-                // ---- Estimated band + starting trial lens ----
-                SectionCard(S.startingTrialLens[l]) {
-                    if (adv.eyes.isEmpty()) {
-                        if (com.drishtisaathi.engine.StartingHint.DISTANCE_BLUR_START_MINUS !in adv.startingHints) Text(S.noStartingLens[l])
-                        adv.startingHints.forEach {
-                            Text("• " + S.startingHint(it)[l], style = MaterialTheme.typography.titleMedium, color = Teal)
-                        }
-                    } else {
-                        adv.eyes.forEach { e ->
-                            val eye = if (e.eye == Eye.RIGHT) "R" else "L"
-                            Text("$eye  ${Fmt.trialLens(e.startingTrialLens.value)}", style = MaterialTheme.typography.titleLarge, color = Teal)
-                            if (e.bandUncertain) Text(S.bandUncertain[l], style = MaterialTheme.typography.bodyMedium)
-                            else Text("${S.estimatedBand[l]}: ${Fmt.band(e.band.value, l)} ${Fmt.meta(e.band, l)}",
-                                style = MaterialTheme.typography.bodyMedium)
-                            e.correctedWithShopRecords?.let {
-                                Text(S.correctedWithRecords.format(it)[l], style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary)
-                            }
-                        }
-                        Text(S.startingLensHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                    }
-                    PowerPathText.sourceLine(adv)?.let { Text(it[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
-                    val compare = PowerPathText.compareLines(state, adv)
-                    if (compare.isNotEmpty()) {
-                        HorizontalDivider()
-                        Text(SAnamnesis.compareHeading[l], style = MaterialTheme.typography.titleSmall, color = RoutineAmber)
-                        compare.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyMedium) }
-                    }
-                    adv.add?.let { add ->
-                        HorizontalDivider()
-                        Text("${S.readingAdd[l]}: ${Fmt.band(add.value, l)}", style = MaterialTheme.typography.titleMedium)
-                        Text(Fmt.meta(add, l), style = MaterialTheme.typography.bodySmall)
-                        if (adv.confirmAddWithReadyReader) {
-                            Text("• " + S.confirmReadyReader[l], style = MaterialTheme.typography.titleMedium, color = Teal)
-                        }
-                    }
-                }
-
                 if (!urgent) ReferralBlock(a.referral, rules, l)
-
-                // ---- Lens package ----
-                SectionCard(S.lensPackage[l]) {
-                    Labeled(S.lensType[l], S.lensType(adv.lensType.value)[l], Fmt.meta(adv.lensType, l))
-                    Labeled(S.material[l], S.material(adv.materialId.value)[l], Fmt.meta(adv.materialId, l))
-                    Labeled(S.coatings[l],
-                        if (adv.coatings.isEmpty()) S.noCoatings[l] else adv.coatings.joinToString("\n") { "• " + S.coating(it)[l] }, null)
-                }
 
                 // ---- Frames ----
                 SectionCard(S.suggestedFrames[l]) {
@@ -205,6 +143,57 @@ fun ResultScreen(
                     color = MaterialTheme.colorScheme.secondary)
             }
             if (shopOpen) {
+            SectionCard(SAnamnesis.profileTitle[l]) {
+                PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
+            }
+            if (adv != null) {
+                // ---- Estimated band + starting trial lens ----
+                SectionCard(S.startingTrialLens[l]) {
+                    if (adv.eyes.isEmpty()) {
+                        if (com.drishtisaathi.engine.StartingHint.DISTANCE_BLUR_START_MINUS !in adv.startingHints) Text(S.noStartingLens[l])
+                        adv.startingHints.forEach {
+                            Text("• " + S.startingHint(it)[l], style = MaterialTheme.typography.titleMedium, color = Teal)
+                        }
+                    } else {
+                        adv.eyes.forEach { e ->
+                            val eye = if (e.eye == Eye.RIGHT) "R" else "L"
+                            Text("$eye  ${Fmt.trialLens(e.startingTrialLens.value)}", style = MaterialTheme.typography.titleLarge, color = Teal)
+                            if (e.bandUncertain) Text(S.bandUncertain[l], style = MaterialTheme.typography.bodyMedium)
+                            else Text("${S.estimatedBand[l]}: ${Fmt.band(e.band.value, l)} ${Fmt.meta(e.band, l)}",
+                                style = MaterialTheme.typography.bodyMedium)
+                            e.correctedWithShopRecords?.let {
+                                Text(S.correctedWithRecords.format(it)[l], style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary)
+                            }
+                        }
+                        Text(S.startingLensHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    }
+                    PowerPathText.sourceLine(adv)?.let { Text(it[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
+                    val compare = PowerPathText.compareLines(state, adv)
+                    if (compare.isNotEmpty()) {
+                        HorizontalDivider()
+                        Text(SAnamnesis.compareHeading[l], style = MaterialTheme.typography.titleSmall, color = RoutineAmber)
+                        compare.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyMedium) }
+                    }
+                    adv.add?.let { add ->
+                        HorizontalDivider()
+                        Text("${S.readingAdd[l]}: ${Fmt.band(add.value, l)}", style = MaterialTheme.typography.titleMedium)
+                        Text(Fmt.meta(add, l), style = MaterialTheme.typography.bodySmall)
+                        if (adv.confirmAddWithReadyReader) {
+                            Text("• " + S.confirmReadyReader[l], style = MaterialTheme.typography.titleMedium, color = Teal)
+                        }
+                    }
+                }
+
+                // ---- Lens package ----
+                SectionCard(S.lensPackage[l]) {
+                    Labeled(S.lensType[l], S.lensType(adv.lensType.value)[l], Fmt.meta(adv.lensType, l))
+                    Labeled(S.material[l], S.material(adv.materialId.value)[l], Fmt.meta(adv.materialId, l))
+                    Labeled(S.coatings[l],
+                        if (adv.coatings.isEmpty()) S.noCoatings[l] else adv.coatings.joinToString("\n") { "• " + S.coating(it)[l] }, null)
+                }
+
+            }
             if (state.glassesOn) SectionCard(SFlow.glassesOnStaff[l], container = RoutineBg) {
                 Text(SFlow.glassesOnNote[l], color = RoutineAmber)
             }
@@ -305,4 +294,62 @@ private fun ReferralBlock(referral: com.drishtisaathi.engine.Referral, rules: Ru
         Text(S.referralLevel(referral.level)[l], color = fg, style = MaterialTheme.typography.titleMedium)
     }
     ReferralReasonGroups(referral, rules, l)
+}
+
+
+/**
+ * Measurements: the power of each eye in large numerals with its range and how it was measured, PD, the starting
+ * trial lens, the reading add, and the screening results with status dots. With a red flag the power is labelled
+ * "For the optometrist only" and no trial-lens start is shown.
+ */
+@Composable
+fun MeasurementsCard(state: UiState, rules: RulesConfig, gate: com.drishtisaathi.engine.profile.SafetyGate) {
+    val l = state.lang
+    val c = DS.colors
+    val P = com.drishtisaathi.i18n.SProfile
+    val a = state.result?.assessment ?: return
+    com.drishtisaathi.profile.SoftCard {
+        Text(P.measurementsTitle[l], style = MaterialTheme.typography.titleLarge, color = c.ink)
+        if (gate.powerForOptometristOnly) Text(P.forOptometristOnly[l], style = MaterialTheme.typography.labelLarge, color = c.urgentInk,
+            modifier = Modifier.background(c.urgentSoft, DS.pill).padding(horizontal = 12.dp, vertical = 6.dp))
+        PowerPathText.knownLine(state)?.let { Text(it[l], style = MaterialTheme.typography.bodyLarge, color = c.ink) }
+        val eyes = state.quick?.eyes.orEmpty()
+        if (eyes.isNotEmpty()) androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            eyes.forEach { (eye, e) ->
+                Column(Modifier.weight(1f).background(c.background, DS.button).padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text((if (eye == Eye.RIGHT) SShop.rightEye else SShop.leftEye)[l], style = MaterialTheme.typography.labelMedium, color = c.inkSecondary)
+                    val se = e.seD
+                    if (se == null || e.noMyopiaAtReach) {
+                        Text("0.00", style = MaterialTheme.typography.displaySmall, color = c.ink)
+                        Text(SAnamnesis.quickNoMyopia[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+                    } else {
+                        val r = com.drishtisaathi.vision.PowerRange.around(se)
+                        Text(com.drishtisaathi.i18n.fmtD(se) + " D", style = MaterialTheme.typography.displaySmall, color = c.ink, maxLines = 1)
+                        Text(com.drishtisaathi.i18n.fmtD(e.rangeFromD ?: r.fromD) + " … " + com.drishtisaathi.i18n.fmtD(e.rangeToD ?: r.toD) + " D",
+                            style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
+                        Text(com.drishtisaathi.vision.quickMethodText(e)[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+                        if (e.highMyopia) Text(P.highMyopiaNote[l], style = MaterialTheme.typography.bodySmall, color = c.warningInk)
+                    }
+                }
+            }
+        }
+        // the full sentence per eye (method, residual, total, range), and the near result
+        PowerPathText.quickLines(state).drop(if (PowerPathText.knownLine(state) != null) 1 else 0).forEach {
+            Text(it[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+        }
+        HorizontalDivider(color = c.hairline)
+        Labeled(S.pd[l], Fmt.pd(a, l), Fmt.meta(a.pdMm, l))
+        val adv = a.advice.takeIf { gate.lensAllowed }
+        if (adv != null && adv.eyes.isNotEmpty()) {
+            Labeled(S.startingTrialLens[l], adv.eyes.joinToString("   ") { (if (it.eye == Eye.RIGHT) "R " else "L ") + Fmt.trialLens(it.startingTrialLens.value) }, S.startingLensHint[l])
+            adv.add?.let { Labeled(S.readingAdd[l], Fmt.band(it.value, l), if (adv.confirmAddWithReadyReader) S.confirmReadyReader[l] else null) }
+        }
+        val lines = com.drishtisaathi.profile.ScreeningText.lines(state, rules)
+        if (lines.isNotEmpty()) {
+            HorizontalDivider(color = c.hairline)
+            Text(P.screeningTitle[l], style = MaterialTheme.typography.titleMedium, color = c.ink)
+            Text(P.screeningLabel[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+            lines.forEach { com.drishtisaathi.profile.ScreenLineRow(it, l) }
+        }
+    }
 }

@@ -37,6 +37,7 @@ import com.drishtisaathi.interview.Question
 import com.drishtisaathi.voice.VoiceAnswers
 import com.drishtisaathi.voice.VoiceController
 import com.drishtisaathi.voice.VoicePanel
+import androidx.compose.animation.togetherWith
 
 /**
  * One question per screen, big buttons. Typed/button input is always available; voice ([voice], optional)
@@ -67,10 +68,23 @@ fun InterviewScreen(
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // No numbering: follow-ups depend on the answers, so a count would only jump around.
+            // Segmented progress, one segment per step of this stage (follow-ups appear and vanish with the answers).
+            val total = state.stageQuestions.size.coerceAtLeast(1)
+            com.drishtisaathi.profile.SegmentedProgress(List(total) { DS.colors.primary }, idx.coerceIn(0, total - 1), DS.colors.hairline, Modifier.fillMaxWidth())
+            Text(com.drishtisaathi.i18n.SProfile.stepOf.format((idx + 1).coerceAtMost(total), total)[l], style = MaterialTheme.typography.labelMedium,
+                color = DS.colors.inkSecondary)
             Text((if (state.stage == com.drishtisaathi.interview.Stage.LATER) com.drishtisaathi.i18n.SShop.fewMoreQuestions
-                else com.drishtisaathi.i18n.SShop.aboutYourEyes)[l], style = MaterialTheme.typography.titleMedium, color = Teal)
-            Text(q.text[l], style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 12.dp))
+                else com.drishtisaathi.i18n.SShop.aboutYourEyes)[l], style = MaterialTheme.typography.labelMedium, color = Teal)
+            // each step slides and fades in
+            androidx.compose.animation.AnimatedContent(
+                targetState = q.text[l],
+                transitionSpec = {
+                    (androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(DS.stepMs)) { it / 4 } +
+                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(DS.stepMs))) togetherWith
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(DS.stepMs / 2))
+                },
+                label = "question",
+            ) { text -> Text(text, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 12.dp)) }
             if (voice != null) VoicePanel(voice, l, showDiagnostics = false)
 
             when (q) {

@@ -22,11 +22,15 @@ data class DrishtiColors(
     val onPrimary: Color,
     val primarySoft: Color,
     val success: Color,
+    /** Success as text: dark enough for 4.5:1 on the soft success background. */
+    val successInk: Color,
     val successSoft: Color,
     val warning: Color,
     val warningInk: Color,
     val warningSoft: Color,
     val urgent: Color,
+    /** Urgent as text on the soft urgent background or the page (4.5:1). */
+    val urgentInk: Color,
     val urgentSoft: Color,
     val work: Color,
     val digital: Color,
@@ -39,9 +43,9 @@ val LightColors = DrishtiColors(
     background = Color(0xFFF7F9FC), surface = Color(0xFFFFFFFF), hairline = Color(0xFFE3E8EF),
     ink = Color(0xFF0B1B2B), inkSecondary = Color(0xFF5A6B7D),
     primary = Color(0xFF1A5CFF), primaryPressed = Color(0xFF0B3FCC), onPrimary = Color(0xFFFFFFFF), primarySoft = Color(0xFFE8EFFF),
-    success = Color(0xFF1E9E6A), successSoft = Color(0xFFE5F6EE),
+    success = Color(0xFF1E9E6A), successInk = Color(0xFF136B47), successSoft = Color(0xFFE5F6EE),
     warning = Color(0xFFE8A317), warningInk = Color(0xFF8A5A00), warningSoft = Color(0xFFFFF4DC),
-    urgent = Color(0xFFD93838), urgentSoft = Color(0xFFFDEAEA),
+    urgent = Color(0xFFD93838), urgentInk = Color(0xFFB32424), urgentSoft = Color(0xFFFDEAEA),
     work = Color(0xFF2F80ED), digital = Color(0xFFA3D33A), mobility = Color(0xFF6B7785), leisure = Color(0xFFF2A93B),
     isDark = false,
 )
@@ -50,9 +54,9 @@ val DarkColors = DrishtiColors(
     background = Color(0xFF0A121C), surface = Color(0xFF131E2B), hairline = Color(0xFF243243),
     ink = Color(0xFFEEF3F9), inkSecondary = Color(0xFF9FB0C2),
     primary = Color(0xFF6C96FF), primaryPressed = Color(0xFF4C7BF2), onPrimary = Color(0xFF05122B), primarySoft = Color(0xFF16284A),
-    success = Color(0xFF45C48E), successSoft = Color(0xFF11301F),
+    success = Color(0xFF45C48E), successInk = Color(0xFF6FDBA9), successSoft = Color(0xFF11301F),
     warning = Color(0xFFF2B93B), warningInk = Color(0xFFF2B93B), warningSoft = Color(0xFF33290F),
-    urgent = Color(0xFFFF6B6B), urgentSoft = Color(0xFF3A1717),
+    urgent = Color(0xFFFF6B6B), urgentInk = Color(0xFFFF8A8A), urgentSoft = Color(0xFF3A1717),
     work = Color(0xFF5B9BF3), digital = Color(0xFFB5E04F), mobility = Color(0xFF94A0AE), leisure = Color(0xFFF5B95A),
     isDark = true,
 )
@@ -81,10 +85,14 @@ object DS {
     /** A section colour from its RGB hex in the question file (e.g. "#2F80ED"). */
     fun parse(hex: String): Color = Color(android.graphics.Color.parseColor(hex))
 
-    /** Black or white, whichever reads better on [bg] (WCAG relative luminance). */
+    /** Dark ink or white, whichever has the higher contrast on [bg] (WCAG relative luminance). */
     fun on(bg: Color): Color {
-        fun lin(c: Float) = if (c <= 0.03928f) c / 12.92f else Math.pow(((c + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
-        val l = 0.2126f * lin(bg.red) + 0.7152f * lin(bg.green) + 0.0722f * lin(bg.blue)
-        return if (l > 0.42f) Color(0xFF0B1B2B) else Color.White
+        fun lin(c: Float) = if (c <= 0.03928f) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4)
+        fun lum(c: Color) = 0.2126 * lin(c.red) + 0.7152 * lin(c.green) + 0.0722 * lin(c.blue)
+        val ink = Color(0xFF0B1B2B)
+        val l = lum(bg)
+        val white = 1.05 / (l + 0.05)
+        val dark = (l + 0.05) / (lum(ink) + 0.05)
+        return if (dark > white) ink else Color.White
     }
 }

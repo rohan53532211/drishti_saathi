@@ -94,11 +94,11 @@ fun ReferralCard(lang: Lang, gate: SafetyGate, modifier: Modifier = Modifier) {
     ) {
         Text(SProfile.referralCard[lang], style = MaterialTheme.typography.labelMedium, color = c.inkSecondary)
         if (gate.urgent) {
-            Text(SProfile.seeDoctorToday[lang], style = MaterialTheme.typography.titleLarge, color = c.urgent, fontWeight = FontWeight.SemiBold)
+            Text(SProfile.seeDoctorToday[lang], style = MaterialTheme.typography.titleLarge, color = c.urgentInk, fontWeight = FontWeight.SemiBold)
             Text(SProfile.noLensToday[lang], style = MaterialTheme.typography.bodyLarge, color = c.ink)
         }
         if (gate.childMyopia) {
-            Text(SProfile.childMyopiaTitle[lang], style = MaterialTheme.typography.titleLarge, color = if (child) c.warningInk else c.urgent, fontWeight = FontWeight.SemiBold)
+            Text(SProfile.childMyopiaTitle[lang], style = MaterialTheme.typography.titleLarge, color = if (child) c.warningInk else c.urgentInk, fontWeight = FontWeight.SemiBold)
             Text(SProfile.childMyopiaBody[lang], style = MaterialTheme.typography.bodyLarge, color = c.ink)
         }
         Text(SProfile.reportTagLine.format(SProfile.tag(gate.tag)[lang])[lang], style = MaterialTheme.typography.labelMedium, color = c.inkSecondary)
