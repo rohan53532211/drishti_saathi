@@ -332,6 +332,20 @@ Found on the phone in reports S2 (routine) and S32 (emergency short path). Each 
 - Debug APK rebuilt: `D:\drishti-data\drishti-vision-profile.apk`; pre-release v1.1 asset replaced.
 - Still to check on the phone: the stronger-lens repeat, the "glasses on" step before the near check, the contrast repeat screen. S2's own case (−1.50 lens, residual −3.25 D) is below the −3.75 D repeat limit: lower `repeatIfResidualFromSeD` (for example to −3.00) if the optometrist wants a repeat there too.
 
+## Teleconsult (`feature/teleconsult`, from `feature/vision-profile`, 15 Nov 2026)
+Patient registers in the app, takes the test, asks for a consultation; a verified optometrist accepts in a web portal, talks by chat / WhatsApp / video, and sends advice or an e-prescription the patient sees in the app. Payments are a placeholder. Demo runs on the laptop over LAN (http); production needs HTTPS hosting, real OTP login and payment integration.
+
+### Teleconsult phase 1: backend accounts and data (done)
+- `backend/app/teleconsult.py`, mounted under `/api` by `create_app`. Tables `tc_users`, `tc_consultations`, `tc_messages`, `tc_prescriptions`, `tc_settings` in the same SQLite file.
+- **Roles:** patient, optometrist, admin. Passwords hashed with bcrypt; JWT (HS256, 7 days) in `Authorization: Bearer`; a role check on every endpoint. The JWT key is `JWT_SECRET`, or a random one kept in the database.
+- **Patient:** name, phone, age, gender, language; the consent sentence is stored with its time. `DELETE /api/me` removes the account with every consultation, report, message and prescription.
+- **Optometrist:** registers as PENDING; only APPROVED ones see cases or are offered to patients. Phone and email are never shown to patients.
+- **Admin:** one account from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `backend/.env` (never committed); approve / reject endpoints.
+- **Consultation:** REQUESTED → ACCEPTED → IN_PROGRESS → COMPLETED / CLOSED; priority from the report's own tag; `payment_status = "not_required (demo)"`. The report is the app's existing optometrist report and passes the same privacy check (no name, photo or phone inside it). The patient's phone is shown only to the optometrist who accepted.
+- **Chat** (text, optional picture up to 600 KB), **video** (a `meet.jit.si/drishti-<12 chars>` room posted into the chat), **WhatsApp** links (`wa.me`, prefilled Hindi / English greeting with the case number; to the optometrist only if they allow it).
+- **Advice / e-prescription:** sphere, cylinder, axis per eye, add, PD, lens advice, referral advice, follow-up date, notes, optometrist name + registration number → PDF (fpdf2, the app's Inter + Devanagari font).
+- Tests: `backend/tests/test_teleconsult.py` (13): auth, roles, approval gate, consultation flow, chat pictures, data deletion. Backend total 96.
+
 ### Vision profile branch: open items
 1. **Tried once on a phone (15 Nov), fixes above.** Still to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
 2. Colour-plate palettes, contrast steps and the "Normal at 3 %" limit are our own starting values: an optometrist should review them. A phone display cannot guarantee low contrast levels.

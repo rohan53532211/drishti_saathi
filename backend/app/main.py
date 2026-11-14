@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from . import anamnesis, catalog as catalog_mod
+from . import anamnesis, catalog as catalog_mod, teleconsult
 from .sarvam import SarvamClient
 
 try:  # backend/.env holds SARVAM_API_KEY (never committed); real environment variables win
@@ -138,7 +138,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 
 def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
-               sarvam: Optional[SarvamClient] = None, catalog_dir: Optional[str] = None) -> FastAPI:
+               sarvam: Optional[SarvamClient] = None, catalog_dir: Optional[str] = None,
+               jwt_secret: Optional[str] = None, admin_email: Optional[str] = None, admin_password: Optional[str] = None) -> FastAPI:
     db_file = db_path or os.environ.get("BRIDGE_DB", str(Path(__file__).resolve().parent.parent / "bridge.db"))
     api_token = token if token is not None else os.environ.get("BRIDGE_TOKEN") or None
 
@@ -284,6 +285,28 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
 
     app.include_router(anamnesis.router(voice, check_token))
     app.include_router(catalog_mod.router(catalog_mod.Catalog(catalog_dir), check_token))
+
+    # Teleconsult: accounts (patient, optometrist, admin), consultations, chat, video link, e-prescription.
+    # Its endpoints use their own login (JWT), not the shared bridge token.
+    app.include_router(teleconsult.router(db, jwt_secret, admin_email=admin_email, admin_password=admin_password,
+                                          report_problems=privacy_problems))
+
+    @app.get("/portal", include_in_schema=False)
+    @app.get("/portal/", include_in_schema=False)
+    def portal_page() -> FileResponse:
+        return FileResponse(STATIC / "portal.html")
+
+    @app.get("/portal/admin", include_in_schema=False)
+    def portal_admin_page() -> FileResponse:
+        return FileResponse(STATIC / "portal.html")
+
+    @app.get("/portal/assets/{name}", include_in_schema=False)
+    def portal_asset(name: str) -> FileResponse:
+        folder = STATIC / ("fonts" if name.endswith(".ttf") else "portal")
+        f = folder / Path(name).name          # the bare file name only: no path can leave the folder
+        if not f.is_file():
+            raise HTTPException(status_code=404, detail="not found")
+        return FileResponse(f)
     return app
 
 
