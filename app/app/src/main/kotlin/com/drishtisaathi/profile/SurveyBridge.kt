@@ -46,6 +46,27 @@ object SurveyBridge {
         return out to ids
     }
 
+    /**
+     * Survey answers the AI voice interview already heard ([fields] = its extracted answers): single choices,
+     * never / sometimes / often and hours, each checked against the survey file. Anything else is ignored, and the
+     * survey then asks only what is still open.
+     */
+    fun fromAi(fields: kotlinx.serialization.json.JsonObject, file: com.drishtisaathi.engine.profile.SurveyFile, base: SurveyAnswers = SurveyAnswers()): SurveyAnswers {
+        var out = base
+        for (q in file.questions) {
+            if (out.answered(q.id)) continue
+            val v = fields[q.id] as? kotlinx.serialization.json.JsonPrimitive ?: continue
+            when (q.kind) {
+                com.drishtisaathi.engine.profile.SurveyKind.CHOICE, com.drishtisaathi.engine.profile.SurveyKind.FREQ ->
+                    v.content.takeIf { v.isString && it in q.optionCodes }?.let { out = out.with(q.id, listOf(it)) }
+                com.drishtisaathi.engine.profile.SurveyKind.NUMBER ->
+                    v.content.toIntOrNull()?.takeIf { !v.isString && it in q.min..q.max }?.let { out = out.with(q.id, listOf(it.toString())) }
+                else -> {}
+            }
+        }
+        return out
+    }
+
     /** Low-light or glare complaints (for the contrast test's eye-health note). */
     fun lowLightOrGlare(s: SurveyAnswers, from: Freq): Boolean =
         listOf("lowLightTrouble", "glareOncoming", "lowLightDriving").any { s.freq(it)?.atLeast(from) == true }

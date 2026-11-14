@@ -213,8 +213,8 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 | A | Safety rules: full check for everyone, red flags, emergency short path, child myopia, report always queued for the optometrist | Done |
 | B | Lens-assisted mode (over-refraction) for strong minus powers | Done |
 | C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Done |
-| D | Survey upgrade (sections, skip logic, "Why we ask") | Next: survey engine, questions and screen written in phase A; Sarvam topics to do |
-| E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | To do |
+| D | Survey upgrade (sections, skip logic, "Why we ask") | Done |
+| E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | Next |
 | F | Premium UI redesign (tokens, fonts, all screens) | Tokens written; screens to do |
 | G | QR, WhatsApp share, PDF additions, backend page | To do |
 | H | All tests, APK, README, architecture doc | To do |
@@ -255,6 +255,14 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 - All results show on the result screen (status dots), the shop PDF and the optometrist report under "Screening, not a diagnosis".
 - Emergency short path: the grid only.
 - Tests: `ScreeningTest` (engine), `ScreeningFlowTest` (app).
+
+### Phase D: survey upgrade (done)
+- `anamnesis_questions.json` → `survey`: 7 colour-coded sections (warning signs, about your eyes, work & daily life, screens, driving & travel, free time & sun, your wishes), 22 questions, each with a "Why we ask" line that is spoken when the customer taps the chip.
+- Kinds: never / sometimes / often (labelled slider), yes / no, single choice, multi-select, hours (slider with − / +). Voice or tap; numbers by tap only.
+- Skip rules look back only: the driving follow-ups are skipped for "never", the first-progressive question is for 45+, the "which signs" question appears only after a red flag, and emergency signs ask that one question only. Answers of a skipped block are dropped.
+- Age, first glasses, known power and budget stay in the core / later questions and are not asked again. The survey fills the older headache, screen-hours, outdoor-work and occupation questions, so nobody is asked twice. Planned time: 22 questions × 10 s, inside the 4-minute limit.
+- **Sarvam coverage tracker:** three optional topics (driving, sun time, work day) and their fields (`driveFrequency`, `glareOncoming`, `tiredEyes`, `indoorOutdoor`, `screenHoursDay`, `workHours`, `outdoorHours`). They are extract-only: picked up when the customer mentions them, never asked, so the interview keeps its 8 questions and the red-flag question stays question 3. The phone's survey then asks only what is still open.
+- Tests: `SurveyTest` (engine), `SurveyBridgeTest` (app), `test_survey_topics_are_optional_extract_only_and_never_asked` (backend).
 
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.

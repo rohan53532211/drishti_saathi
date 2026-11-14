@@ -370,7 +370,11 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
             val visible = Questions.visibleIn(Stage.CORE, m.answers)
             val next = visible.indexOfFirst { it.id !in m.answered }
             all = next < 0
-            s.copy(answers = m.answers, answered = m.answered, stage = Stage.CORE, questionIndex = if (next < 0) 0 else next,
+            // survey answers the AI already heard (driving, hours…): the survey later asks only what is still open
+            val survey = com.drishtisaathi.engine.profile.Survey.prune(surveyFile, m.answers,
+                com.drishtisaathi.profile.SurveyBridge.fromAi(profile.answers, surveyFile, s.survey))
+            val (filled, filledIds) = com.drishtisaathi.profile.SurveyBridge.apply(m.answers, m.answered, survey, rules)
+            s.copy(answers = filled, answered = filledIds, survey = survey, stage = Stage.CORE, questionIndex = if (next < 0) 0 else next,
                 editingFromConfirm = false, aiInterview = record, result = null)
         }
         onDone(all)
