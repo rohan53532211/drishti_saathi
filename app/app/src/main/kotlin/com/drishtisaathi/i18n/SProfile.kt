@@ -48,12 +48,85 @@ object SProfile {
         RedFlag.NEW_FLOATERS to tx("New floating spots", "नए तैरते धब्बे"),
         RedFlag.CURTAIN_SHADOW to tx("A curtain or shadow over the vision", "नज़र के आगे पर्दा या परछाईं"),
         RedFlag.DOUBLE_VISION to tx("Double vision", "दो-दो दिखना"),
-        RedFlag.AMSLER_DISTORTION to tx("Wavy, bent or missing lines (grid)", "लकीरें टेढ़ी, लहरदार या ग़ायब (ग्रिड)"),
+        RedFlag.AMSLER_DISTORTION to tx("Wavy, bent or missing lines on the grid test", "ग्रिड जाँच में लकीरें टेढ़ी, लहरदार या ग़ायब"),
+        RedFlag.BENT_LINES_REPORTED to tx("Straight lines look bent or wavy (the customer's answer)", "सीधी लकीरें टेढ़ी या लहरदार दिखती हैं (ग्राहक का जवाब)"),
         RedFlag.FLASHES_FLOATERS_CURTAIN_UNSPECIFIED to tx("Flashes, floating spots or a curtain over the vision", "रोशनी की चमक, तैरते धब्बे या नज़र के आगे पर्दा"),
         RedFlag.SUDDEN_LOSS_PAIN_DOUBLE_UNSPECIFIED to tx(
             "Sudden drop in vision, eye pain or redness, or double vision", "अचानक नज़र कम होना, आँख में दर्द-लाली, या दो-दो दिखना"),
     )
     fun redFlag(f: RedFlag): Txt = FLAG.getValue(f)
+
+    /**
+     * The red-flag reasons of [gate] in words. The grid flag names the eye whose grid showed it ("… – left eye"), so
+     * it can never disagree with the grid lines printed further down.
+     */
+    fun redFlagLines(gate: com.drishtisaathi.engine.profile.SafetyGate): List<Txt> = gate.redFlags.map { f ->
+        val t = redFlag(f)
+        val eyes = gate.amslerEyes
+        if (f != RedFlag.AMSLER_DISTORTION || eyes.isEmpty()) t else {
+            val e = when {
+                eyes.size > 1 -> SShop.bothEyes
+                eyes.single() == com.drishtisaathi.engine.Eye.RIGHT -> SShop.rightEye
+                else -> SShop.leftEye
+            }
+            Txt("${t.en} – ${e.en.lowercase()}", "${t.hi} – ${e.hi}")
+        }
+    }
+
+    // ---- phone-test fixes (15 Nov): both eyes, optometrist-only wording, header, short path ----
+    val notMeasured = tx("not measured – %s", "नहीं नापा गया – %s")
+    private val NOT_MEASURED = mapOf(
+        com.drishtisaathi.engine.NotMeasured.SKIPPED to tx("skipped", "छोड़ दिया गया"),
+        com.drishtisaathi.engine.NotMeasured.NOT_DONE to tx("eye check not done", "आँख की जाँच नहीं हुई"),
+    )
+    fun notMeasuredReason(r: com.drishtisaathi.engine.NotMeasured): Txt = NOT_MEASURED.getValue(r)
+    val measureEyeNow = tx("Measure the %s eye now", "%s आँख अभी नापें")
+    val continueWithoutEye = tx("Continue without it", "इसके बिना आगे बढ़ें")
+    val bothEyesNeeded = tx("Both eyes should be measured.", "दोनों आँखें नापी जानी चाहिए।")
+    /** The power line of an URGENT or CHILD MYOPIA report: never "your power". */
+    val optomRange = tx(
+        "%s to %s D (read up to %d cm; phone estimate, to be confirmed with a trial lens)",
+        "%s से %s D (%d cm तक पढ़ा; फ़ोन का अनुमान, ट्रायल लेंस से पक्का होना बाकी)",
+    )
+    val reportHeader = tx("Date: %s · Age: %s · Language: %s", "तारीख़: %s · उम्र: %s · भाषा: %s")
+    val ageNotGiven = tx("not given", "नहीं बताई")
+    val langHindi = tx("Hindi", "हिन्दी")
+    val langEnglish = tx("English", "अंग्रेज़ी")
+    val shortPathHeader = tx("Short path (emergency)", "छोटी जाँच (आपात स्थिति)")
+    val ringSkippedEmergency = tx("Skipped – emergency short path", "छोड़ा गया – आपात स्थिति की छोटी जाँच")
+
+    // ---- lens-assisted: the lens was too weak ----
+    val lensTooWeak = tx(
+        "Through this lens the letters still blur very close (residual %s D), so the lens is too weak. Use a stronger lens and repeat once.",
+        "इस लेंस से भी अक्षर बहुत पास ही धुंधले हो रहे हैं (बचा हुआ %s D), यानी लेंस कमज़ोर है। ज़्यादा तेज़ लेंस लेकर एक बार फिर जाँचें।",
+    )
+    val lensKeepReading = tx("No stronger lens here: keep this reading", "ज़्यादा तेज़ लेंस नहीं है: यही रीडिंग रखें")
+
+    // ---- near check of a short-sighted customer ----
+    val nearCorrectionTitle = tx("Near check: distance glasses on", "पास की जाँच: दूर का चश्मा पहनें")
+    val nearCorrectionBody = tx(
+        "This customer is short-sighted. For the near check the distance correction must be on: the customer's own glasses, or the trial lens for the measured power.",
+        "इस ग्राहक की दूर की नज़र कमज़ोर है। पास की जाँच के लिए दूर का चश्मा पहनना ज़रूरी है: ग्राहक का अपना चश्मा, या नापे गए नंबर का ट्रायल लेंस।",
+    )
+    val nearCorrectionOn = tx("Glasses / trial lens on: start", "चश्मा / ट्रायल लेंस पहन लिया: शुरू करें")
+    val nearCorrectionOff = tx("No glasses or trial lens here", "चश्मा या ट्रायल लेंस नहीं है")
+    val nearFartherMyope = tx(
+        "Near point %d cm with the distance correction on (expected about %d cm): farther than expected for the age. Possible focusing weakness; the optometrist should check.",
+        "दूर के चश्मे के साथ पास का बिंदु %d cm (उम्मीद लगभग %d cm): उम्र के हिसाब से ज़्यादा दूर। फ़ोकस की कमज़ोरी हो सकती है; ऑप्टोमेट्रिस्ट जाँचें।",
+    )
+    val nearUncorrectedMyope = tx(
+        "Near point %d cm without the distance correction. For a short-sighted eye this cannot be judged: repeat with the glasses or the trial lens on.",
+        "दूर के चश्मे के बिना पास का बिंदु %d cm। कमज़ोर दूर-नज़र वाली आँख में इससे कुछ तय नहीं होता: चश्मा या ट्रायल लेंस पहनकर दोबारा करें।",
+    )
+
+    // ---- contrast: validity ----
+    val resContrastInvalid = tx("Test not valid – repeat with glasses/trial lens on", "जाँच मान्य नहीं – चश्मा / ट्रायल लेंस पहनकर दोबारा करें")
+    val contrastWearCorrection = tx("Put on your glasses or the trial lens for this test.", "इस जाँच के लिए अपना चश्मा या ट्रायल लेंस पहनें।")
+    val contrastInvalidBody = tx(
+        "Even the darkest letter was not read, so this test is not valid. Put the glasses or the trial lens on and repeat.",
+        "सबसे गहरा अक्षर भी नहीं पढ़ा गया, इसलिए यह जाँच मान्य नहीं है। चश्मा या ट्रायल लेंस पहनकर दोबारा करें।",
+    )
+    val contrastRepeat = tx("Repeat the test", "जाँच दोबारा करें")
 
     // ---- Phase B: lens-assisted mode ----
     val lensModeTitle = tx("Check through a lens", "लेंस के साथ जाँच")
@@ -137,7 +210,6 @@ object SProfile {
     val resGridBad = tx("wavy or missing lines reported (%d square(s) marked)", "टेढ़ी या ग़ायब लकीरें बताईं (%d खाने चिह्नित)")
     val resContrast = tx("Contrast", "कंट्रास्ट")
     val resContrastStep = tx("lowest step seen %s%% – %s", "सबसे हल्का दिखा %s%% – %s")
-    val resContrastNone = tx("no step seen – %s", "कोई स्तर नहीं दिखा – %s")
     val normal = tx("Normal", "सामान्य")
     val reduced = tx("Reduced", "कम")
     val eyeHealthNote = tx("Suggest cataract / eye-health check", "मोतियाबिंद / आँखों की सेहत की जाँच की सलाह")
@@ -284,6 +356,7 @@ object SProfile {
     /** Every fixed string (for tests). */
     fun touchAll() {
         ReportTag.entries.forEach(::tag); RedFlag.entries.forEach(::redFlag); Freq.entries.forEach(::freq)
+        com.drishtisaathi.engine.NotMeasured.entries.forEach(::notMeasuredReason)
         reasonCodes.forEach { reason(it, listOf("LOW")) }
     }
 }

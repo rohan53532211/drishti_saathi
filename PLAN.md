@@ -317,8 +317,23 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 - Debug APK: `D:\drishti-data\drishti-vision-profile.apk` (85.7 MB, not in git).
 - `README.md` (features, safety rules, lens-assisted mode, screening tests, new flow) and `docs/ARCHITECTURE.md` (section 6) updated.
 
+### Phase I: fixes from the first phone test (done, 15 Nov 2026)
+Found on the phone in reports S2 (routine) and S32 (emergency short path). Each fix has a unit test in `PhoneTestFixesTest` (engine) and `PhoneTestFixesAppTest` (app).
+1. **Both eyes always printed.** A skipped eye is stored with its reason and every output (result screen, PDF, WhatsApp picture, QR, optometrist report) shows "L: not measured – skipped". The eye check's last screen lists both eyes and its main button goes back to the eye that has no reading.
+2. **Lens-assisted mode.** The suggested lens stays about 2 D weaker than the first pass (`lensAssisted.suggestOffsetD`). New: if the residual through the lens is still at or beyond `repeatIfResidualFromSeD` (−3.75 D), staff are asked for a stronger lens (about 2 D weaker than the new total) and the test is repeated, at most `maxStrongerRepeats` (1) times.
+3. **Near point of a short-sighted customer.** "Possible long-sightedness" is never shown next to a measured minus power (also for sessions stored earlier). Staff are asked to put the distance glasses or trial lens on for the near check; with the correction on the far power counts as 0 D, without it the near point is not judged.
+4. **Contrast.** Failing even the 100 % step = "Test not valid – repeat with glasses/trial lens on" (no "Reduced", no cataract note, and it no longer counts as poor low-light vision for the lens engine); the screen offers the repeat at once. An eye with 1.00 D or more (`screening.contrast.wearCorrectionFromAbsD`) is told to wear its correction first. `rules.json` must start the steps at 100 %.
+5. **Ring labels.** The Leisure label now comes from the ring's own score (`visionProfile.leisure.mediumFromScore` 34, `highFromScore` 67), so 17 is "Low".
+6. **Report header and disclaimer.** The header has the date, the age band and the session's language. The disclaimer is printed once (top of each PDF, end of the WhatsApp picture).
+7. **Grid red flag.** `AMSLER_DISTORTION` comes only from a grid result and names the eye ("… on the grid test – left eye"). The customer's own answer "straight lines look bent" is a separate flag, `BENT_LINES_REPORTED`, worded as an answer, so the referral is not lost.
+8. **Emergency short path.** Rings say "Skipped – emergency short path"; the header says "Short path (emergency)".
+9. **URGENT and CHILD_MYOPIA reports.** The power lines read "For the optometrist only: R … D" instead of "Your approximate power…", and that result is not read aloud during the check.
+- Tests: engine 383, app 379, backend 83 = 845, all passing.
+- Debug APK rebuilt: `D:\drishti-data\drishti-vision-profile.apk`; pre-release v1.1 asset replaced.
+- Still to check on the phone: the stronger-lens repeat, the "glasses on" step before the near check, the contrast repeat screen. S2's own case (−1.50 lens, residual −3.25 D) is below the −3.75 D repeat limit: lower `repeatIfResidualFromSeD` (for example to −3.00) if the optometrist wants a repeat there too.
+
 ### Vision profile branch: open items
-1. **Nothing on this branch has been tried on a phone.** First things to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
+1. **Tried once on a phone (15 Nov), fixes above.** Still to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
 2. Colour-plate palettes, contrast steps and the "Normal at 3 %" limit are our own starting values: an optometrist should review them. A phone display cannot guarantee low contrast levels.
 3. A phone screen is narrower than 10 cm, so the grid shows fewer columns than 20 (the rows are complete).
 4. Lens triggers are our own rules. Lens product descriptions on the cards are English only (the reasons are in Hindi too).

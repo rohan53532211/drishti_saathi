@@ -53,7 +53,7 @@ class QrPayloadTest {
 
     @Test fun `the compact payload has every field of the brief and nothing personal`() {
         val j = QrPayload.json(state, view, f.rules, "1.2")
-        assertEquals(setOf("caseId", "ageBand", "tag", "rings", "eyes", "pd", "screening", "lens", "appVersion"), j.keys)
+        assertEquals(setOf("caseId", "ageBand", "tag", "lang", "rings", "eyes", "pd", "screening", "lens", "appVersion"), j.keys)
         assertEquals("S12", j["caseId"]!!.jsonPrimitive.content)
         assertEquals("30-44", j["ageBand"]!!.jsonPrimitive.content)
         assertEquals("ROUTINE", j["tag"]!!.jsonPrimitive.content)
@@ -111,12 +111,13 @@ class QrPayloadTest {
 
     @Test fun `the shared summary has the tag, rings, the method line, screening and the lens family - and the labels`() {
         val lines = QrPayload.shareLines(state, view, f.rules).map { it.en }
-        assertTrue(lines.toString(), lines.first().contains("ROUTINE"))
+        assertTrue(lines.toString(), lines.first().startsWith("Date: ") && lines[1].contains("ROUTINE"))
         assertTrue(lines.any { it.startsWith("Digital: Digital Native") })
         assertTrue(lines.any { it.contains("Measured through −2.00 D lens, residual −2.25 D, total −4.25 D") })
         assertTrue(lines.any { it.startsWith("Colour: Possible red-green deficiency") })
         assertTrue("Suggested ZEISS lens family – optician confirms" in lines)
-        assertTrue(lines.last().startsWith("Screening, not a diagnosis"))
+        assertTrue(lines.indexOf("Screening, not a diagnosis") in 1 until lines.indexOfFirst { it.startsWith("Grid R") })
+        assertEquals("the disclaimer once, at the end", com.drishtisaathi.i18n.S.disclaimer.en, lines.last())
         val urgent = f.state(a.copy(redFlagOther = true), survey)
         val ul = QrPayload.shareLines(urgent, ProfileView.build(urgent, f.rules, engine), f.rules).map { it.en }
         assertTrue("Please see an eye doctor today" in ul)

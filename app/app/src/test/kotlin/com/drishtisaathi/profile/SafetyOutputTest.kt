@@ -94,7 +94,7 @@ class SafetyOutputTest {
         val shop = f.texts(PdfContent.shopCopy(st, f.rules, f.ctx, Lang.EN))
         assertTrue(SProfile.childMyopiaTitle.en in shop)
         assertFalse(S.lensPackage.en in shop)
-        assertTrue("the measured power is still printed for the optometrist", shop.any { it.startsWith("R: ") })
+        assertTrue("the measured power is still printed for the optometrist", shop.any { it.startsWith("For the optometrist only: R ") })
         val t = BridgeProfile.build(st, f.rules, f.consent, "t")["triage"]!!.jsonObject
         assertEquals("CHILD_MYOPIA", t["tag"]!!.jsonPrimitive.content)
         assertEquals("true", t["childMyopia"]!!.jsonPrimitive.content)

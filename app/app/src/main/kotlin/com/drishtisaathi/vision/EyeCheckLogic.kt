@@ -159,21 +159,36 @@ object NearCheck {
         /** Under the add age: the near point expected from the Hofstetter mean amplitude. */
         val expectedNearPointCm: Double?,
         val fartherThanExpected: Boolean,
+        /** Myopia was measured in the far check of this session. */
+        val myopic: Boolean = false,
+        /** The near check was done with the distance correction on (glasses or trial lens). */
+        val withCorrection: Boolean = false,
     )
 
-    fun analyse(nearPointMm: Double, age: Int?, farSeD: Double?, answers: InterviewAnswers, rules: RulesConfig): Result {
+    /**
+     * [myopic]: a minus power was measured in the far check. The near point is then read with the distance
+     * correction on ([withCorrection]: the far power counts as corrected, 0 D). Without the correction a
+     * short-sighted eye's near point says nothing about focusing, so under the add age nothing is judged: never
+     * "farther than expected", never long-sightedness.
+     */
+    fun analyse(
+        nearPointMm: Double, age: Int?, farSeD: Double?, answers: InterviewAnswers, rules: RulesConfig,
+        myopic: Boolean = false, withCorrection: Boolean = false,
+    ): Result {
         val vm = VisionMath(rules)
         val m = nearPointMm / 1000.0
         val cm = (nearPointMm / 10.0).roundToInt().toDouble()
-        if (age == null) return Result(cm, null, null, false)
+        if (age == null) return Result(cm, null, null, false, myopic, withCorrection)
+        val se = if (withCorrection) 0.0 else farSeD ?: 0.0
         if (age >= rules.quickEstimate.nearAddFromAge) {
             val wd = QuickEstimator(rules).workingDistanceM(answers)
-            val add = vm.nearPointAdd(m, farSeD ?: 0.0, wd, age).addD
-            return Result(cm, ((add / 0.25).roundToInt() * 0.25).coerceIn(ADD_MIN, ADD_MAX), null, false)
+            val add = vm.nearPointAdd(m, se, wd, age).addD
+            return Result(cm, ((add / 0.25).roundToInt() * 0.25).coerceIn(ADD_MIN, ADD_MAX), null, false, myopic, withCorrection)
         }
-        val amplitude = vm.accommodationAmplitude(m, farSeD ?: 0.0)
+        if (myopic && !withCorrection) return Result(cm, null, null, false, myopic, withCorrection)
+        val amplitude = vm.accommodationAmplitude(m, se)
         val expected = vm.hofstetterMean(age).takeIf { it > 0 }?.let { (100.0 / it).roundToInt().toDouble() }
-        return Result(cm, null, expected, amplitude < vm.hofstetterMin(age))
+        return Result(cm, null, expected, amplitude < vm.hofstetterMin(age), myopic, withCorrection)
     }
 }
 
