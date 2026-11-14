@@ -34,6 +34,8 @@ import com.drishtisaathi.i18n.SFlow
 import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.i18n.SShop
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import com.drishtisaathi.profile.gate
 
 /** M6: one screen with profile, bands + confidence, starting trial lens, lens package, frames, referral status. */
 @Composable
@@ -58,6 +60,14 @@ fun ResultScreen(
     onEditAnswers: (() -> Unit)? = null,
     /** Frames this customer saved in 3D (with the session). */
     savedFrames: @Composable () -> Unit = {},
+    /** Phase A safety gate: red flags and child myopia hide every lens suggestion. */
+    gate: com.drishtisaathi.engine.profile.SafetyGate = state.gate(rules),
+    /** Phase E: the profile rings and the suggested lens family. */
+    view: com.drishtisaathi.profile.ProfileView? = null,
+    /** Phase G: the QR card's text and whether it is the link to the optometrist's page. */
+    qr: Pair<String, Boolean>? = null,
+    /** Phase G: shares the summary picture (called after the consent checkbox). */
+    onShareImage: (() -> Unit)? = null,
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -67,35 +77,87 @@ fun ResultScreen(
 
     AppScaffold(l, onLang, title = title, onBack = onBack) { pad ->
         Column(
-            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Order: functional vision profile, power and its source, referral, lens package, frames.
             // An urgent referral goes first.
-            val urgent = a.referral.level == ReferralLevel.URGENT
-            // Urgent warning signs: ONE red card at the very top (message and reasons), never hidden or softened.
-            if (urgent) SectionCard(S.referral[l], container = UrgentBg) {
+            val urgent = a.referral.level == ReferralLevel.URGENT || gate.urgent
+            // Urgent warning signs: ONE red banner at the very top (message and reasons), never hidden or softened.
+            if (gate.urgent) com.drishtisaathi.profile.UrgentBanner(l, gate)
+            else if (urgent) SectionCard(S.referral[l], container = UrgentBg) {
                 Text(SShop.urgentTop[l], style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = UrgentRed)
                 a.referral.reasons.forEach {
                     Text("• " + S.referralReason(it, rules)[l], style = MaterialTheme.typography.bodyLarge, color = UrgentRed)
                 }
             }
-            // Below it, the eye check, lens package and frames as for everyone else.
-            if (urgent) Text(SShop.afterDoctor[l], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            // The eye check runs for everyone: its ranges show even when lens advice is withheld.
-            val eyeLines = PowerPathText.quickLines(state)
-            if (eyeLines.isNotEmpty()) SectionCard(SShop.eyeCheckTitle[l]) {
-                eyeLines.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyLarge) }
-            }
-            SectionCard(SAnamnesis.profileTitle[l]) {
-                PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
-            }
+            // "Your Vision Profile": the rings.
+            view?.let { com.drishtisaathi.profile.VisionProfileCard(l, it.profile) }
+            // Measurements: power per eye in large numerals with its range and method, PD, trial-lens start, screening.
+            MeasurementsCard(state, rules, gate)
+            // A red flag or child myopia: the referral card replaces every lens and frame suggestion; else the lens cards.
+            if (!gate.lensAllowed) com.drishtisaathi.profile.ReferralCard(l, gate)
+            else view?.let { com.drishtisaathi.profile.LensCards(l, it.plan) }
 
-            val adv = a.advice
-            if (adv == null) {
+            val adv = a.advice.takeIf { gate.lensAllowed }
+            if (!gate.lensAllowed) {
+                if (!gate.urgent) ReferralBlock(a.referral, rules, l)
+            } else if (adv == null) {
                 SectionCard(S.lensPackage[l]) { Text(S.adviceWithheld[l], fontWeight = FontWeight.SemiBold) }
                 if (!urgent) ReferralBlock(a.referral, rules, l)
             } else {
+                if (!urgent) ReferralBlock(a.referral, rules, l)
+
+                // ---- Frames ----
+                SectionCard(S.suggestedFrames[l]) {
+                    if (onTry3D != null) BigButton(com.drishtisaathi.i18n.S3D.tryIn3d[l], onTry3D, container = Teal)
+                    if (onTryOn != null && r.frames.any { it.frame.overlay != null }) {
+                        BigButton(SFlow.tryOnAll[l], { onTryOn(null) }, container = if (onTry3D != null) null else Teal)
+                    }
+                    r.frames.forEachIndexed { i, rf ->
+                        if (i > 0) HorizontalDivider()
+                        Text("${i + 1}. ${rf.frame.name}", style = MaterialTheme.typography.titleMedium)
+                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Fmt.label(rf, l)?.let { MatchChip(rf.label!!, it) }
+                            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                            androidx.compose.material3.Checkbox(checked = rf.frame.id in state.compareIds, onCheckedChange = { onToggleCompare(rf.frame.id) })
+                            Text(S.compareTick[l], style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Text(Fmt.frameLine(rf, l), style = MaterialTheme.typography.bodyMedium)
+                        ReasonBullets(rf, l)
+                        if (onTryOn != null && rf.frame.overlay != null) {
+                            TextButton({ onTryOn(rf.frame.id) }) { Text(SFlow.tryOn[l]) }
+                        }
+                    }
+                    if (r.frames.size >= 2) {
+                        HorizontalDivider()
+                        if (state.compareIds.size == 2) BigButton(S.compareTwo[l], onCompare, container = Teal)
+                        else Text(S.compareHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    }
+                }
+                savedFrames()
+            }
+
+            // QR card, then the optometrist card ("Send to optometrist" is always on) and the share action
+            qr?.let { com.drishtisaathi.profile.QrCard(l, it.first, it.second) }
+            remoteCard()
+            if (onShareImage != null) {
+                var askShare by remember { mutableStateOf(false) }
+                BigButton(com.drishtisaathi.i18n.SProfile.shareWhatsApp[l], { askShare = true })
+                if (askShare) com.drishtisaathi.profile.ShareConsentDialog(l, onShare = { askShare = false; onShareImage() }, onDismiss = { askShare = false })
+            }
+
+            // ---- For the shop (folded: the customer may be looking at this screen) ----
+            var shopOpen by remember { mutableStateOf(false) }
+            SectionCard(SShop.forShop[l], modifier = Modifier.clickable { shopOpen = !shopOpen }) {
+                Text((if (shopOpen) "− " else "+ ") + SShop.forShopHint[l], style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary)
+            }
+            if (shopOpen) {
+            SectionCard(SAnamnesis.profileTitle[l]) {
+                PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
+            }
+            if (adv != null) {
                 // ---- Estimated band + starting trial lens ----
                 SectionCard(S.startingTrialLens[l]) {
                     if (adv.eyes.isEmpty()) {
@@ -134,8 +196,6 @@ fun ResultScreen(
                     }
                 }
 
-                if (!urgent) ReferralBlock(a.referral, rules, l)
-
                 // ---- Lens package ----
                 SectionCard(S.lensPackage[l]) {
                     Labeled(S.lensType[l], S.lensType(adv.lensType.value)[l], Fmt.meta(adv.lensType, l))
@@ -144,45 +204,7 @@ fun ResultScreen(
                         if (adv.coatings.isEmpty()) S.noCoatings[l] else adv.coatings.joinToString("\n") { "• " + S.coating(it)[l] }, null)
                 }
 
-                // ---- Frames ----
-                SectionCard(S.suggestedFrames[l]) {
-                    if (onTry3D != null) BigButton(com.drishtisaathi.i18n.S3D.tryIn3d[l], onTry3D, container = Teal)
-                    if (onTryOn != null && r.frames.any { it.frame.overlay != null }) {
-                        BigButton(SFlow.tryOnAll[l], { onTryOn(null) }, container = if (onTry3D != null) null else Teal)
-                    }
-                    r.frames.forEachIndexed { i, rf ->
-                        if (i > 0) HorizontalDivider()
-                        Text("${i + 1}. ${rf.frame.name}", style = MaterialTheme.typography.titleMedium)
-                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            Fmt.label(rf, l)?.let { MatchChip(rf.label!!, it) }
-                            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                            androidx.compose.material3.Checkbox(checked = rf.frame.id in state.compareIds, onCheckedChange = { onToggleCompare(rf.frame.id) })
-                            Text(S.compareTick[l], style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Text(Fmt.frameLine(rf, l), style = MaterialTheme.typography.bodyMedium)
-                        ReasonBullets(rf, l)
-                        if (onTryOn != null && rf.frame.overlay != null) {
-                            TextButton({ onTryOn(rf.frame.id) }) { Text(SFlow.tryOn[l]) }
-                        }
-                    }
-                    if (r.frames.size >= 2) {
-                        HorizontalDivider()
-                        if (state.compareIds.size == 2) BigButton(S.compareTwo[l], onCompare, container = Teal)
-                        else Text(S.compareHint[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                    }
-                }
-                savedFrames()
             }
-
-            remoteCard()
-
-            // ---- For the shop (folded: the customer may be looking at this screen) ----
-            var shopOpen by remember { mutableStateOf(false) }
-            SectionCard(SShop.forShop[l], modifier = Modifier.clickable { shopOpen = !shopOpen }) {
-                Text((if (shopOpen) "− " else "+ ") + SShop.forShopHint[l], style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary)
-            }
-            if (shopOpen) {
             if (state.glassesOn) SectionCard(SFlow.glassesOnStaff[l], container = RoutineBg) {
                 Text(SFlow.glassesOnNote[l], color = RoutineAmber)
             }
@@ -283,4 +305,62 @@ private fun ReferralBlock(referral: com.drishtisaathi.engine.Referral, rules: Ru
         Text(S.referralLevel(referral.level)[l], color = fg, style = MaterialTheme.typography.titleMedium)
     }
     ReferralReasonGroups(referral, rules, l)
+}
+
+
+/**
+ * Measurements: the power of each eye in large numerals with its range and how it was measured, PD, the starting
+ * trial lens, the reading add, and the screening results with status dots. With a red flag the power is labelled
+ * "For the optometrist only" and no trial-lens start is shown.
+ */
+@Composable
+fun MeasurementsCard(state: UiState, rules: RulesConfig, gate: com.drishtisaathi.engine.profile.SafetyGate) {
+    val l = state.lang
+    val c = DS.colors
+    val P = com.drishtisaathi.i18n.SProfile
+    val a = state.result?.assessment ?: return
+    com.drishtisaathi.profile.SoftCard {
+        Text(P.measurementsTitle[l], style = MaterialTheme.typography.titleLarge, color = c.ink)
+        if (gate.powerForOptometristOnly) Text(P.forOptometristOnly[l], style = MaterialTheme.typography.labelLarge, color = c.urgentInk,
+            modifier = Modifier.background(c.urgentSoft, DS.pill).padding(horizontal = 12.dp, vertical = 6.dp))
+        PowerPathText.knownLine(state)?.let { Text(it[l], style = MaterialTheme.typography.bodyLarge, color = c.ink) }
+        val eyes = state.quick?.eyes.orEmpty()
+        if (eyes.isNotEmpty()) androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            eyes.forEach { (eye, e) ->
+                Column(Modifier.weight(1f).background(c.background, DS.button).padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text((if (eye == Eye.RIGHT) SShop.rightEye else SShop.leftEye)[l], style = MaterialTheme.typography.labelMedium, color = c.inkSecondary)
+                    val se = e.seD
+                    if (se == null || e.noMyopiaAtReach) {
+                        Text("0.00", style = MaterialTheme.typography.displaySmall, color = c.ink)
+                        Text(SAnamnesis.quickNoMyopia[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+                    } else {
+                        val r = com.drishtisaathi.vision.PowerRange.around(se)
+                        Text(com.drishtisaathi.i18n.fmtD(se) + " D", style = MaterialTheme.typography.displaySmall, color = c.ink, maxLines = 1)
+                        Text(com.drishtisaathi.i18n.fmtD(e.rangeFromD ?: r.fromD) + " … " + com.drishtisaathi.i18n.fmtD(e.rangeToD ?: r.toD) + " D",
+                            style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
+                        Text(com.drishtisaathi.vision.quickMethodText(e)[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+                        if (e.highMyopia) Text(P.highMyopiaNote[l], style = MaterialTheme.typography.bodySmall, color = c.warningInk)
+                    }
+                }
+            }
+        }
+        // the full sentence per eye (method, residual, total, range), and the near result
+        PowerPathText.quickLines(state).drop(if (PowerPathText.knownLine(state) != null) 1 else 0).forEach {
+            Text(it[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+        }
+        HorizontalDivider(color = c.hairline)
+        Labeled(S.pd[l], Fmt.pd(a, l), Fmt.meta(a.pdMm, l))
+        val adv = a.advice.takeIf { gate.lensAllowed }
+        if (adv != null && adv.eyes.isNotEmpty()) {
+            Labeled(S.startingTrialLens[l], adv.eyes.joinToString("   ") { (if (it.eye == Eye.RIGHT) "R " else "L ") + Fmt.trialLens(it.startingTrialLens.value) }, S.startingLensHint[l])
+            adv.add?.let { Labeled(S.readingAdd[l], Fmt.band(it.value, l), if (adv.confirmAddWithReadyReader) S.confirmReadyReader[l] else null) }
+        }
+        val lines = com.drishtisaathi.profile.ScreeningText.lines(state, rules)
+        if (lines.isNotEmpty()) {
+            HorizontalDivider(color = c.hairline)
+            Text(P.screeningTitle[l], style = MaterialTheme.typography.titleMedium, color = c.ink)
+            Text(P.screeningLabel[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+            lines.forEach { com.drishtisaathi.profile.ScreenLineRow(it, l) }
+        }
+    }
 }

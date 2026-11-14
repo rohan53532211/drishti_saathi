@@ -33,6 +33,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,41 +48,57 @@ fun AppScaffold(
     onBack: (() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val c = DS.colors
     Scaffold(
+        containerColor = c.background,
         topBar = {
-            TopAppBar(
-                title = { Text(title, maxLines = 1) },
-                navigationIcon = {
-                    if (onBack != null) TextButton(onClick = onBack) { Text("‹ " + S.back[lang]) }
-                },
-                actions = { LangToggle(lang, onLang) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Teal, titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White, actionIconContentColor = Color.White),
-            )
+            // calm top bar: the page colour, the title in ink, a hairline below
+            Column {
+                TopAppBar(
+                    title = { Text(title, maxLines = 1, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                    navigationIcon = {
+                        if (onBack != null) TextButton(onClick = onBack, modifier = Modifier.heightIn(min = DS.minTouch)) {
+                            Text("‹ " + S.back[lang], color = c.primary, style = MaterialTheme.typography.labelMedium)
+                        }
+                    },
+                    actions = { LangToggle(lang, onLang) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = c.background, titleContentColor = c.ink,
+                        navigationIconContentColor = c.primary, actionIconContentColor = c.ink),
+                )
+                androidx.compose.material3.HorizontalDivider(color = c.hairline)
+            }
         },
         content = content,
     )
 }
 
+/** Language switch: two pill chips, each a 48 dp touch target. */
 @Composable
 fun LangToggle(lang: Lang, onLang: (Lang) -> Unit) {
-    Row(Modifier.padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    val c = DS.colors
+    Row(Modifier.padding(end = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf(Lang.HI to "हिंदी", Lang.EN to "EN").forEach { (l, label) ->
             val selected = l == lang
-            OutlinedButton(
-                onClick = { onLang(l) },
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                border = BorderStroke(1.dp, Color.White),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (selected) Color.White else Color.Transparent,
-                    contentColor = if (selected) Teal else Color.White,
-                ),
-            ) { Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold) }
+            androidx.compose.material3.Surface(
+                onClick = { onLang(l) }, shape = DS.pill,
+                color = if (selected) c.primary else c.surface,
+                border = if (selected) null else BorderStroke(1.dp, c.hairline),
+                modifier = Modifier.heightIn(min = DS.minTouch).semantics { this.selected = selected; role = Role.Tab },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(label, color = if (selected) c.onPrimary else c.ink, style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                }
+            }
         }
     }
 }
 
-/** Large touch target (≥ 64 dp) for the customer-facing interview. */
+/**
+ * Large touch target (at least 64 dp). [selected] or a [container] colour makes it the filled main action; otherwise it
+ * is a quiet card-like button (surface, hairline border).
+ */
 @Composable
 fun BigButton(
     text: String,
@@ -87,31 +108,43 @@ fun BigButton(
     enabled: Boolean = true,
     container: Color? = null,
 ) {
-    val shape = RoundedCornerShape(16.dp)
-    if (selected || container != null) {
-        Button(
-            onClick = onClick, enabled = enabled, shape = shape,
-            modifier = modifier.fillMaxWidth().heightIn(min = 64.dp),
-            colors = if (container != null) ButtonDefaults.buttonColors(containerColor = container) else ButtonDefaults.buttonColors(),
-        ) { Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center) }
-    } else {
-        OutlinedButton(
-            onClick = onClick, enabled = enabled, shape = shape,
-            modifier = modifier.fillMaxWidth().heightIn(min = 64.dp),
-            border = BorderStroke(2.dp, Teal),
-        ) { Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center) }
+    val c = DS.colors
+    val filled = selected || container != null
+    val bg = when {
+        !enabled -> c.hairline
+        filled -> container ?: c.primary
+        else -> c.surface
+    }
+    val fg = when {
+        !enabled -> c.inkSecondary
+        filled -> if (container == null) c.onPrimary else DS.on(bg)
+        else -> c.ink
+    }
+    androidx.compose.material3.Surface(
+        onClick = onClick, enabled = enabled, shape = DS.button, color = bg,
+        border = if (filled || !enabled) null else BorderStroke(1.dp, c.hairline),
+        modifier = modifier.fillMaxWidth().heightIn(min = DS.answerMin).semantics { role = Role.Button },
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, color = fg, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp))
+        }
     }
 }
 
+/** A soft card with a title: surface, 24 dp corners, hairline border, no shadow. [container] tints it (warnings). */
 @Composable
-fun SectionCard(title: String, modifier: Modifier = Modifier, container: Color = Color.White, content: @Composable () -> Unit) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = container),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+fun SectionCard(title: String, modifier: Modifier = Modifier, container: Color = Color.Unspecified, content: @Composable () -> Unit) {
+    val c = DS.colors
+    val tinted = container != Color.Unspecified && container != Color.White
+    androidx.compose.material3.Surface(
+        modifier = modifier.fillMaxWidth(), shape = DS.card,
+        color = if (tinted) container else c.surface,
+        border = if (tinted) null else BorderStroke(1.dp, c.hairline),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = c.ink, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() })
             content()
         }
     }
@@ -148,7 +181,7 @@ fun MatchChip(label: com.drishtisaathi.engine.MatchLabel, text: String) {
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .padding(vertical = 2.dp)
-            .background(bg, RoundedCornerShape(8.dp))
+            .background(bg, DS.pill)
             .padding(horizontal = 10.dp, vertical = 3.dp),
     )
 }

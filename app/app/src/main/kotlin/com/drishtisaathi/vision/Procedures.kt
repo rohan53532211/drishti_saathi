@@ -262,6 +262,18 @@ object VisionFlowPlan {
         add(VisionStep.Summary)
     }
 
+    /**
+     * Screening stage (after the power of each eye): the tumbling-E near acuity and the fogged clock dial per eye.
+     * The far point is not repeated here: the dial is placed from the power check's far point.
+     */
+    fun screeningSteps(rules: RulesConfig): List<VisionStep> = buildList {
+        if (rules.visionTests.nearAcuityPerEye) {
+            add(VisionStep.NearAcuity(TestEye.RIGHT)); add(VisionStep.NearAcuity(TestEye.LEFT))
+        } else add(VisionStep.NearAcuity(TestEye.BOTH))
+        add(VisionStep.ClockDial(TestEye.RIGHT)); add(VisionStep.ClockDial(TestEye.LEFT))
+        add(VisionStep.Summary)
+    }
+
     /** Confidence of the result a step just produced in [session], or null if it produced none. Used to offer a retry. */
     fun resultConfidence(step: VisionStep, session: VisionSession): Confidence? = when (step) {
         is VisionStep.FarPoint -> session.farPoint[step.eye]?.confidence

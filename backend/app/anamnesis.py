@@ -49,12 +49,19 @@ ENUMS = {
     "nearTask": ["PHONE", "NEWSPAPER", "SEWING", "ACCOUNTS", "OTHER"],
     "distanceSituation": ["DRIVING", "TV", "SIGNBOARDS", "CLASSROOM_BOARD", "OTHER"],
     "powerKnown": ["YES", "NOT_SURE", "NO"],
+    # vision-profile survey (the phone asks whatever is still open afterwards)
+    "driveFrequency": ["DAILY", "WEEKLY", "MONTHLY", "NEVER"],
+    "glareOncoming": ["NEVER", "SOMETIMES", "OFTEN"],
+    "tiredEyes": ["NEVER", "SOMETIMES", "OFTEN"],
+    "indoorOutdoor": ["INDOOR", "OUTDOOR", "BOTH"],
 }
 BOOLS = [
     "eyeStrain", "headacheStrain", "outdoorWork", "nightDriving", "nightVisionDifficulty", "wearsGlasses",
     "redFlagFlashes", "redFlagOther", "redFlagAny",
 ]
-INTS = {"age": (3, 110), "glassesAgeYears": (0, 60)}
+INTS = {"age": (3, 110), "glassesAgeYears": (0, 60),
+        # vision-profile survey: hours a day
+        "screenHoursDay": (0, 16), "workHours": (0, 16), "outdoorHours": (0, 14)}
 RED_FLAG_FIELDS = ("redFlagFlashes", "redFlagOther", "redFlagAny")
 
 
@@ -64,6 +71,9 @@ class Topic:
     fields: tuple[str, ...]
     about: str                   # what to ask, for the model
     scripted: dict[str, str]     # fallback question per language
+    # Vision-profile survey topics: their fields are picked up whenever the customer mentions them, but they are
+    # never asked here (the interview keeps its 8-question limit; the phone's survey asks what is still open).
+    optional: bool = False
 
 
 # Ask order = priority. red_flags is placed at RED_FLAG_POSITION by the tracker, whatever its place here.
@@ -103,6 +113,17 @@ BUILTIN_TOPICS: list[Topic] = [
     Topic("outdoor_indoor", ("outdoorWork",), "whether they mostly work outdoors in the sun or indoors",
           {"en-IN": "Do you mostly work outside in the sun, or indoors?",
            "hi-IN": "क्या आप ज़्यादातर बाहर धूप में काम करते हैं, या अंदर?"}),
+    # Vision-profile survey topics: last in priority, so they are asked only when questions are left; whatever the
+    # customer says about them at any point is still picked up and the phone's survey skips it.
+    Topic("driving", ("driveFrequency", "glareOncoming"), "how often they drive or ride (daily, weekly, now and then, never) and whether oncoming headlights dazzle them",
+          {"en-IN": "How often do you drive or ride, and do oncoming headlights dazzle you?",
+           "hi-IN": "आप कितनी बार गाड़ी या बाइक चलाते हैं, और क्या सामने की लाइट से आँखें चौंधियाती हैं?"}, optional=True),
+    Topic("sun_time", ("outdoorHours", "indoorOutdoor"), "how many hours a day they are outdoors in the sun",
+          {"en-IN": "How many hours a day are you out in the sun?",
+           "hi-IN": "आप रोज़ कितने घंटे धूप में रहते हैं?"}, optional=True),
+    Topic("work_day", ("workHours", "screenHoursDay"), "how many hours a day they work or study, and how many of them at a screen",
+          {"en-IN": "How many hours a day do you work, and how many of them at a screen?",
+           "hi-IN": "आप रोज़ कितने घंटे काम करते हैं, और उनमें से कितने घंटे स्क्रीन पर?"}, optional=True),
 ]
 # The app's question file: same topics for the phone's scripted questions and the AI interview.
 DEFAULT_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "app", "app", "src", "main", "assets",
@@ -121,7 +142,7 @@ def load_topics(path: Optional[str] = None) -> list[Topic]:
         with open(p, encoding="utf-8") as f:
             raw = json.load(f)["aiTopics"]
         topics = [Topic(str(t["id"]), tuple(t["fields"]), str(t["about"]),
-                        {k: str(t["scripted"][k]) for k in LANGUAGES}) for t in raw]
+                        {k: str(t["scripted"][k]) for k in LANGUAGES}, bool(t.get("optional", False))) for t in raw]
     except (OSError, KeyError, TypeError, ValueError):
         return list(BUILTIN_TOPICS)
     ids = [t.id for t in topics]
@@ -276,7 +297,7 @@ class CoverageTracker:
         return any(self.answers.get(f) is True for f in RED_FLAG_FIELDS)
 
     def missing(self) -> list[str]:
-        return [t.id for t in TOPICS if not self.covered(t.id)]
+        return [t.id for t in TOPICS if not t.optional and not self.covered(t.id)]
 
     def next_topic(self, assume_done: Optional[str] = None) -> Optional[str]:
         """The topic for the next question, or None to stop. [assume_done]: treat this topic as answered (planning)."""
@@ -291,7 +312,7 @@ class CoverageTracker:
         # Ends when every topic is covered or asked twice. With 11 topics that takes at least MIN_QUESTIONS unless
         # the customer answered several topics at once; then there is nothing left to ask.
         for t in TOPICS:
-            if t.id != "red_flags" and not done(t.id):
+            if t.id != "red_flags" and not t.optional and not done(t.id):
                 return t.id
         return "red_flags" if red_pending else None   # never stop before the red-flag question
 
@@ -304,7 +325,7 @@ class CoverageTracker:
             self.red_flag_unclear = True
 
     def expected_total(self) -> int:
-        remaining = sum(1 for t in TOPICS if not self.done(t.id))
+        remaining = sum(1 for t in TOPICS if not t.optional and not self.done(t.id))
         return max(MIN_QUESTIONS, min(MAX_QUESTIONS, self.asked + remaining))
 
 

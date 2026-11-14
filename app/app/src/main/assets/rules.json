@@ -404,5 +404,94 @@
     "distanceHoursNightDriving": 1.0,
     "distanceHoursBySituation": { "DRIVING": 2.0, "TV": 2.0, "SIGNBOARDS": 1.0, "CLASSROOM_BOARD": 3.0, "OTHER": 0.5 },
     "dominantMinShare": 0.45
+  },
+
+  "safety": {
+    "_comment": "Phase A safety rules. Everyone gets the full check and the report always goes to the optometrist. A red flag = no lens suggestion, report marked URGENT. Emergency signs = short path (power of each eye + grid only), then urgent referral. Under childUnderAge with any minus power (SE at or below childMyopiaFromSeD) = referral only, tag CHILD_MYOPIA. DRAFT: optometrist review needed.",
+    "emergencySigns": ["SUDDEN_VISION_LOSS", "CURTAIN_SHADOW", "NEW_FLASHES"],
+    "unspecifiedIsEmergency": true,
+    "childUnderAge": 18,
+    "childMyopiaFromSeD": -0.25,
+    "shortPathSteps": ["POWER", "AMSLER"],
+    "shortPathMinutes": 2
+  },
+
+  "lensAssisted": {
+    "_comment": "Phase B over-refraction. Power = -1/d: for a strong eye the blur point is very close and 1 cm is about 0.18 D at -4.25 D. From triggerSeD (blur point under about 27 cm) staff hold a known minus lens about suggestOffsetD weaker (rounded towards the weaker lens to suggestStepD: -4.25 -> -2.00, -6.00 -> -4.00) and the test is repeated through it. Total = lens (vertex-corrected from vertexFromAbsD for a vertexDistanceM hold) + residual. No blur point within maxReachM = lens too strong, use a weaker one. From highMyopiaBeyondSeD the optometrist must confirm.",
+    "triggerSeD": -3.75,
+    "suggestOffsetD": 2.0,
+    "suggestStepD": 0.5,
+    "lensStepD": 0.25,
+    "vertexFromAbsD": 4.0,
+    "vertexDistanceM": 0.012,
+    "maxReachM": 0.60,
+    "highMyopiaBeyondSeD": -8.0,
+    "maxLensAbsD": 20.0,
+    "rangeHalfWidthD": 0.25
+  },
+
+  "screening": {
+    "_comment": "Phase C screening tests (one eye at a time, camera distance gate, full brightness). Screening, not a diagnosis. Amsler: squareMm squares, squares x squares, at distanceMm (a 10 cm grid at 30 cm; on a narrower screen whole columns are left out and the report says so). Contrast: letters of letterLogMar, steps in percent, passCorrect of trialsPerStep to pass a step; Normal when the lowest step passed is at or below normalMaxPercent. Colour: our own generated dot plates; palettes are RGB hex (figure colours, background colours).",
+    "amsler": { "distanceMm": 300.0, "minMm": 270.0, "maxMm": 330.0, "squareMm": 5.0, "squares": 20, "minColumns": 8 },
+    "contrast": {
+      "letterLogMar": 0.5, "minMm": 300.0, "maxMm": 500.0,
+      "stepsPercent": [100.0, 50.0, 25.0, 12.5, 6.0, 3.0, 1.5],
+      "trialsPerStep": 3, "passCorrect": 2, "choices": 4,
+      "normalMaxPercent": 3.0, "eyeHealthNoteFromAge": 50
+    },
+    "colour": {
+      "controlPlates": 1, "redGreenPlates": 5, "blueYellowPlates": 2,
+      "redGreenFailFrom": 2, "blueYellowFailFrom": 1,
+      "dots": 1100, "minDotRadius": 0.012, "maxDotRadius": 0.030, "plateMm": 60.0,
+      "palettes": {
+        "CONTROL": { "figure": ["#D9622B", "#E0763A", "#C9541F"], "background": ["#7C8FA6", "#8FA3BA", "#6D7F96"] },
+        "RED_GREEN": { "figure": ["#C8804A", "#D08F5E", "#B87340"], "background": ["#8F9A4A", "#9FA85C", "#808B40"] },
+        "BLUE_YELLOW": { "figure": ["#7A7FC0", "#8A8ECC", "#6C70B0"], "background": ["#6F9E96", "#7FADA5", "#629088"] }
+      }
+    }
+  },
+
+  "visionProfile": {
+    "_comment": "Phase E profile rings (score 0-100 and a label). Work: share of near work from the activities (weights 0 = distance, 1 = near). Digital: screen hours a day. Mobility: how often the person drives or rides. Leisure: outdoor hours plus an activity bonus. Starting values: review with pilot data.",
+    "work": {
+      "nearWeights": { "DESKTOP": 0.75, "MEETINGS": 0.45, "READING_WRITING": 1.0, "FINE_HANDWORK": 1.0, "FIELD_FARM": 0.10 },
+      "defaultScore": 50, "nearFocusedFrom": 60, "distanceFocusedBelow": 40
+    },
+    "digital": { "connectedFromHours": 3.0, "nativeAboveHours": 6.0, "fullScaleHours": 10.0 },
+    "mobility": { "scores": { "NEVER": 5, "MONTHLY": 30, "WEEKLY": 65, "DAILY": 100 }, "sensitiveFrom": "SOMETIMES" },
+    "leisure": {
+      "mediumFromHours": 1.0, "highFromHours": 3.0, "fullScaleHours": 6.0,
+      "activityBonus": { "OUTDOOR_SPORT": 15, "WATER": 15, "FARMING_FIELD": 20, "CITY": 0 }
+    }
+  },
+
+  "lensEngine": {
+    "_comment": "Phase E lens engine. The products, their texts, 'why' lines and links come from lens_catalog.json; the numbers of its 'trigger' rules (Drishti Saathi's own, not ZEISS's) are here. Output is always labelled 'Suggested ZEISS lens family - optician confirms'.",
+    "singleVisionUnderAge": 30,
+    "antiFatigueFromAge": 30,
+    "antiFatigueToAge": 44,
+    "progressiveFromAge": 45,
+    "nearAddFromD": 0.75,
+    "screenHoursFrom": 4.0,
+    "symptomFrom": "SOMETIMES",
+    "officeDeskHoursFrom": 6.0,
+    "officeFromAge": 40,
+    "photoFusionOutdoorHoursFrom": 2.0,
+    "childUnderAge": 18,
+    "driveFrequencies": ["DAILY", "WEEKLY"],
+    "driveSafeMainFrequencies": ["DAILY"],
+    "digitalLifestyleFromHours": 3.0,
+    "veryBrightOutdoorHoursFrom": 6.0,
+    "maxSecondPairs": 2,
+    "defaultBudget": "MID",
+    "fallbackScreenHours": { "H0_2": 1.0, "H2_4": 3.0, "H4_PLUS": 6.0 },
+    "fallbackOutdoorWorkHours": 5.0,
+    "fallbackOfficeDeskHours": 7.0,
+    "names": {
+      "clearview": "ZEISS ClearView", "light2": "ZEISS Light 2", "smartlife": "ZEISS SmartLife",
+      "clearmind": "ZEISS ClearMind", "drivesafe": "ZEISS DriveSafe", "smartlife_young": "ZEISS SmartLife Young",
+      "sun_polarised": "ZEISS polarised sun lenses", "sun_adaptivesun": "ZEISS AdaptiveSun",
+      "sun_tint": "ZEISS sun tints", "sun_mirror_flash": "ZEISS DuraVision Mirror / Flash", "sun_skylet": "ZEISS Skylet"
+    }
   }
 }

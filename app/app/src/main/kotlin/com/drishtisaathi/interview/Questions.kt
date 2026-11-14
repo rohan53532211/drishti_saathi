@@ -106,6 +106,8 @@ data class ChoiceContext(val budgetLowCap: Int, val budgetMidCap: Int)
     val voiceKeywords: JsonObject,
     /** Topics the backend's AI interview covers (read by backend/app/anamnesis.py). */
     val aiTopics: JsonArray,
+    /** The vision-profile survey (sections, questions, skip rules), read by the engine's Survey. */
+    val survey: com.drishtisaathi.engine.profile.SurveyFile,
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = false }
@@ -119,6 +121,8 @@ object QuestionBank {
     @Volatile var loader: () -> String = { java.io.File("src/main/assets/$ASSET").readText(Charsets.UTF_8) }
     val text: String by lazy { loader() }
     val file: QuestionsFile by lazy { QuestionsFile.parse(text) }
+    /** The survey block, checked once (unknown sections, rule targets, options). */
+    val survey: com.drishtisaathi.engine.profile.SurveyFile by lazy { file.survey.also { it.validate() } }
 }
 
 /**

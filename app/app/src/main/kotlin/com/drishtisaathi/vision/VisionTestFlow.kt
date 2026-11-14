@@ -76,6 +76,10 @@ fun VisionTestFlow(
     debugDistance: FakeDistanceProvider? = distance as? FakeDistanceProvider,
     farPoint: Boolean = true,
     nearPoint: Boolean = true,
+    /** Runs exactly these steps instead of the full plan (screening stage: E test and clock dial). */
+    stepsOverride: List<VisionStep>? = null,
+    /** Results known before this flow starts (the power check's far points, so the dial is placed from them). */
+    initialSession: VisionSession? = null,
 ) {
     val cfg = rules.visionTests
     val simulated = distance is FakeDistanceProvider
@@ -94,11 +98,11 @@ fun VisionTestFlow(
     val env = remember(lang, rules, scale, onInstruction) { TestEnv(lang, rules, scale, onInstruction) }
     val wd = workingDistanceM ?: env.vm.workingDistanceM(occupation)
 
-    val steps = remember(age, rules, farPoint, nearPoint) { VisionFlowPlan.steps(age, rules, farPoint, nearPoint) }
+    val steps = remember(age, rules, farPoint, nearPoint, stepsOverride) { stepsOverride ?: VisionFlowPlan.steps(age, rules, farPoint, nearPoint) }
     var index by remember { mutableIntStateOf(0) }
     var phase by remember { mutableStateOf(Phase.INTRO) }
     var run by remember { mutableIntStateOf(0) }
-    var session by remember { mutableStateOf(VisionSession(simulatedDistance = simulated)) }
+    var session by remember { mutableStateOf((initialSession ?: VisionSession()).copy(simulatedDistance = simulated)) }
     val retries = remember { mutableStateMapOf<VisionStep, Int>() }
     val step = steps[index.coerceAtMost(steps.lastIndex)]
 

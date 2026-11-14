@@ -183,7 +183,7 @@ fun CatalogBrowser(
                 items(shown, key = { it.id }) { f ->
                     Card(
                         Modifier.clickable { onOpen(f) }, shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     ) {
                         Column(Modifier.padding(8.dp)) {
                             FrameThumb(f, thumb, Modifier.fillMaxWidth().aspectRatio(2.4f))
@@ -250,7 +250,7 @@ fun SavedAcrossSessions(
     androidx.compose.foundation.lazy.LazyColumn(modifier, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         groups.forEach { (sid, list) ->
             item(key = sid) {
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(S3D.savedSession.format(sid.toInt(), fmt.format(java.util.Date(sessionDates[sid] ?: 0L)))[l],
@@ -283,7 +283,7 @@ fun FrameCatalogueScreen(
     var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
     AppScaffold(l, onLang, title = S3D.frameCatalogue[l], onBack = onBack) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            androidx.compose.material3.TabRow(tab, containerColor = Color.White) {
+            androidx.compose.material3.TabRow(tab, containerColor = MaterialTheme.colorScheme.surface) {
                 androidx.compose.material3.Tab(tab == 0, { tab = 0 }, text = { Text(S3D.allFrames[l]) })
                 androidx.compose.material3.Tab(tab == 1, { tab = 1 }, text = { Text(S3D.savedFrames[l]) })
             }

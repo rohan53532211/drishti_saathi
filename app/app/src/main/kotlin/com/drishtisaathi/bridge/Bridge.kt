@@ -65,13 +65,29 @@ object BridgeProfile {
     private val json = Json { encodeDefaults = true; explicitNulls = false }
     private fun <T> enc(s: KSerializer<T>, v: T?): JsonElement = if (v == null) JsonNull else json.encodeToJsonElement(s, v)
 
-    fun build(state: UiState, rules: RulesConfig, consent: BridgeConsent, appVersion: String): JsonObject {
+    fun build(
+        state: UiState, rules: RulesConfig, consent: BridgeConsent, appVersion: String,
+        /** The profile rings and the lens suggestion (Phase E); null = not sent. */
+        view: com.drishtisaathi.profile.ProfileView? = null,
+    ): JsonObject {
         require(consent.complete) { "spoken and tapped consent are both required" }
         val r = requireNotNull(state.result) { "no result yet" }
         val a = r.assessment
         val adv = a.advice
         val answers = state.answers
+        val gate = com.drishtisaathi.engine.profile.Safety.gate(
+            answers, state.survey, rules.safety, state.quick, state.tests.takeIf { state.testsDone }, state.screening)
         return buildJsonObject {
+            // Phase A: how the optometrist's list marks and sorts this report; the red-flag reasons come first.
+            put("triage", buildJsonObject {
+                put("tag", gate.tag.name)
+                put("redFlags", kotlinx.serialization.json.JsonArray(gate.redFlags.map { JsonPrimitive(it.name) }))
+                put("redFlagReasons", kotlinx.serialization.json.JsonArray(gate.redFlags.map { JsonPrimitive(com.drishtisaathi.i18n.SProfile.redFlag(it).en) }))
+                put("emergency", gate.emergency)
+                put("childMyopia", gate.childMyopia)
+                put("lensSuggested", gate.lensAllowed)
+                if (gate.powerForOptometristOnly) put("powerLabel", com.drishtisaathi.i18n.SProfile.forOptometristOnly.en)
+            })
             put("consent", buildJsonObject {
                 put("consentAt", consent.consentAt); put("spoken", consent.spoken); put("tapped", consent.tapped)
                 put("textVersion", CONSENT_TEXT_VERSION)
@@ -104,6 +120,42 @@ object BridgeProfile {
                 put("screenTests", enc(com.drishtisaathi.engine.VisionTests.serializer(), state.tests.takeIf { state.testsDone }))
                 put("glassesOn", state.glassesOn)
             })
+            // Screening tests: the results in words (always under the label) and the raw results with the tapped grid squares.
+            state.screening?.let { sc ->
+                put("screening", buildJsonObject {
+                    put("label", com.drishtisaathi.i18n.SProfile.screeningLabel.en)
+                    put("lines", kotlinx.serialization.json.JsonArray(com.drishtisaathi.profile.ScreeningText.lines(state, rules).map {
+                        buildJsonObject { put("text", it.text.en); put("status", it.status.name) }
+                    }))
+                    put("results", enc(com.drishtisaathi.engine.profile.ScreeningResults.serializer(), sc))
+                })
+            }
+            if (view != null) {
+                put("visionProfile", buildJsonObject {
+                    view.profile.rings.forEach { (id, r) ->
+                        put(id.lowercase(), buildJsonObject {
+                            put("score", r.score); put("label", com.drishtisaathi.i18n.SProfile.ringLabel(r.label).en); put("answered", r.known)
+                        })
+                    }
+                    put("overall", view.profile.overall)
+                    put("nightGlareSensitive", view.profile.nightGlareSensitive)
+                })
+                put("lens", buildJsonObject {
+                    put("label", com.drishtisaathi.i18n.SProfile.lensLabel.en)
+                    put("suggested", view.plan.allowed)
+                    put("optometristConfirms", view.plan.optometristConfirms)
+                    put("ids", kotlinx.serialization.json.JsonArray(view.plan.ids.map(::JsonPrimitive)))
+                    put("items", kotlinx.serialization.json.JsonArray(view.plan.all.map { s ->
+                        buildJsonObject {
+                            put("kind", s.kind.name); put("id", s.id); put("product", s.name)
+                            put("why", kotlinx.serialization.json.JsonArray(com.drishtisaathi.profile.LensText.why(s).map { JsonPrimitive(it.en) }))
+                            s.url?.let { put("url", it) }
+                        }
+                    }))
+                    view.plan.referralInfo?.let { put("referralInfo", it.name) }
+                })
+                if (state.survey.values.isNotEmpty()) put("survey", enc(com.drishtisaathi.engine.profile.SurveyAnswers.serializer(), state.survey))
+            }
             put("estimates", buildJsonObject {
                 put("referralLevel", a.referral.level.name)
                 put("referralReasons", enc(ListSerializer(com.drishtisaathi.engine.ReferralReason.serializer()), a.referral.reasons))
@@ -112,12 +164,11 @@ object BridgeProfile {
                 put("material", adv?.materialId?.value?.let(::JsonPrimitive) ?: JsonNull)
                 put("coatings", enc(ListSerializer(com.drishtisaathi.engine.Coating.serializer()), adv?.coatings))
                 put("notes", enc(ListSerializer(com.drishtisaathi.engine.Note.serializer()), a.notes))
-                put("suggestedFrames", kotlinx.serialization.json.JsonArray(r.frames.take(5).map {
+                // a red flag or child myopia: nothing is suggested or sold, so no frames are listed either
+                put("suggestedFrames", kotlinx.serialization.json.JsonArray((if (gate.lensAllowed) r.frames.take(5) else emptyList()).map {
                     JsonPrimitive("${it.frame.id} · ₹${it.frame.priceInr}")
                 }))
-                if (a.referral.level == com.drishtisaathi.engine.ReferralLevel.URGENT) {
-                    put("suggestionsNote", com.drishtisaathi.i18n.SShop.afterDoctor.en)
-                }
+                if (!gate.lensAllowed) put("suggestionsNote", com.drishtisaathi.i18n.SProfile.noLensToday.en)
             })
         }
     }
@@ -140,8 +191,20 @@ object BridgeProfile {
     val advice: String? = null,
     val needsInPersonExam: Boolean? = null,
     val reviewedAt: Long? = null,
+    /** The power the optometrist confirmed or corrected, as written. */
+    val confirmedPower: ConfirmedPower? = null,
 ) {
     val reviewed: Boolean get() = status == "REVIEWED"
+
+    /** The advice with the confirmed power as its last line (stored and shown together, no extra column). */
+    fun adviceWithPower(label: (String) -> String): String? {
+        val p = confirmedPower?.line() ?: return advice
+        return listOfNotNull(advice, label(p)).joinToString("\n")
+    }
+}
+
+@Serializable data class ConfirmedPower(val right: String? = null, val left: String? = null, val add: String? = null) {
+    fun line(): String? = listOfNotNull(right?.let { "R $it" }, left?.let { "L $it" }, add?.let { "ADD $it" }).joinToString(" · ").ifBlank { null }
 }
 @Serializable data class BridgeHealth(val ok: Boolean, val tokenRequired: Boolean = false, val tokenOk: Boolean = true)
 

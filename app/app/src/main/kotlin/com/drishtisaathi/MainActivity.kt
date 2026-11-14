@@ -109,6 +109,9 @@ private object Routes {
     // Remote Optometrist Bridge
     const val BRIDGE_CONSENT = "bridgeConsent"
     const val BRIDGE_SETTINGS = "bridgeSettings"
+    // Vision profile: survey, the red banner, screening tests
+    const val SURVEY = "survey"
+    const val SCREENING = "screening"
 
     fun tryOn(frameId: String?) = "tryOn" + (frameId?.let { "?frame=$it" } ?: "")
 
@@ -176,15 +179,34 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         else computeAndShow()
     }
 
-    /** Face measurement for frame fit (card on the forehead first, optional). */
+    /** Camera distance + PD: face measurement (card on the forehead first, optional). */
     fun toFace() = nav.navigate(Routes.CARD) { popUpTo(Routes.LANGUAGE) }
 
+    // ---- Phase A: the red banner comes first, the check continues behind it ----
+    /** Red flags the banner has already been shown for in this session. */
+    var bannerFor by remember { mutableStateOf(emptyList<com.drishtisaathi.engine.profile.RedFlag>()) }
+    /** The banner is up (over whatever screen is open); the value is what runs after "Continue the check". */
+    var afterBanner by remember { mutableStateOf<(() -> Unit)?>(null) }
+    /** Shows the red banner when a red flag was found that it has not been shown for yet, then [next]. */
+    fun withBanner(next: () -> Unit) {
+        val gate = vm.safety()
+        if (gate.urgent && !bannerFor.containsAll(gate.redFlags)) {
+            bannerFor = gate.redFlags
+            afterBanner = next
+        } else next()
+    }
+
     /**
-     * After the eye check: precision mode → the results; everyone else (urgent cases too) → the face measurement
-     * for frame fit and the remaining questions, then the results (an urgent warning at the top).
+     * After the screening tests: precision mode and the emergency short path → the results; everyone else → the
+     * remaining questions, then the results (the urgent banner at the top when there is a red flag).
      */
+    fun afterScreening() = withBanner {
+        if (vm.state.value.precision || vm.safety().emergency) computeAndShow() else toLater()
+    }
+
+    /** After the power of each eye: the screening tests (the grid first). */
     fun afterEyeCheck() {
-        if (vm.state.value.precision) { vm.skipCapture(); computeAndShow() } else toFace()
+        nav.navigate(Routes.SCREENING)
     }
 
     // ---- power path ----
@@ -211,8 +233,21 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
     }
 
-    /** CORE questions done: the power question's path and the eye check, also after a red flag (no early end). */
-    fun afterCore() = startPowerPath()
+    /** After the survey: emergency signs → the short path (power of each eye, then the grid); else camera distance + PD first. */
+    fun afterSurvey() = withBanner {
+        if (vm.safety().emergency) { vm.skipCapture(); startPowerPath() } else toFace()
+    }
+
+    /** After the face measurement: the power of each eye. */
+    fun afterFace() = startPowerPath()
+
+    /**
+     * CORE questions done: a red flag shows the red banner first; then the vision-profile survey (for emergency
+     * signs only "which signs"), camera distance + PD, power of each eye, screening tests.
+     */
+    fun afterCore() = withBanner {
+        if (vm.nextSurveyQuestion() != null) nav.navigate(Routes.SURVEY) else afterSurvey()
+    }
 
     /** Precision mode: consent first, then the same eye check and the same results, saved as a session. */
     var precisionRun by remember { mutableStateOf(false) }
@@ -222,12 +257,18 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.HOME) {
             HomeScreen(
                 state, vm::setLang,
-                onStart = { precisionRun = false; vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
+                onStart = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onHistory = { nav.navigate(Routes.HISTORY) },
                 onShopTools = { vm.avatarStaffDefault = true; nav.navigate(Routes.SHOP_TOOLS) },
                 setupDone = setupDone,
                 onSetup = { nav.navigate(Routes.PHONE_SETUP) },
+                onFrames = { vm.avatarStaffDefault = true; vm.loadCatalog3D(); nav.navigate(Routes.FRAME_CATALOGUE) },
+                bridgeOnline = vm.bridgeOnline.collectAsStateWithLifecycle().value,
+                queued = vm.reportQueue.pending.collectAsStateWithLifecycle().value,
+                onBridgeChip = { vm.flushReports() },
             )
+            // while Home is open: check the backend and send queued reports every 20 s
+            androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { vm.flushReports(); kotlinx.coroutines.delay(20_000) } }
         }
         composable(Routes.SHOP_TOOLS) {
             ShopToolsScreen(
@@ -269,14 +310,14 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             DiagnosticsScreen(
                 state.lang, vm::setLang,
                 onCamera = { nav.navigate(Routes.CAMERA_DEBUG) },
-                onPrecision = { precisionRun = true; vm.startNew(); nav.navigate(Routes.CONSENT) },
+                onPrecision = { precisionRun = true; bannerFor = emptyList(); vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onAlign3D = { vm.loadCatalog3D(); nav.navigate(Routes.live3d(null, debug = true)) },
                 onBack = { nav.popBackStack() },
             )
         }
         composable(Routes.CONSENT) {
             ConsentScreen(
-                state.lang, vm::setLang,
+                state.lang, vm::setLang, speak = { voice.instructionSpeaker.speak(it, state.lang) },
                 onContinue = {
                     vm.giveConsent()
                     if (precisionRun) {
@@ -362,6 +403,29 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onContinue = { fellBack -> leave(fellBack) },
             )
         }
+        composable(Routes.SURVEY) {
+            com.drishtisaathi.profile.SurveyScreen(
+                state.lang, vm.surveyFile, state.answers, state.survey,
+                sections = vm::surveySections,
+                onAnswer = vm::answerSurvey,
+                onDone = { afterSurvey() },
+                onBack = { nav.popBackStack() },
+                voice = voice,
+            )
+        }
+        composable(Routes.SCREENING) {
+            val l = state.lang
+            val emergency = androidx.compose.runtime.remember { vm.safety().emergency }
+            var finished by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+            if (!finished) com.drishtisaathi.ui.LightTheme { com.drishtisaathi.profile.CameraScreeningFlow(
+                l, vm.rules, vm.calibration, state.answers, state.quick, emergency,
+                onDone = { r -> finished = true; vm.setScreening(r); afterScreening() },
+                onSkip = { finished = true; vm.setScreening(null); afterScreening() },
+                modifier = Modifier.fillMaxSize(), voice = voice,
+                speak = { voice.instructionSpeaker.speak(it, l) },
+                allowDemoWithoutCamera = state.demo || state.precision,
+            ) }
+        }
         composable(Routes.OLD_NUMBERS) {
             OldNumbersScreen(
                 state.lang, state.answers.knownRx, vm::setLang,
@@ -391,7 +455,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             val l = state.lang
             val primary = entry.arguments?.getBoolean("primary") ?: true
             val plan = androidx.compose.runtime.remember { vm.eyeCheckPlan() }
-            StepFrame(l, vm::setLang, SShop.eyeCheckTitle[l], onBack = { nav.popBackStack() }) {
+            com.drishtisaathi.profile.ImmersiveMode()
+            com.drishtisaathi.ui.LightTheme { StepFrame(l, vm::setLang, SShop.eyeCheckTitle[l], onBack = { nav.popBackStack() }) {
                 CameraQuickEstimateFlow(
                     l, vm.rules, vm.calibration, plan, state.answers, primary,
                     onDone = { q -> vm.setQuick(q); finishPowerPath() },
@@ -403,8 +468,10 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     allowDemoWithoutCamera = state.demo || state.precision,
                     // Staff / device checks: the far letters' size line
                     debug = state.precision || state.demo,
+                    // learning loop: in lens-assisted mode the phone-model correction applies to the residual only
+                    deviceFit = vm.deviceFit.collectAsStateWithLifecycle().value.takeIf { !state.demo && vm.rules.deviceCorrection.enabled },
                 )
-            }
+            } }
         }
         composable(Routes.EDIT) {
             ConfirmScreen(
@@ -433,7 +500,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 FaceCaptureScreen(
                     l, vm.rules.camera,
                     onDone = { frames -> vm.setCapture(frames); nav.navigate(Routes.CAPTURE_OUTCOME) },
-                    onSkip = { vm.skipCapture(); toLater() },
+                    onSkip = { vm.skipCapture(); afterFace() },
                     modifier = Modifier.fillMaxSize(),
                     speaker = voice.instructionSpeaker,
                 )
@@ -441,11 +508,11 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         composable(Routes.CAPTURE_OUTCOME) {
             val status = state.captureStatus
-            if (status == null) androidx.compose.runtime.LaunchedEffect(Unit) { toLater() }
+            if (status == null) androidx.compose.runtime.LaunchedEffect(Unit) { afterFace() }
             else CaptureOutcomeScreen(
                 state.lang, vm::setLang, status,
                 onRetry = { nav.navigate(Routes.CAPTURE) { popUpTo(Routes.CAPTURE) { inclusive = true } } },
-                onContinue = { toLater() },
+                onContinue = { afterFace() },
             )
         }
 
@@ -457,8 +524,24 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             )
         }
         composable(Routes.RESULT) {
+            val gate = androidx.compose.runtime.remember(state.answers, state.survey, state.quick, state.tests, state.screening) { vm.safety(state) }
+            val resultView = androidx.compose.runtime.remember(state.answers, state.survey, state.quick, state.tests, state.screening, state.result) { vm.profileView(state) }
+            val online by vm.bridgeOnline.collectAsStateWithLifecycle()
+            val resultContext = LocalContext.current
+            val qrText = androidx.compose.runtime.remember(resultView, state.remote, online, state.sessionId) {
+                com.drishtisaathi.profile.QrPayload.content(state, resultView, vm.rules, vm.appVersion, online)
+            }
             ResultScreen(
-                state, vm.rules, vm::setLang,
+                state, vm.rules, vm::setLang, gate = gate,
+                view = resultView,
+                qr = qrText to (online && state.remote != null),
+                onShareImage = {
+                    val title = S.appName[state.lang] + " · " + com.drishtisaathi.profile.QrPayload.caseId(state)
+                    runCatching {
+                        val lines = com.drishtisaathi.profile.QrPayload.shareLines(state, resultView, vm.rules).map { it[state.lang] }
+                        com.drishtisaathi.profile.ShareImage.share(resultContext, com.drishtisaathi.profile.ShareImage.render(resultContext, title, lines, qrText), state.sessionId, title)
+                    }.onFailure { Toast.makeText(resultContext, com.drishtisaathi.i18n.SProfile.shareFailed[state.lang], Toast.LENGTH_LONG).show() }
+                },
                 onSaveVerification = vm::saveVerification,
                 onDelete = { vm.deleteCurrentSession { goHome() } },
                 onDone = { goHome() },
@@ -487,9 +570,11 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onTry3D = { vm.loadCatalog3D(); nav.navigate(Routes.CATALOG3D) },
                 remoteCard = {
                     val bridge by vm.bridgeSettings.config.collectAsStateWithLifecycle()
+                    val queued by vm.reportQueue.pending.collectAsStateWithLifecycle()
                     RemoteReviewCard(
-                        state, configured = bridge.isValid,
-                        onSend = { vm.clearBridgeError(); nav.navigate(Routes.BRIDGE_CONSENT) },
+                        state, configured = bridge.isValid, queued = queued > 0 && state.remote == null,
+                        // the consent given at the start covers the report: "send" only retries the queue now
+                        onSend = { vm.clearBridgeError(); vm.flushReports() },
                         onCheck = { vm.checkReview() },
                         onPoll = { vm.checkReview(silent = true) },
                     )
@@ -678,6 +763,15 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onBack = { nav.popBackStack() },
             )
         }
+    }
+    // Phase A: the red banner comes first, over whatever screen is open; the check continues behind it.
+    afterBanner?.let { next ->
+        androidx.activity.compose.BackHandler { }
+        val gate = androidx.compose.runtime.remember(state.answers, state.survey, state.screening) { vm.safety() }
+        com.drishtisaathi.profile.RedFlagBannerScreen(
+            state.lang, gate, speak = { voice.instructionSpeaker.speak(it, state.lang) },
+            onContinue = { afterBanner = null; next() },
+        )
     }
     if (state.demo) DemoBadge(state.lang, Modifier.align(androidx.compose.ui.Alignment.TopCenter))
     }

@@ -30,9 +30,9 @@ object PdfExporter {
     }
 
     fun write(context: Context, blocks: List<Block>, file: File, thumbs: Map<String, android.graphics.Bitmap> = emptyMap()): File {
-        // Same bundled Noto font as the screens, so the PDF does not depend on the phone's font either.
-        val regular = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.noto_regular) ?: Typeface.DEFAULT
-        val boldFace = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.noto_bold) ?: Typeface.DEFAULT_BOLD
+        // Same bundled font (Inter + Noto Sans Devanagari) as the screens, so the PDF does not depend on the phone's font either.
+        val regular = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.inter_deva_regular) ?: Typeface.DEFAULT
+        val boldFace = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.inter_deva_bold) ?: Typeface.DEFAULT_BOLD
         val doc = PdfDocument()
         var pageNo = 0
         var page: PdfDocument.Page? = null
@@ -93,6 +93,27 @@ object PdfExporter {
                 c.drawText(b.name, tx, y + 14f, pName)
                 c.drawText(b.line, tx, y + 29f, pLine)
                 y += rowH + 4f
+            }
+            is Block.Rings -> {
+                val rowH = 62f
+                if (y + rowH > PAGE_H - MARGIN) newPage()
+                val c = page!!.canvas
+                val cell = CONTENT_W / b.rings.size.coerceAtLeast(1).toFloat()
+                b.rings.forEachIndexed { i, r ->
+                    val cx = MARGIN + i * cell + 22f; val cy = y + 24f; val rad = 17f
+                    val oval = android.graphics.RectF(cx - rad, cy - rad, cx + rad, cy + rad)
+                    val col = Color.rgb((r.rgb shr 16) and 0xFF, (r.rgb shr 8) and 0xFF, r.rgb and 0xFF)
+                    val track = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6f; color = Color.rgb(227, 232, 239) }
+                    c.drawArc(oval, 0f, 360f, false, track)
+                    if (r.score >= 0) c.drawArc(oval, -90f, 360f * r.score / 100f, false,
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6f; strokeCap = Paint.Cap.ROUND; color = col })
+                    val num = paint(9f, true, Tone.NORMAL).apply { textAlign = Paint.Align.CENTER }
+                    c.drawText(if (r.score >= 0) r.score.toString() else "–", cx, cy + 3f, num)
+                    c.drawText(r.title, cx + rad + 8f, cy - 3f, paint(10f, true, Tone.NORMAL))
+                    val label = paint(8.5f, false, Tone.MUTED)
+                    c.drawText(android.text.TextUtils.ellipsize(r.label, label, cell - 2 * rad - 16f, android.text.TextUtils.TruncateAt.END).toString(), cx + rad + 8f, cy + 10f, label)
+                }
+                y += rowH
             }
             Block.Rule -> {
                 if (y + 12 > PAGE_H - MARGIN) newPage()

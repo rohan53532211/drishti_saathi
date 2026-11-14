@@ -117,6 +117,31 @@ object PowerRange {
 
     /** Two readings of one eye (the one automatic repeat): the mean vergence. */
     fun farEyeMedian(aMm: Double, bMm: Double): QuickEye = farEye(2.0 / (1.0 / aMm + 1.0 / bMm))
+
+    /**
+     * Lens-assisted mode: [first] is the first pass without a lens, [through] the same test repeated through a minus
+     * lens of [lensD]. Total = lens (vertex-corrected from 4 D) + residual; [fit] (this phone model's correction)
+     * changes the residual only. Null = the letters stayed sharp at every distance: the lens is too strong.
+     */
+    fun lensAssistedEye(
+        first: QuickEye, through: QuickEye, lensD: Double, cfg: com.drishtisaathi.engine.config.LensAssistedConfig,
+        fit: com.drishtisaathi.engine.vision.DeviceFit? = null,
+    ): QuickEye? {
+        val cm = through.blurAtCm?.takeIf { !through.noMyopiaAtReach && it > 0 }
+        val raw = cm?.let { -100.0 / it }
+        val t = (com.drishtisaathi.engine.profile.LensAssisted.total(lensD, raw, cfg, fit)
+            as? com.drishtisaathi.engine.profile.LensAssisted.Outcome.Measured)?.total ?: return null
+        return QuickEye(
+            t.totalD, cm, through.target, rangeFromD = t.rangeFromD, rangeToD = t.rangeToD,
+            method = com.drishtisaathi.engine.profile.PowerMethod.LENS_ASSISTED,
+            lensD = lensD, residualD = t.residualD, residualRawD = raw, unaidedSeD = first.seD, highMyopia = t.highMyopia,
+        )
+    }
+
+    /** The first pass kept as it is (no lens available): only the high-myopia note is added. */
+    fun unaided(first: QuickEye, cfg: com.drishtisaathi.engine.config.LensAssistedConfig): QuickEye =
+        first.copy(method = com.drishtisaathi.engine.profile.PowerMethod.UNAIDED,
+            highMyopia = com.drishtisaathi.engine.profile.LensAssisted.highMyopia(first.seD, cfg))
 }
 
 /**

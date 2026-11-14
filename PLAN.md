@@ -204,6 +204,130 @@ Full flow wired: consent → interview → confirm → forehead card (optional) 
 - Two backend failures in a row, or a permanent one (no key, wrong token, no server), switch to the standard interview with the answers so far.
 - The transcript (text only) is stored in the session's measurements JSON (`aiInterview`). It appears only in staff mode on the summary and on the shop PDF. It is never on the customer copy and never in the optometrist profile, and it is deleted with the session.
 
+## Vision profile branch (`feature/vision-profile`, from `feature-3d-avatar`, 14 Nov 2026)
+
+Rules for this branch: push only `feature/vision-profile`; thresholds live in `rules.json` or `lens_catalog.json`; Gradle runs with `--no-daemon --max-workers=2 -Xmx2g`.
+
+| Phase | What | Status |
+|---|---|---|
+| A | Safety rules: full check for everyone, red flags, emergency short path, child myopia, report always queued for the optometrist | Done |
+| B | Lens-assisted mode (over-refraction) for strong minus powers | Done |
+| C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Done |
+| D | Survey upgrade (sections, skip logic, "Why we ask") | Done |
+| E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | Done |
+| F | Premium UI redesign (tokens, fonts, all screens) | Done (see the limits below) |
+| G | QR, WhatsApp share, PDF additions, backend page | Done |
+| H | All tests, APK, README, architecture doc | Done |
+
+### Phase A: safety rules (done)
+- **Order of the check:** core questions → (red banner if a red flag) → vision-profile survey → camera distance + PD → power of each eye → screening tests → remaining questions → results. Before this branch the power came before the PD.
+- **Red flags** (`engine/profile/Safety.kt`, `rules.json` → `safety`): sudden loss of vision, eye pain or redness, new flashes, new floaters, curtain or shadow, double vision, wavy or missing lines on the grid.
+  - The two red-flag questions stay where they were (question 3 in the AI interview). After a "yes" the survey asks "which of these?" (`redFlagSigns`); the survey's Digital section asks about double vision.
+  - A "yes" without that follow-up is kept as "unspecified" and counts as an emergency.
+- **When a red flag is found:**
+  - a red banner comes first: "Please see an eye doctor today" with the reasons, in Hindi or English, spoken;
+  - the check continues, no lens or frame is suggested, the power is labelled "For the optometrist only";
+  - the report is tagged URGENT with the reasons first (`triage` block of the profile).
+- **Emergency signs** (sudden vision loss, curtain / shadow, new flashes): short path only (power of each eye + grid), then the results.
+- **Under 18 with any minus power:** the power is measured, no lens choice, "Get your child checked by an optometrist (myopia control)", tag CHILD_MYOPIA. Under 18 without myopia may get a lens family, labelled "optometrist confirms" (phase E).
+- **The report is always sent** (`bridge/ReportQueue.kt`): every finished session is queued at once and sent when the backend answers (app start, after each result, "Send to optometrist"). The queue holds session ids only and survives restarts. The consent at the start of the session now says so, is read aloud, and covers the report; the separate send-consent screen is no longer used.
+- **Changed on purpose:** urgent sessions used to show lens and frame suggestions "for after the eye doctor visit". They no longer do (screen, both PDFs, optometrist report).
+- Tests: `SafetyTest`, `SurveyTest` (engine), `SafetyOutputTest` (app).
+
+### Phase B: lens-assisted mode (done)
+- **Why:** power = −1/d. At −4.25 D the blur point is at 23.5 cm, where 1 cm is about 0.18 D.
+- The first pass runs without a lens as before. From −3.75 D (`lensAssisted.triggerSeD`) the eye switches to lens-assisted mode.
+- Staff hold a known minus lens (trial lens or the customer's old glasses). The app suggests one about 2 D weaker, rounded towards the weaker lens to 0.5 D (−4.25 → −2.00, −6.00 → −4.00), and staff type the lens actually held on a number pad (0.25 D steps).
+- The blur-distance test is repeated through the lens. Total = lens + residual; from 4 D the lens gets the vertex correction for a 12 mm hold, Fe = F / (1 − 0.012·F).
+- Letters sharp at every distance through the lens: "Use a weaker lens", never a guess. "No lens here" keeps the first reading.
+- Stronger than −8 D: still measured through a lens, with "High myopia – optometrist must confirm; eye-health check advised".
+- Every output (result screen, shop PDF, optometrist report) states the method, e.g. "Measured through −2.00 D lens, residual −2.25 D, total −4.25 D (range −4.00 to −4.50)".
+- Learning loop: the phone-model correction is applied to the residual only; lens, residual (raw and rounded), first pass and method are stored with the session, and a verified lens-assisted eye gives a pair for the residual.
+- Tests: `LensAssistedTest` (engine), `LensAssistedFlowTest` (app).
+
+### Phase C: screening tests (done)
+- The screening stage runs after the power of each eye: full brightness, a note for staff to turn off Night light / Eye comfort mode, then one eye at a time with a live distance pill (green inside the range, amber outside), a 3-2-1 countdown and Skip on every test. System bars are hidden.
+- **Grid (Amsler):** squares of 5 real mm from the display dpi or the bank-card scale, centre dot, starts only at 27–33 cm. "Are any lines wavy, missing, blurred or broken?" by voice or tap; on yes the person taps the squares. Any yes is a red flag and the tapped squares are stored and sent.
+  - A phone screen is narrower than 10 cm, so whole columns are left out at the sides (e.g. 12 × 20 on a 66 mm screen); the squares are never scaled and the screen says which grid was shown.
+- **Contrast:** one Sloan letter at 0.5 logMAR for the measured distance, steps 100 / 50 / 25 / 12.5 / 6 / 3 / 1.5 %, 2 of 3 right passes a step. Result: lowest step passed, Normal (3 % or better) or Reduced. Reduced with age 50+ or low-light / glare complaints adds "Suggest cataract / eye-health check".
+- **Colour:** our own generated dot plates (`ColourPlates`, no copied test images): 1 control + 5 red-green + 2 blue-yellow, digit by voice or pad. Normal / possible red-green / possible blue-yellow, "confirm with optometrist" and "Ask about colour needs for driving licence/work". A missed control plate gives "Test not valid, repeat". Palettes are in `rules.json` and are not clinically validated.
+- **E test and clock dial:** the earlier screens run after the colour test; the dial is placed from the power check's far point.
+- All results show on the result screen (status dots), the shop PDF and the optometrist report under "Screening, not a diagnosis".
+- Emergency short path: the grid only.
+- Tests: `ScreeningTest` (engine), `ScreeningFlowTest` (app).
+
+### Phase D: survey upgrade (done)
+- `anamnesis_questions.json` → `survey`: 7 colour-coded sections (warning signs, about your eyes, work & daily life, screens, driving & travel, free time & sun, your wishes), 22 questions, each with a "Why we ask" line that is spoken when the customer taps the chip.
+- Kinds: never / sometimes / often (labelled slider), yes / no, single choice, multi-select, hours (slider with − / +). Voice or tap; numbers by tap only.
+- Skip rules look back only: the driving follow-ups are skipped for "never", the first-progressive question is for 45+, the "which signs" question appears only after a red flag, and emergency signs ask that one question only. Answers of a skipped block are dropped.
+- Age, first glasses, known power and budget stay in the core / later questions and are not asked again. The survey fills the older headache, screen-hours, outdoor-work and occupation questions, so nobody is asked twice. Planned time: 22 questions × 10 s, inside the 4-minute limit.
+- **Sarvam coverage tracker:** three optional topics (driving, sun time, work day) and their fields (`driveFrequency`, `glareOncoming`, `tiredEyes`, `indoorOutdoor`, `screenHoursDay`, `workHours`, `outdoorHours`). They are extract-only: picked up when the customer mentions them, never asked, so the interview keeps its 8 questions and the red-flag question stays question 3. The phone's survey then asks only what is still open.
+- Tests: `SurveyTest` (engine), `SurveyBridgeTest` (app), `test_survey_topics_are_optional_extract_only_and_never_asked` (backend).
+
+### Phase E: vision profile and lens engine (done)
+- **Rings** (`engine/profile/VisionProfile.kt`, `rules.json` → `visionProfile`), score 0–100 and a label each:
+  - Work: Near-focused / Balanced / Distance-focused (share of near work in the activities)
+  - Digital: Light / Connected / Digital Native (under 3, 3–6, over 6 screen hours)
+  - Mobility: Rarely / Weekly / Daily, plus "Night-glare sensitive"
+  - Leisure: Low / Medium / High Sun & UV Exposure
+  - a ring whose questions were not answered says "not answered" (never an invented score).
+- **Lens engine** (`engine/profile/LensEngine.kt`): reads the products, texts, "why" templates and links from `lens_catalog.json` (unchanged) and follows its selection order: safety gate → lens type → design → materials (UVProtect always) → coating → up to 2 second pairs. The numbers of the trigger rules are in `rules.json` → `lensEngine`.
+  - Each of the 27 catalogue entries has one trigger in `LensEngine.triggers`; a test fails when the catalogue and the engine differ.
+  - Budget: low → ClearView / Light 2 + Chrome; mid → SmartLife + Silver (Platinum for heavy screen users, AntiVirus Platinum UV for public-facing work); high → ClearMind (busy work or focus complaints) or SmartLife + Gold. An unknown budget counts as mid.
+  - DriveSafe is the main design for daily drivers with glare or poor low-light vision (with its own coating) and a second pair for weekly drivers. A reduced contrast test counts as poor low-light vision.
+  - Exclusions: never BlueProtect with BlueGuard (or PhotoFusion X, which contains it); PhotoFusion X only for outdoor hours + "one pair" wish, never for night glare; myopia management is a referral, never a lens.
+  - Our own choices where the catalogue leaves room: DriveSafe main vs second pair, one sun lens per customer (polarised first), a mid-budget progressive gets Light 2 only as a first progressive.
+- Each suggestion has the product name, what it does (catalogue text, English), 1–2 "Why for you" lines from this customer's answers (Hindi and English) and the ZEISS link. Label: "Suggested ZEISS lens family – optician confirms".
+- The result screen shows the rings card and the lens cards; the shop PDF and the optometrist report carry the rings, lens ids and reasons. Red flag or child myopia: rings stay, lens cards are replaced by the referral card.
+- Tests: `LensEngineTest` (one per trigger and exclusion, 5 personas: 25-year student, 35-year IT worker, 52-year shopkeeper who drives at night, 60-year farmer, 10-year child with −2.00), `ProfileViewTest`.
+
+### Phase F: UI redesign (done)
+- **Tokens** (`ui/Tokens.kt`, `ui/Theme.kt`): the colours from the brief (background #F7F9FC, surface #FFFFFF, hairline #E3E8EF, ink #0B1B2B, secondary ink #5A6B7D, primary #1A5CFF, success #1E9E6A, warning #E8A317, urgent #D93838; section colours Work #2F80ED, Digital #A3D33A, Mobility #6B7785, Leisure #F2A93B) and a full dark set. The app follows the phone's light / dark setting.
+  - Added for contrast: darker "ink" versions of success, warning and urgent for text on their soft tints. A test checks every text pair for 4.5:1 in both themes.
+  - The vision tests (power check, screening) always run in the light theme: black targets on white at full brightness.
+- **Fonts:** Inter (Latin) + Noto Sans Devanagari (Hindi), both OFL, merged into one TTF per weight (`res/font/inter_deva_*.ttf`, built by `tools/build_fonts.py`), because Compose does not fall back glyph by glyph inside one font family. Tabular figures are on everywhere. The glyph-coverage test still passes.
+- **Type and shape:** display 32 sp semibold, title 24 sp, body 18 sp, label 15 sp; cards 24 dp, buttons 16 dp, pill chips, hairline borders, a soft shadow only on hero cards, 24 dp screen padding.
+- **Home:** hero card "Start new customer", three tiles (Past sessions, Shop tools, Frames), bridge chip "Connected" / "Offline – queued N" (tap = try to send now; checked every 20 s while Home is open).
+- **Guided flow:** segmented progress bar and "Step n of m" in the interview and the survey; the survey has full-colour section intros, large answer cards with a haptic tick, labelled Never / Sometimes / Often sliders, a "Why we ask?" chip that opens a sheet and speaks, and a 72 dp floating mic with a pulsing ring. Steps slide and fade in 250 ms.
+- **Test screens:** system bars hidden, live distance pill (green inside the range, amber outside), 3-2-1 countdown, a drawn-in tick after each screening test.
+- **Result screen, top to bottom:** urgent banner (if any) → "Your Vision Profile" rings (900 ms draw-in) → Measurements card (power per eye in large numerals, range, method, PD, trial-lens start, screening with status dots) → lens card with a drawn lens (blue tint for BlueGuard, grey gradient for PhotoFusion X, amber edge for DriveSafe) and "Why for you" bullets → second-pair cards → frames → optometrist card → actions. The older detailed cards (functional profile, trial-lens bands, generic lens package) moved into "For the shop". Red flag or child myopia: the referral card replaces the lens cards.
+- **All older screens** take the new look through the shared scaffold, buttons and cards and the theme colours; their logic is unchanged.
+- **Limits:**
+  - Icons are drawn in code (mic, lens, tick, dots); the Material Symbols Rounded font is not bundled.
+  - The older screens were restyled through the shared components, not redesigned one by one; skeleton loaders were not added (the empty history has a friendly card).
+  - The interview keeps its existing voice strip; the 72 dp mic is on the survey.
+  - Nothing here has been seen on a phone yet: spacing at font scale 1.3 and the dark theme need a look on the S23 FE.
+- Tests: `DesignTokensTest`, `BundledFontTest`.
+
+### Phase G: outputs and bridge (done)
+- **QR** (ZXing core 3.5.3, Apache-2.0, encoding only): a QR card on the result screen.
+  - Report sent and backend reachable: the QR is the link `<server>/profiles/<id>`.
+  - Otherwise a compact JSON summary that needs no network: `caseId`, `ageBand`, `tag` (URGENT / CHILD_MYOPIA / ROUTINE), the 4 ring labels and scores, per-eye power range + method + lens used, PD, screening results, lens ids, `appVersion`. No name, photo or phone number; the exact age is not in it. About 600 bytes.
+- **WhatsApp share:** "Share on WhatsApp" opens a consent checkbox first, then shares a PNG of the summary (tag, rings, power ranges with the method, screening, lens family, the QR) to WhatsApp, or the phone's share sheet when WhatsApp is not installed. The file sits with the session's PDFs and is deleted with the session.
+- **Shop PDF:** the four rings drawn, the screening results under "Screening, not a diagnosis", the measurement method per eye, the lens cards with their reasons, and the referral block for red flags and child myopia.
+- **Backend 1.2** (`backend/app/main.py`, `static/index.html`):
+  - accepts `triage`, `visionProfile`, `screening`, `lens`, `survey` (older apps without them still work; the privacy rules cover them);
+  - tags every report URGENT / CHILD_MYOPIA / ROUTINE (an urgent referral level is always URGENT) and lists URGENT first, then child myopia, then routine, newest first inside each group;
+  - the optometrist page shows urgent cases in red with the red-flag reasons at the top, the rings, the phone measurement with its method, the screening lines with status dots, the grid with the squares the person tapped, and the lens suggestion with its reasons;
+  - the optometrist can confirm or correct the power (right, left, add) with the reply; the app shows it as the last line of the advice. Older databases get the new column at start.
+- Tests: `QrPayloadTest` (payload, QR read back, share lines, PDF rings, confirmed power), `backend/tests/test_vision_profile.py`.
+
+### Phase H: finish (done, 14 Nov 2026)
+- Tests: engine 375, app 370, backend 83, all passing (`--no-daemon --max-workers=2 -Xmx2g`).
+- Debug APK: `D:\drishti-data\drishti-vision-profile.apk` (85.7 MB, not in git).
+- `README.md` (features, safety rules, lens-assisted mode, screening tests, new flow) and `docs/ARCHITECTURE.md` (section 6) updated.
+
+### Vision profile branch: open items
+1. **Nothing on this branch has been tried on a phone.** First things to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
+2. Colour-plate palettes, contrast steps and the "Normal at 3 %" limit are our own starting values: an optometrist should review them. A phone display cannot guarantee low contrast levels.
+3. A phone screen is narrower than 10 cm, so the grid shows fewer columns than 20 (the rows are complete).
+4. Lens triggers are our own rules. Lens product descriptions on the cards are English only (the reasons are in Hindi too).
+5. Survey numbers (hours) are tap only; voice works for the choices.
+6. The profile survey is not editable from "Edit answers" after the results.
+7. The report is sent under the session's consent. Before real use this needs the same review as the bridge itself (DPDP, per-optometrist login).
+8. Icons are drawn in code; Material Symbols Rounded is not bundled. Older screens were restyled through shared components, not redesigned one by one.
+9. On this PC Gradle is sometimes refused access to its own build-output folders; clearing the named folder and running again works.
+
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
 2. Run the phone checklist:

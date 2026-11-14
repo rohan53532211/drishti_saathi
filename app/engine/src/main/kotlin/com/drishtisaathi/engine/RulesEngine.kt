@@ -224,7 +224,9 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
 
     /** Every measured eye (full test, or else the primary quick estimate) was still clear at arm's length. */
     private fun noMyopiaAnywhere(measured: List<MeasuredEye>, quick: QuickEstimate?): Boolean {
-        if (measured.isNotEmpty()) return measured.all { it.noMyopiaAtArmsLength }
+        // an eye with only a clock-dial result (screening stage) says nothing about the far point
+        val far = measured.filter { it.seD != null || it.noMyopiaAtArmsLength }
+        if (far.isNotEmpty()) return far.all { it.noMyopiaAtArmsLength }
         val q = quick?.takeIf { it.primary }?.eyes?.map { it.second }.orEmpty()
         return q.isNotEmpty() && q.all { it.noMyopiaAtReach }
     }

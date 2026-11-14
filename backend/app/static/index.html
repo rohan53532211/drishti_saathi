@@ -36,6 +36,19 @@
   .btn.secondary { background:none; color:var(--teal); border:1px solid var(--teal); }
   .note { border-left:3px solid var(--amber); padding:6px 10px; margin:8px 0; }
   .flag { border-left:3px solid var(--red); padding:6px 10px; margin:8px 0; color:var(--red); font-weight:600; }
+  .list button.urgentrow { border-left:4px solid var(--red); background:color-mix(in srgb, var(--red) 9%, transparent); }
+  .tag.urgentfill { background:var(--red); color:#fff; border-color:var(--red); font-weight:700; }
+  .tag.child { color:var(--amber); font-weight:700; }
+  .banner { background:var(--red); color:#fff; border-radius:10px; padding:12px 14px; margin:10px 0; font-weight:600; }
+  .banner ul { margin:6px 0 0 18px; padding:0; font-weight:500; }
+  .rings { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin:8px 0; }
+  .ring { display:flex; gap:10px; align-items:center; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; background:var(--muted); }
+  .dot.OK { background:#1e9e6a; } .dot.WATCH { background:#e8a317; } .dot.URGENT { background:var(--red); }
+  .lensitem { border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:6px 0; }
+  .lensitem b { display:block; }
+  .confirm { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin:8px 0; }
+  .confirm input { width:100%; font:inherit; padding:6px 8px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:inherit; }
   .sent { background:var(--okbg); color:var(--ok); border-radius:8px; padding:10px 12px; margin-top:10px; font-weight:600; }
 </style>
 </head>
@@ -120,16 +133,18 @@ async function load() {
     const list = $("list"); list.replaceChildren();
     rows.forEach(r => {
       const isNew = !opened.has(r.id);
-      const b = el("button"); b.className = (r.id === selected ? "sel " : "") + (isNew ? "isnew" : "");
+      const b = el("button"); b.className = (r.id === selected ? "sel " : "") + (r.tag === "URGENT" ? "urgentrow " : "") + (isNew ? "isnew" : "");
       const top = el("div");
       top.append(el("span", "Case #" + (r.caseId || r.id.slice(0, 6).toUpperCase()), "case"));
       if (isNew) top.append(el("span", "NEW", "tag newtag"));
       top.append(el("span", r.status === "WAITING" ? "Waiting" : "Reviewed", "tag " + (r.status === "WAITING" ? "waiting" : "reviewed")));
-      if (r.referralLevel === "URGENT") top.append(el("span", "Urgent referral", "tag urgent"));
+      if (r.tag === "URGENT") top.append(el("span", "URGENT", "tag urgentfill"));
+      else if (r.tag === "CHILD_MYOPIA") top.append(el("span", "Child myopia", "tag child"));
       else if (r.referralLevel && r.referralLevel !== "NONE") top.append(el("span", nice(r.referralLevel) + " referral", "tag waiting"));
       if (r.demo) top.append(el("span", "DEMO", "tag demo"));
       b.append(top);
       b.append(el("div", "Age " + (r.age ?? "?") + " · " + problem(r.visionProblem) + (r.dominantZone ? " · mostly " + nice(r.dominantZone) : "")));
+      if ((r.redFlagReasons || []).length) b.append(el("div", r.redFlagReasons.join(" · "), "urgent"));
       b.append(el("div", when(r.receivedAt) + " · " + source(r.powerSource), "muted"));
       b.onclick = () => open(r.id);
       list.append(b);
@@ -164,17 +179,54 @@ function powerLines(p) {
   return out;
 }
 
+// A ring drawn as an SVG arc: score 0-100.
+function ringSvg(score, colour) {
+  const ns = "http://www.w3.org/2000/svg", r = 16, c = 2 * Math.PI * r;
+  const svg = document.createElementNS(ns, "svg"); svg.setAttribute("width", "44"); svg.setAttribute("height", "44"); svg.setAttribute("viewBox", "0 0 44 44");
+  const mk = (stroke, dash) => { const o = document.createElementNS(ns, "circle"); o.setAttribute("cx", "22"); o.setAttribute("cy", "22"); o.setAttribute("r", String(r));
+    o.setAttribute("fill", "none"); o.setAttribute("stroke", stroke); o.setAttribute("stroke-width", "6"); if (dash != null) { o.setAttribute("stroke-dasharray", dash + " " + c);
+    o.setAttribute("transform", "rotate(-90 22 22)"); o.setAttribute("stroke-linecap", "round"); } return o; };
+  svg.append(mk("#8884", null), mk(colour, c * Math.max(0, Math.min(100, score)) / 100));
+  return svg;
+}
+
+// The grid as it was shown, with the squares the person tapped.
+function amslerSvg(a) {
+  const ns = "http://www.w3.org/2000/svg", q = 9, w = a.columns * q, h = a.rows * q;
+  const svg = document.createElementNS(ns, "svg"); svg.setAttribute("width", String(w + 2)); svg.setAttribute("height", String(h + 2));
+  svg.setAttribute("viewBox", "-1 -1 " + (w + 2) + " " + (h + 2)); svg.style.background = "#fff";
+  (a.cells || []).forEach(c => { const r = document.createElementNS(ns, "rect"); r.setAttribute("x", String(c.col * q)); r.setAttribute("y", String(c.row * q));
+    r.setAttribute("width", String(q)); r.setAttribute("height", String(q)); r.setAttribute("fill", "#d93838"); r.setAttribute("opacity", "0.6"); svg.append(r); });
+  for (let i = 0; i <= a.columns; i++) { const l = document.createElementNS(ns, "line"); l.setAttribute("x1", String(i * q)); l.setAttribute("x2", String(i * q)); l.setAttribute("y1", "0"); l.setAttribute("y2", String(h)); l.setAttribute("stroke", "#222"); l.setAttribute("stroke-width", "0.6"); svg.append(l); }
+  for (let j = 0; j <= a.rows; j++) { const l = document.createElementNS(ns, "line"); l.setAttribute("y1", String(j * q)); l.setAttribute("y2", String(j * q)); l.setAttribute("x1", "0"); l.setAttribute("x2", String(w)); l.setAttribute("stroke", "#222"); l.setAttribute("stroke-width", "0.6"); svg.append(l); }
+  const dot = document.createElementNS(ns, "circle"); dot.setAttribute("cx", String(w / 2)); dot.setAttribute("cy", String(h / 2)); dot.setAttribute("r", "2"); svg.append(dot);
+  return svg;
+}
+
+const RING_COLOUR = { work: "#2f80ed", digital: "#a3d33a", mobility: "#6b7785", leisure: "#f2a93b" };
+
 async function open(id) {
   selected = id;
   markOpened(id);
   const d = $("detail"); d.replaceChildren(el("p", "Loading…", "muted"));
   try {
-    const { profile: p, review, receivedAt, caseId } = await api("/profiles/" + id);
+    const { profile: p, review, receivedAt, caseId, tag } = await api("/profiles/" + id);
+    const tri = p.triage || {}, vp = p.visionProfile, scr = p.screening, lens = p.lens;
     const a = p.answers || {}, fp = p.functionalProfile || {}, est = p.estimates || {};
     d.replaceChildren();
     d.append(el("p", "Case #" + (caseId || id.slice(0, 6).toUpperCase()), "bigcase"));
     d.append(el("div", "Received " + when(receivedAt) + " · no name or photo is ever sent · phone values are estimates, confirmed with the trial lens", "muted"));
     if (p.demo) d.append(el("div", "DEMO session: sample customer, not a real person.", "note"));
+
+    // ---- urgent first: the red-flag reasons at the top ----
+    if (tag === "URGENT") {
+      const b = el("div", "URGENT: the customer was told to see an eye doctor today. No lens was suggested.", "banner");
+      const ul = el("ul"); (tri.redFlagReasons || []).forEach(r => ul.append(el("li", r))); if (ul.children.length) b.append(ul);
+      if (tri.emergency) b.append(el("div", "Emergency signs: short check only (power of each eye and the grid)."));
+      d.append(b);
+    } else if (tag === "CHILD_MYOPIA") {
+      d.append(el("div", "CHILD MYOPIA: under 18 with minus power. The power was measured; no lens was chosen. Please check for myopia control.", "note"));
+    }
 
     // ---- at a glance ----
     const sum = el("div", null, "summary");
@@ -195,13 +247,68 @@ async function open(id) {
     if (a.diabetesOrBp) flags.push("Diabetes or BP");
     flags.forEach(f => d.append(el("div", f, "flag")));
 
+    // ---- measurements and how they were taken ----
+    const pr = (p.power || {}).phoneRange || {};
+    if (pr.right || pr.left || pr.near) {
+      d.append(el("h2", "Phone measurement and method" + (tri.powerLabel ? " · " + tri.powerLabel : "")));
+      if (pr.right) d.append(el("div", "R: " + pr.right));
+      if (pr.left) d.append(el("div", "L: " + pr.left));
+      if (pr.near) d.append(el("div", pr.near));
+    }
+    const pd = (p.measurements || {}).pdMm;
+    if (pd && pd.value != null) d.append(el("div", "PD: about " + Math.round(pd.value * 10) / 10 + " mm (" + nice(pd.source || "") + ")", "muted"));
     const pl = powerLines(p);
     if (pl.length) { d.append(el("h2", "Power (" + source(p.powerSource) + ")")); pl.forEach(t => d.append(el("div", t))); }
+
+    // ---- vision profile rings ----
+    if (vp) {
+      d.append(el("h2", "Vision profile"));
+      const rings = el("div", null, "rings");
+      ["work", "digital", "mobility", "leisure"].forEach(k => {
+        const r = vp[k]; if (!r) return;
+        const box = el("div", null, "ring"); box.append(ringSvg(r.answered ? r.score : 0, RING_COLOUR[k]));
+        const t = el("div"); t.append(el("b", k.charAt(0).toUpperCase() + k.slice(1)), el("div", r.answered ? r.label + " (" + r.score + ")" : "not answered"));
+        box.append(t); rings.append(box);
+      });
+      d.append(rings);
+      if (vp.nightGlareSensitive) d.append(el("div", "Night-glare sensitive", "note"));
+    }
+
+    // ---- screening ----
+    if (scr) {
+      d.append(el("h2", "Screening tests"));
+      d.append(el("div", scr.label || "Screening, not a diagnosis", "muted"));
+      (scr.lines || []).forEach(l => { const row = el("div"); const dot = el("span", null, "dot " + (l.status || "")); row.append(dot, document.createTextNode(l.text)); d.append(row); });
+      ((scr.results || {}).amsler || []).filter(a => a.distortion).forEach(a => {
+        d.append(el("div", "Grid, " + (a.eye === "RIGHT" ? "right" : "left") + " eye: squares the person tapped (" + a.columns + " × " + a.rows + " shown, 5 mm each, at about " + Math.round((a.distanceMm || 300) / 10) + " cm)", "flag"));
+        d.append(amslerSvg(a));
+      });
+    }
+
+    // ---- lens suggestion ----
+    if (lens) {
+      d.append(el("h2", lens.suggested ? (lens.label || "Suggested lens family") : "Lens suggestion"));
+      if (!lens.suggested) d.append(el("div", "None: referral only." + (lens.referralInfo ? " For the referral: " + lens.referralInfo + "." : ""), "note"));
+      if (lens.optometristConfirms) d.append(el("div", "Child without myopia: optometrist confirms.", "note"));
+      (lens.items || []).forEach(it => {
+        const box = el("div", null, "lensitem"); box.append(el("b", nice(it.kind) + ": " + it.product));
+        (it.why || []).forEach(w => box.append(el("div", "✓ " + w)));
+        d.append(box);
+      });
+    }
 
     // ---- reply ----
     d.append(el("h2", "Your advice to the shop"));
     if (review.status === "REVIEWED") d.append(el("div", "Replied " + when(review.reviewedAt) + ". Submitting again replaces it.", "muted"));
     const ta = el("textarea"); ta.maxLength = 4000; ta.value = review.advice || ""; d.append(ta);
+    d.append(el("div", "Confirm or correct the power (optional), e.g. -4.25 / -0.50 x 180", "muted"));
+    const cp = review.confirmedPower || {}, conf = el("div", null, "confirm"), inputs = {};
+    const startOf = (eye) => { const e = ((p.power || {}).eyes || []).find(x => x.eye === eye); const s = e && e.startingTrialLens && e.startingTrialLens.value; return s ? String(s.sph.toFixed(2)) : ""; };
+    [["right", "Right eye", startOf("RIGHT")], ["left", "Left eye", startOf("LEFT")], ["add", "Add", ""]].forEach(([k, label, hint]) => {
+      const w = el("label", label); const i = el("input"); i.type = "text"; i.maxLength = k === "add" ? 20 : 40; i.value = cp[k] || ""; i.placeholder = hint ? "phone: " + hint : "";
+      w.append(i); conf.append(w); inputs[k] = i;
+    });
+    d.append(conf);
     const lab = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!review.needsInPersonExam;
     lab.append(cb, document.createTextNode(" Needs an in-person eye exam"));
     const flagRow = el("div"); flagRow.append(lab); d.append(flagRow);
@@ -210,7 +317,10 @@ async function open(id) {
       if (!ta.value.trim()) { msg.className = "muted"; msg.textContent = "Write some advice first."; return; }
       btn.disabled = true;
       try {
-        await api("/profiles/" + id + "/review", { method: "POST", body: JSON.stringify({ advice: ta.value, needsInPersonExam: cb.checked }) });
+        const confirmed = {}; Object.entries(inputs).forEach(([k, i]) => { if (i.value.trim()) confirmed[k] = i.value.trim(); });
+        const body = { advice: ta.value, needsInPersonExam: cb.checked };
+        if (Object.keys(confirmed).length) body.confirmedPower = confirmed;
+        await api("/profiles/" + id + "/review", { method: "POST", body: JSON.stringify(body) });
         msg.className = "sent";
         msg.textContent = "Reply sent to the shop. It appears on the shop's phone within about 15 seconds.";
         load();
@@ -220,7 +330,7 @@ async function open(id) {
     const row = el("div"); row.style.marginTop = "10px"; row.append(btn); d.append(row, msg);
 
     // ---- everything else ----
-    [["Estimates (lens, referral, notes)", p.estimates], ["Power values", p.power], ["Functional vision profile", p.functionalProfile],
+    [["Survey answers", (p.survey || {}).values], ["Estimates (lens, referral, notes)", p.estimates], ["Power values", p.power], ["Functional vision profile", p.functionalProfile],
      ["Measurements", p.measurements], ["Interview answers", p.answers], ["Consent", p.consent]].forEach(([title, obj]) => {
       const det = el("details"); det.append(el("summary", title), table(obj)); d.append(det);
     });

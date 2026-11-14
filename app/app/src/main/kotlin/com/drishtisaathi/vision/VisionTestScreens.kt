@@ -280,7 +280,7 @@ fun ClockDialTestScreen(
                         )
                     }
                     val label = if (hour == 0) "12" else hour.toString()
-                    val layout = measurer.measure(label, TextStyle(fontSize = 18.sp, color = Teal, fontWeight = FontWeight.Bold, fontFamily = com.drishtisaathi.ui.NotoFamily))
+                    val layout = measurer.measure(label, TextStyle(fontSize = 18.sp, color = com.drishtisaathi.ui.LightColors.primary, fontWeight = FontWeight.Bold, fontFamily = com.drishtisaathi.ui.NotoFamily))
                     val c = Offset(center.x + ux * r * 0.92f, center.y + uy * r * 0.92f)
                     drawText(layout, topLeft = Offset(c.x - layout.size.width / 2f, c.y - layout.size.height / 2f))
                 }

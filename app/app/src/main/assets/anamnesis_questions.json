@@ -686,6 +686,800 @@
     {"id": "headache", "fields": ["headacheStrain"], "about": "headaches during reading, screen or other visual work", "scripted": {"en-IN": "Do you get headaches when you read or look at a screen?", "hi-IN": "क्या पढ़ते या स्क्रीन देखते समय सिरदर्द होता है?"}},
     {"id": "eye_strain", "fields": ["eyeStrain"], "about": "tired, strained or watery eyes", "scripted": {"en-IN": "Do your eyes feel tired or strained?", "hi-IN": "क्या आपकी आँखें थकी हुई या भारी लगती हैं?"}},
     {"id": "night_vision", "fields": ["nightDriving", "nightVisionDifficulty"], "about": "seeing at night and driving at night", "scripted": {"en-IN": "Is it hard to see at night? Do you drive at night?", "hi-IN": "क्या रात में देखने में दिक्कत होती है? क्या आप रात में गाड़ी चलाते हैं?"}},
-    {"id": "outdoor_indoor", "fields": ["outdoorWork"], "about": "whether they mostly work outdoors in the sun or indoors", "scripted": {"en-IN": "Do you mostly work outside in the sun, or indoors?", "hi-IN": "क्या आप ज़्यादातर बाहर धूप में काम करते हैं, या अंदर?"}}
-  ]
+    {"id": "outdoor_indoor", "fields": ["outdoorWork"], "about": "whether they mostly work outdoors in the sun or indoors", "scripted": {"en-IN": "Do you mostly work outside in the sun, or indoors?", "hi-IN": "क्या आप ज़्यादातर बाहर धूप में काम करते हैं, या अंदर?"}},
+    {"id": "driving", "optional": true, "fields": ["driveFrequency", "glareOncoming"], "about": "how often they drive or ride (daily, weekly, now and then, never) and whether oncoming headlights dazzle them", "scripted": {"en-IN": "How often do you drive or ride, and do oncoming headlights dazzle you?", "hi-IN": "आप कितनी बार गाड़ी या बाइक चलाते हैं, और क्या सामने की लाइट से आँखें चौंधियाती हैं?"}},
+    {"id": "sun_time", "optional": true, "fields": ["outdoorHours", "indoorOutdoor"], "about": "how many hours a day they are outdoors in the sun", "scripted": {"en-IN": "How many hours a day are you out in the sun?", "hi-IN": "आप रोज़ कितने घंटे धूप में रहते हैं?"}},
+    {"id": "work_day", "optional": true, "fields": ["workHours", "screenHoursDay"], "about": "how many hours a day they work or study, and how many of them at a screen", "scripted": {"en-IN": "How many hours a day do you work, and how many of them at a screen?", "hi-IN": "आप रोज़ कितने घंटे काम करते हैं, और उनमें से कितने घंटे स्क्रीन पर?"}}
+  ],
+  "survey": {
+    "notes": "Vision-profile survey (Hindi and English, voice and tap), asked after the core questions. Sections are colour-coded. A block whose showIf rule fails is skipped; a rule may only look at an earlier question. kind: FREQ = never / sometimes / often, YES_NO, CHOICE, MULTI (several options), NUMBER (min..max, step, unit). 'say' = spoken keywords per option. 'why' is the 'Why we ask' line, spoken when the customer taps '?'. Age, first glasses, known power and budget are asked in the core / later questions and are not repeated here. Whole survey: at most maxMinutes.",
+    "maxMinutes": 4,
+    "secondsPerQuestion": 10,
+    "sections": [
+      {
+        "id": "SAFETY",
+        "colour": "#D93838",
+        "title": {
+          "en": "Warning signs",
+          "hi": "चेतावनी के लक्षण"
+        },
+        "why": {
+          "en": "So the eye doctor knows exactly what you noticed.",
+          "hi": "ताकि आँख के डॉक्टर को ठीक पता चले कि आपको क्या दिखा।"
+        }
+      },
+      {
+        "id": "GENERAL",
+        "colour": "#1A5CFF",
+        "title": {
+          "en": "About your eyes",
+          "hi": "आपकी आँखों के बारे में"
+        },
+        "why": {
+          "en": "How your eyes feel during the day shapes the lens that suits you.",
+          "hi": "दिन भर आँखें कैसा महसूस करती हैं, उसी से सही लेंस तय होता है।"
+        }
+      },
+      {
+        "id": "WORK",
+        "colour": "#2F80ED",
+        "title": {
+          "en": "Work & daily life",
+          "hi": "काम और रोज़मर्रा"
+        },
+        "why": {
+          "en": "Your work decides the distances your glasses must be sharp at.",
+          "hi": "आपके काम से तय होता है कि चश्मा किन दूरियों पर साफ़ दिखाए।"
+        }
+      },
+      {
+        "id": "DIGITAL",
+        "colour": "#A3D33A",
+        "title": {
+          "en": "Screens",
+          "hi": "स्क्रीन"
+        },
+        "why": {
+          "en": "Phones and computers ask a lot of close focus from the eyes.",
+          "hi": "फ़ोन और कंप्यूटर में आँखों को पास पर बहुत ज़ोर लगाना पड़ता है।"
+        }
+      },
+      {
+        "id": "MOBILITY",
+        "colour": "#6B7785",
+        "title": {
+          "en": "Driving & travel",
+          "hi": "गाड़ी चलाना और सफ़र"
+        },
+        "why": {
+          "en": "Driving needs clear, comfortable sight, also at night.",
+          "hi": "गाड़ी चलाने के लिए साफ़ और आरामदायक नज़र चाहिए, रात में भी।"
+        }
+      },
+      {
+        "id": "LEISURE",
+        "colour": "#F2A93B",
+        "title": {
+          "en": "Free time & sun",
+          "hi": "फ़ुर्सत और धूप"
+        },
+        "why": {
+          "en": "Time in the sun decides how much UV and glare protection helps you.",
+          "hi": "धूप में बिताया समय बताता है कि UV और चौंध से कितनी सुरक्षा चाहिए।"
+        }
+      },
+      {
+        "id": "WISHES",
+        "colour": "#1A5CFF",
+        "title": {
+          "en": "Your wishes",
+          "hi": "आपकी पसंद"
+        },
+        "why": {
+          "en": "So the suggestion fits how you want to use your glasses.",
+          "hi": "ताकि सुझाव आपके चश्मा पहनने के तरीक़े से मेल खाए।"
+        }
+      }
+    ],
+    "questions": [
+      {
+        "id": "redFlagSigns",
+        "section": "SAFETY",
+        "kind": "MULTI",
+        "text": {
+          "en": "Which of these did you notice? Choose all that apply.",
+          "hi": "इनमें से आपको क्या हुआ? जो-जो हुआ, सब चुनें।"
+        },
+        "why": {
+          "en": "These signs need an eye doctor today; the doctor needs to know which one.",
+          "hi": "इन लक्षणों में आज ही आँख के डॉक्टर को दिखाना ज़रूरी है; डॉक्टर को जानना होगा कि कौन-सा लक्षण है।"
+        },
+        "options": {
+          "SUDDEN_VISION_LOSS": {
+            "en": "Vision dropped suddenly",
+            "hi": "नज़र अचानक कम हुई"
+          },
+          "CURTAIN_SHADOW": {
+            "en": "A curtain or shadow over the vision",
+            "hi": "नज़र के आगे पर्दा या परछाईं"
+          },
+          "NEW_FLASHES": {
+            "en": "New flashes of light",
+            "hi": "रोशनी की नई चमक"
+          },
+          "NEW_FLOATERS": {
+            "en": "New floating spots",
+            "hi": "नए तैरते धब्बे"
+          },
+          "EYE_PAIN_REDNESS": {
+            "en": "Eye pain or redness",
+            "hi": "आँख में दर्द या लाली"
+          },
+          "DOUBLE_VISION": {
+            "en": "Seeing double",
+            "hi": "दो-दो दिखना"
+          }
+        },
+        "say": {
+          "SUDDEN_VISION_LOSS": [
+            "अचानक कम",
+            "sudden",
+            "achanak kam"
+          ],
+          "CURTAIN_SHADOW": [
+            "पर्दा",
+            "परछाईं",
+            "curtain",
+            "shadow",
+            "parda"
+          ],
+          "NEW_FLASHES": [
+            "चमक",
+            "flash",
+            "flashes",
+            "chamak"
+          ],
+          "NEW_FLOATERS": [
+            "धब्बे",
+            "floaters",
+            "spots",
+            "dhabbe"
+          ],
+          "EYE_PAIN_REDNESS": [
+            "दर्द",
+            "लाली",
+            "pain",
+            "red",
+            "dard",
+            "lali"
+          ],
+          "DOUBLE_VISION": [
+            "दो-दो",
+            "double",
+            "do do"
+          ]
+        },
+        "showIf": [
+          {
+            "flag": "urgent"
+          }
+        ]
+      },
+      {
+        "id": "tiredEyes",
+        "section": "GENERAL",
+        "kind": "FREQ",
+        "text": {
+          "en": "Do your eyes feel tired or strained?",
+          "hi": "क्या आपकी आँखें थकी या भारी लगती हैं?"
+        },
+        "why": {
+          "en": "Tired eyes can mean the eyes work too hard to focus.",
+          "hi": "थकी आँखों का मतलब हो सकता है कि आँखों को देखने में ज़्यादा ज़ोर लगाना पड़ रहा है।"
+        }
+      },
+      {
+        "id": "nearBlurFreq",
+        "section": "GENERAL",
+        "kind": "FREQ",
+        "text": {
+          "en": "Do close things or your phone look blurred?",
+          "hi": "क्या पास की चीज़ें या फ़ोन धुंधला दिखता है?"
+        },
+        "why": {
+          "en": "Blur up close tells us whether you need help for near.",
+          "hi": "पास का धुंधलापन बताता है कि पास के लिए मदद चाहिए या नहीं।"
+        }
+      },
+      {
+        "id": "headacheFreq",
+        "section": "GENERAL",
+        "kind": "FREQ",
+        "text": {
+          "en": "Do you get headaches?",
+          "hi": "क्या आपको सिरदर्द होता है?"
+        },
+        "why": {
+          "en": "Headaches after reading or screens are often linked to the eyes.",
+          "hi": "पढ़ने या स्क्रीन के बाद का सिरदर्द अक्सर आँखों से जुड़ा होता है।"
+        }
+      },
+      {
+        "id": "neckPain",
+        "section": "GENERAL",
+        "kind": "FREQ",
+        "text": {
+          "en": "Do you get neck or shoulder pain?",
+          "hi": "क्या गर्दन या कंधे में दर्द होता है?"
+        },
+        "why": {
+          "en": "People often tilt the head to see the screen sharply; the right lens avoids that.",
+          "hi": "स्क्रीन साफ़ देखने के लिए लोग अक्सर सिर टेढ़ा करते हैं; सही लेंस से यह नहीं करना पड़ता।"
+        }
+      },
+      {
+        "id": "workHours",
+        "section": "WORK",
+        "kind": "NUMBER",
+        "text": {
+          "en": "How many hours a day do you work or study?",
+          "hi": "आप रोज़ कितने घंटे काम या पढ़ाई करते हैं?"
+        },
+        "why": {
+          "en": "Longer hours mean more strain on the eyes.",
+          "hi": "ज़्यादा घंटों का मतलब आँखों पर ज़्यादा ज़ोर।"
+        },
+        "min": 0,
+        "max": 16,
+        "step": 1,
+        "unit": {
+          "en": "hours a day",
+          "hi": "घंटे रोज़"
+        }
+      },
+      {
+        "id": "workActivities",
+        "section": "WORK",
+        "kind": "MULTI",
+        "text": {
+          "en": "What do you mostly do? Choose all that apply.",
+          "hi": "आप ज़्यादातर क्या करते हैं? जो-जो लागू हो, सब चुनें।"
+        },
+        "why": {
+          "en": "Each kind of work needs sharp sight at a different distance.",
+          "hi": "हर तरह के काम में अलग दूरी पर साफ़ दिखना चाहिए।"
+        },
+        "options": {
+          "DESKTOP": {
+            "en": "Desktop / computer",
+            "hi": "कंप्यूटर"
+          },
+          "MEETINGS": {
+            "en": "Meetings / dealing with people",
+            "hi": "लोगों से मिलना / मीटिंग"
+          },
+          "READING_WRITING": {
+            "en": "Reading / writing",
+            "hi": "पढ़ना / लिखना"
+          },
+          "FINE_HANDWORK": {
+            "en": "Fine handwork",
+            "hi": "बारीक हाथ का काम"
+          },
+          "FIELD_FARM": {
+            "en": "Field / farm work",
+            "hi": "खेत / बाहर का काम"
+          }
+        },
+        "say": {
+          "DESKTOP": [
+            "कंप्यूटर",
+            "computer",
+            "desktop",
+            "laptop"
+          ],
+          "MEETINGS": [
+            "मीटिंग",
+            "लोगों",
+            "meeting",
+            "people",
+            "customers",
+            "ग्राहक"
+          ],
+          "READING_WRITING": [
+            "पढ़ना",
+            "लिखना",
+            "reading",
+            "writing",
+            "padhna",
+            "likhna"
+          ],
+          "FINE_HANDWORK": [
+            "बारीक",
+            "सिलाई",
+            "fine",
+            "handwork",
+            "sewing",
+            "bareek"
+          ],
+          "FIELD_FARM": [
+            "खेत",
+            "खेती",
+            "field",
+            "farm",
+            "khet"
+          ]
+        }
+      },
+      {
+        "id": "indoorOutdoor",
+        "section": "WORK",
+        "kind": "CHOICE",
+        "text": {
+          "en": "Are you mostly indoors or outdoors?",
+          "hi": "आप ज़्यादातर अंदर रहते हैं या बाहर?"
+        },
+        "why": {
+          "en": "Indoor and outdoor light are very different for the eyes.",
+          "hi": "अंदर और बाहर की रोशनी आँखों के लिए बहुत अलग होती है।"
+        },
+        "options": {
+          "INDOOR": {
+            "en": "Mostly indoors",
+            "hi": "ज़्यादातर अंदर"
+          },
+          "OUTDOOR": {
+            "en": "Mostly outdoors",
+            "hi": "ज़्यादातर बाहर"
+          },
+          "BOTH": {
+            "en": "Both",
+            "hi": "दोनों"
+          }
+        },
+        "say": {
+          "INDOOR": [
+            "अंदर",
+            "indoor",
+            "indoors",
+            "inside",
+            "andar"
+          ],
+          "OUTDOOR": [
+            "बाहर",
+            "outdoor",
+            "outdoors",
+            "outside",
+            "bahar"
+          ],
+          "BOTH": [
+            "दोनों",
+            "both",
+            "dono"
+          ]
+        }
+      },
+      {
+        "id": "screenHoursDay",
+        "section": "DIGITAL",
+        "kind": "NUMBER",
+        "text": {
+          "en": "How many hours a day do you look at screens?",
+          "hi": "आप रोज़ कितने घंटे स्क्रीन देखते हैं?"
+        },
+        "why": {
+          "en": "Many screen hours can tire the eyes and dry them out.",
+          "hi": "ज़्यादा देर स्क्रीन देखने से आँखें थकती और सूखती हैं।"
+        },
+        "min": 0,
+        "max": 16,
+        "step": 1,
+        "unit": {
+          "en": "hours a day",
+          "hi": "घंटे रोज़"
+        }
+      },
+      {
+        "id": "devices",
+        "section": "DIGITAL",
+        "kind": "MULTI",
+        "text": {
+          "en": "Which screens do you use? Choose all that apply.",
+          "hi": "आप कौन-सी स्क्रीन देखते हैं? जो-जो लागू हो, सब चुनें।"
+        },
+        "why": {
+          "en": "A phone is held closer than a computer or a TV.",
+          "hi": "फ़ोन कंप्यूटर या टीवी से ज़्यादा पास पकड़ा जाता है।"
+        },
+        "options": {
+          "PHONE": {
+            "en": "Phone",
+            "hi": "फ़ोन"
+          },
+          "LAPTOP_DESKTOP": {
+            "en": "Laptop / desktop",
+            "hi": "लैपटॉप / कंप्यूटर"
+          },
+          "TV": {
+            "en": "TV",
+            "hi": "टीवी"
+          }
+        },
+        "say": {
+          "PHONE": [
+            "फ़ोन",
+            "मोबाइल",
+            "phone",
+            "mobile"
+          ],
+          "LAPTOP_DESKTOP": [
+            "लैपटॉप",
+            "कंप्यूटर",
+            "laptop",
+            "computer",
+            "desktop"
+          ],
+          "TV": [
+            "टीवी",
+            "tv",
+            "television"
+          ]
+        }
+      },
+      {
+        "id": "focusStruggle",
+        "section": "DIGITAL",
+        "kind": "FREQ",
+        "text": {
+          "en": "Do you struggle to focus when you look up from the screen?",
+          "hi": "स्क्रीन से नज़र हटाने पर क्या साफ़ देखने में दिक्कत होती है?"
+        },
+        "why": {
+          "en": "Slow refocusing is a sign of tired focusing muscles.",
+          "hi": "देर से साफ़ दिखना आँख की थकी मांसपेशियों का संकेत है।"
+        }
+      },
+      {
+        "id": "lowLightTrouble",
+        "section": "DIGITAL",
+        "kind": "FREQ",
+        "text": {
+          "en": "Do you have trouble seeing in low light?",
+          "hi": "क्या कम रोशनी में देखने में दिक्कत होती है?"
+        },
+        "why": {
+          "en": "Trouble in dim light can point to a need for better contrast.",
+          "hi": "कम रोशनी की दिक्कत बताती है कि बेहतर कंट्रास्ट चाहिए।"
+        }
+      },
+      {
+        "id": "doubleVision",
+        "section": "DIGITAL",
+        "kind": "YES_NO",
+        "text": {
+          "en": "Do you ever see double?",
+          "hi": "क्या आपको कभी दो-दो दिखता है?"
+        },
+        "why": {
+          "en": "Seeing double must be checked by an eye doctor.",
+          "hi": "दो-दो दिखने पर आँख के डॉक्टर को दिखाना ज़रूरी है।"
+        }
+      },
+      {
+        "id": "driveFrequency",
+        "section": "MOBILITY",
+        "kind": "CHOICE",
+        "text": {
+          "en": "How often do you drive or ride?",
+          "hi": "आप कितनी बार गाड़ी या बाइक चलाते हैं?"
+        },
+        "why": {
+          "en": "Regular drivers benefit from lenses made for the road.",
+          "hi": "रोज़ गाड़ी चलाने वालों को सड़क के लिए बने लेंस से फ़ायदा होता है।"
+        },
+        "options": {
+          "DAILY": {
+            "en": "Every day",
+            "hi": "रोज़"
+          },
+          "WEEKLY": {
+            "en": "Every week",
+            "hi": "हर हफ़्ते"
+          },
+          "MONTHLY": {
+            "en": "Now and then",
+            "hi": "कभी-कभी"
+          },
+          "NEVER": {
+            "en": "Never",
+            "hi": "कभी नहीं"
+          }
+        },
+        "say": {
+          "DAILY": [
+            "रोज़",
+            "daily",
+            "every day",
+            "roz"
+          ],
+          "WEEKLY": [
+            "हफ़्ते",
+            "weekly",
+            "week",
+            "hafte"
+          ],
+          "MONTHLY": [
+            "कभी-कभी",
+            "monthly",
+            "sometimes",
+            "kabhi kabhi"
+          ],
+          "NEVER": [
+            "कभी नहीं",
+            "never",
+            "नहीं चलाता",
+            "kabhi nahi"
+          ]
+        }
+      },
+      {
+        "id": "glareOncoming",
+        "section": "MOBILITY",
+        "kind": "FREQ",
+        "text": {
+          "en": "Do oncoming headlights dazzle you?",
+          "hi": "क्या सामने से आती गाड़ी की लाइट से आँखें चौंधियाती हैं?"
+        },
+        "why": {
+          "en": "Glare at night is tiring and can be reduced.",
+          "hi": "रात की चौंध थकाती है और उसे कम किया जा सकता है।"
+        },
+        "showIf": [
+          {
+            "survey": "driveFrequency",
+            "notIn": [
+              "NEVER"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "lowLightDriving",
+        "section": "MOBILITY",
+        "kind": "FREQ",
+        "text": {
+          "en": "Is it hard to see the road at dusk, in rain or fog?",
+          "hi": "क्या शाम, बारिश या धुंध में सड़क देखना मुश्किल होता है?"
+        },
+        "why": {
+          "en": "Poor light is when the road is hardest to judge.",
+          "hi": "कम रोशनी में सड़क का अंदाज़ा लगाना सबसे मुश्किल होता है।"
+        },
+        "showIf": [
+          {
+            "survey": "driveFrequency",
+            "notIn": [
+              "NEVER"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "refocusDashboard",
+        "section": "MOBILITY",
+        "kind": "FREQ",
+        "text": {
+          "en": "Is it hard to switch between the road and the dashboard or mirrors?",
+          "hi": "क्या सड़क से डैशबोर्ड या शीशे पर नज़र बदलना मुश्किल होता है?"
+        },
+        "why": {
+          "en": "Drivers look near and far again and again.",
+          "hi": "गाड़ी चलाते हुए बार-बार पास और दूर देखना पड़ता है।"
+        },
+        "showIf": [
+          {
+            "survey": "driveFrequency",
+            "notIn": [
+              "NEVER"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "outdoorHours",
+        "section": "LEISURE",
+        "kind": "NUMBER",
+        "text": {
+          "en": "How many hours a day are you out in the sun?",
+          "hi": "आप रोज़ कितने घंटे धूप में रहते हैं?"
+        },
+        "why": {
+          "en": "Sunlight carries UV, which the eyes should be protected from.",
+          "hi": "धूप में UV होती है, जिससे आँखों को बचाना चाहिए।"
+        },
+        "min": 0,
+        "max": 14,
+        "step": 1,
+        "unit": {
+          "en": "hours a day",
+          "hi": "घंटे रोज़"
+        }
+      },
+      {
+        "id": "leisureActivities",
+        "section": "LEISURE",
+        "kind": "MULTI",
+        "text": {
+          "en": "What do you do outside? Choose all that apply.",
+          "hi": "आप बाहर क्या करते हैं? जो-जो लागू हो, सब चुनें।"
+        },
+        "why": {
+          "en": "Water, fields and sport each bring their own glare.",
+          "hi": "पानी, खेत और खेल-कूद में अलग-अलग तरह की चौंध होती है।"
+        },
+        "options": {
+          "OUTDOOR_SPORT": {
+            "en": "Outdoor sport",
+            "hi": "बाहर के खेल"
+          },
+          "WATER": {
+            "en": "Water (river, fishing, boats)",
+            "hi": "पानी (नदी, मछली पकड़ना, नाव)"
+          },
+          "FARMING_FIELD": {
+            "en": "Farming / field",
+            "hi": "खेती / खेत"
+          },
+          "CITY": {
+            "en": "City and market",
+            "hi": "शहर और बाज़ार"
+          }
+        },
+        "say": {
+          "OUTDOOR_SPORT": [
+            "खेल",
+            "sport",
+            "cricket",
+            "क्रिकेट",
+            "khel"
+          ],
+          "WATER": [
+            "पानी",
+            "नदी",
+            "water",
+            "river",
+            "fishing",
+            "paani"
+          ],
+          "FARMING_FIELD": [
+            "खेती",
+            "खेत",
+            "farming",
+            "field",
+            "kheti"
+          ],
+          "CITY": [
+            "शहर",
+            "बाज़ार",
+            "city",
+            "market",
+            "shahar",
+            "bazaar"
+          ]
+        }
+      },
+      {
+        "id": "onePair",
+        "section": "WISHES",
+        "kind": "YES_NO",
+        "text": {
+          "en": "Do you want one pair for indoors and outdoors?",
+          "hi": "क्या आप अंदर और बाहर, दोनों के लिए एक ही चश्मा चाहते हैं?"
+        },
+        "why": {
+          "en": "Some lenses darken in the sun and clear indoors.",
+          "hi": "कुछ लेंस धूप में गहरे और अंदर साफ़ हो जाते हैं।"
+        }
+      },
+      {
+        "id": "firstProgressive",
+        "section": "WISHES",
+        "kind": "YES_NO",
+        "text": {
+          "en": "Would this be your first pair with far and near in one lens?",
+          "hi": "क्या यह आपका पहला चश्मा होगा जिसमें दूर और पास दोनों एक लेंस में हों?"
+        },
+        "why": {
+          "en": "First-time wearers do best with a lens that is easy to get used to.",
+          "hi": "पहली बार पहनने वालों के लिए आसानी से आदत पड़ने वाला लेंस सबसे अच्छा रहता है।"
+        },
+        "showIf": [
+          {
+            "minAge": 45
+          }
+        ]
+      },
+      {
+        "id": "wearFor",
+        "section": "WISHES",
+        "kind": "MULTI",
+        "text": {
+          "en": "What do you wear glasses for? Choose all that apply.",
+          "hi": "आप चश्मा किस-किस काम के लिए पहनते हैं? जो-जो लागू हो, सब चुनें।"
+        },
+        "why": {
+          "en": "The lens should be best for the things you use it for most.",
+          "hi": "लेंस उन कामों के लिए सबसे अच्छा होना चाहिए जिनमें आप उसे सबसे ज़्यादा पहनते हैं।"
+        },
+        "options": {
+          "ALL_DAY": {
+            "en": "All day",
+            "hi": "पूरा दिन"
+          },
+          "READING": {
+            "en": "Reading",
+            "hi": "पढ़ना"
+          },
+          "COMPUTER": {
+            "en": "Computer",
+            "hi": "कंप्यूटर"
+          },
+          "DRIVING": {
+            "en": "Driving",
+            "hi": "गाड़ी चलाना"
+          },
+          "TV": {
+            "en": "TV",
+            "hi": "टीवी"
+          },
+          "OUTDOOR": {
+            "en": "Outdoors",
+            "hi": "बाहर"
+          },
+          "NOT_YET": {
+            "en": "I don't wear glasses yet",
+            "hi": "अभी चश्मा नहीं पहनता"
+          }
+        },
+        "say": {
+          "ALL_DAY": [
+            "पूरा दिन",
+            "all day",
+            "always",
+            "हमेशा",
+            "poora din"
+          ],
+          "READING": [
+            "पढ़ना",
+            "reading",
+            "padhna"
+          ],
+          "COMPUTER": [
+            "कंप्यूटर",
+            "computer"
+          ],
+          "DRIVING": [
+            "गाड़ी",
+            "driving",
+            "gaadi"
+          ],
+          "TV": [
+            "टीवी",
+            "tv"
+          ],
+          "OUTDOOR": [
+            "बाहर",
+            "outdoor",
+            "outside",
+            "bahar"
+          ],
+          "NOT_YET": [
+            "नहीं पहनता",
+            "not yet",
+            "no glasses"
+          ]
+        }
+      }
+    ]
+  }
 }

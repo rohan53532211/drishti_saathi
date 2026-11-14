@@ -1,6 +1,6 @@
-# Drishti Saathi: 3D frames, live 3D try-on and face avatar
+# Drishti Saathi: architecture notes
 
-This note covers the 3D pipeline added on branch `feature-3d-avatar`. The 2D try-on is unchanged and stays the automatic fallback.
+Sections 1–5 cover the 3D pipeline added on branch `feature-3d-avatar` (the 2D try-on is unchanged and stays the automatic fallback). Section 6 covers the vision profile added on branch `feature/vision-profile`: safety rules, lens-assisted mode, screening tests, survey, profile rings, lens engine, outputs and the bridge.
 
 ## Pipeline at a glance
 
@@ -142,6 +142,70 @@ The method follows MediaPipe's face_effect / face geometry sample. Code: `engine
   - The mesh and texture exist only in memory.
   - A unit test checks that the bridge, PDF and database code never touch the avatar.
 
+## 6. Vision profile (branch `feature/vision-profile`)
+
+All logic is in the pure Kotlin `engine` module, package `engine/profile`, and is unit-tested on the JVM. Thresholds are in `rules.json` (`safety`, `lensAssisted`, `screening`, `visionProfile`, `lensEngine`); products and their texts are in `lens_catalog.json`; survey questions are in `anamnesis_questions.json` → `survey`. The app's screens are in `app/.../profile`.
+
+### 6.1 Order of the check
+
+core questions → red banner (if a red flag) → survey → camera distance + PD → power of each eye → screening tests → remaining questions → results. `Safety.steps` gives the steps; emergency signs get `safety.shortPathSteps` (power + grid).
+
+### 6.2 Safety gate (`Safety.kt`)
+
+- `Safety.gate(answers, survey, …)` returns a `SafetyGate`: the red flags found, `emergency`, `childMyopia`, and the report tag (URGENT / CHILD_MYOPIA / ROUTINE).
+- Red flags come from the two red-flag questions, the "which signs" survey question, the survey's double-vision question, "straight lines look bent", and the grid test. A "yes" without the follow-up stays as an unspecified flag and counts as an emergency.
+- `lensAllowed` is false for any red flag or child myopia. The result screen, both PDFs, the QR, the share picture and the optometrist report all read the same gate, so none of them can show a lens when it is false.
+- The red banner is an overlay over whatever screen is open, shown once per new set of flags, so the check continues behind it.
+
+### 6.3 Report queue (`bridge/ReportQueue.kt`)
+
+- Every finished, non-demo session is queued at once. The queue holds session ids only (app-private preferences); the report itself is rebuilt from the encrypted database when it is sent.
+- A flush runs at app start, after each result, every 20 s while Home is open, and on "Send to optometrist". A failed send keeps everything queued; a deleted session leaves the queue; an edited session replaces its earlier server copy.
+- The session's consent (read aloud, tapped) covers the report.
+
+### 6.4 Lens-assisted mode (`LensAssisted.kt`)
+
+- First pass without a lens. At or beyond `triggerSeD` (−3.75 D) the eye is measured again through a known minus lens.
+- Suggested lens = estimate + `suggestOffsetD` (2 D), rounded towards the weaker lens to `suggestStepD` (0.5 D).
+- Total = effective lens + residual, rounded to 0.25 D, range ± 0.25 D. Effective lens = F / (1 − 0.012·F) from `vertexFromAbsD` (4 D).
+- No blur point through the lens = lens too strong: the app asks for a weaker one and never guesses.
+- The learning loop's phone-model correction is applied to the residual only. The session stores the lens, the raw and rounded residual, the first pass and the method; a verified lens-assisted eye pairs the raw residual with (final trial lens − effective lens).
+
+### 6.5 Screening tests (`Screening.kt`, `ScreeningFlow.kt`)
+
+- **Grid:** `Amsler.layout` keeps squares at 5 real mm (display dpi or bank-card scale) and fits whole, even counts of columns and rows; the test accepts answers only at 27–33 cm; tapped squares are stored as (column, row).
+- **Contrast:** `ContrastRun` is a small state machine: a step passes with 2 right of 3 and fails as soon as that cannot be reached. Letter grey = 255 · (1 − c)^(1/2.2) for a Weber contrast c on white.
+- **Colour:** `ColourPlates` generates non-overlapping dots in a circle from a seed; dots inside a 5 × 7 digit shape take the figure palette. One control plate, then red-green and blue-yellow plates mixed. A missed control plate makes the run invalid.
+- **E test and clock dial:** the earlier `VisionTestFlow` runs with only those steps; the dial is placed from the power check's far point (the first pass for a lens-assisted eye), which is never stored as a measured power.
+- `ScreeningResults.toVisionTests()` feeds the rules engine (grid → urgent, E test below the limit and astigmatism flag → routine reasons).
+
+### 6.6 Survey (`Survey.kt`, `SurveyScreen.kt`)
+
+- The survey is data: sections with a colour and a "why", questions with a kind (FREQ, YES_NO, CHOICE, MULTI, NUMBER), options, spoken keywords and `showIf` rules. A rule may only look at an earlier question, so file order is asking order.
+- Answers are a map of question id → option codes. `Survey.prune` drops answers of blocks that no longer apply.
+- The screen shows the first unanswered visible question (never an index of its own), so an answer that changes the list cannot skip or repeat a step.
+- `SurveyBridge` fills the older interview fields the survey covers, and takes over survey answers the AI interview already heard (the backend's three optional, extract-only topics).
+
+### 6.7 Profile rings and lens engine (`VisionProfile.kt`, `LensEngine.kt`)
+
+- `ProfileInputs.from` collects what is known about the customer from the survey, the interview (as a fallback) and the measurements.
+- `VisionProfile.from` gives four rings (score 0–100, label, and whether the ring's questions were answered).
+- `LensEngine.triggers` has one entry per catalogue id, written from the catalogue's trigger text; `LensEngine.plan` follows the catalogue's selection order and `validate` enforces the exclusions on every plan.
+- "Why for you" lines: the catalogue's `why_en` / `why_hi` templates filled with the customer's numbers (a line with a missing number is dropped), plus reason codes the app words in both languages.
+
+### 6.8 Outputs
+
+- **Result screen:** banner → rings → measurements → lens cards or referral card → frames → QR → actions.
+- **QR** (`QrPayload.kt`, ZXing core): the bridge link when the report was sent and the server is reachable, else a compact JSON summary.
+- **Share picture:** rendered with the bundled font and the QR; shared after a consent checkbox.
+- **Shop PDF:** tag line, banner or child-myopia block, rings (drawn), screening, method per eye, lens cards with reasons.
+- **Optometrist report:** adds `triage`, `screening`, `visionProfile`, `lens`, `survey` to the profile. The backend tags and sorts the reports and the page shows them; the reply can carry a confirmed power.
+
+### 6.9 Design system (`ui/Tokens.kt`, `ui/Theme.kt`)
+
+- Colours come from `DS.colors` (light or dark tokens); the older colour names map onto the tokens, so every screen follows the theme. The vision tests always use the light theme.
+- One merged font per weight (Inter + Noto Sans Devanagari), tabular figures on.
+
 ## References
 
 | Reference | Used for | Notes |
@@ -157,6 +221,8 @@ The method follows MediaPipe's face_effect / face geometry sample. Code: `engine
 - **COLMAP, TRELLIS.2, photogrammetry:** the Kaggle views are 4 uncalibrated photos of thin, shiny frames. Thin metal parts and reflective lenses break feature matching, and 4 views are far too few for accurate geometry. Photo extrusion plus measured sizes is more truthful for fitting.
 
 ## Limitations
+
+- **Vision profile:** the colour plates, contrast steps and lens triggers are our own and not clinically validated; a phone shows a narrower grid than 10 cm; lens product descriptions are English only; survey numbers are tap only (no voice); the new screens have not been tried on a phone yet.
 
 - **Sizes:** all Kaggle frame sizes are estimated (135 mm front); the true size of each product is unknown. Material and colour tags are guesses and are labelled "estimated". Prices are placeholders.
 - **Frame shape:** fronts are flat extrusions, with no wrap or bevel. Temples are straight bars with a fixed bend. Nose pads are not modelled.

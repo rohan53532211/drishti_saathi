@@ -86,17 +86,17 @@ fun ScreenCardCalibrationScreen(
                 val h = longSidePx
                 val w = h / config.cardAspect.toFloat()
                 drawRoundRect(
-                    color = Teal.copy(alpha = 0.15f), topLeft = Offset(margin, margin), size = Size(w, h),
+                    color = com.drishtisaathi.ui.LightColors.primary.copy(alpha = 0.15f), topLeft = Offset(margin, margin), size = Size(w, h),
                     cornerRadius = CornerRadius(3.dp.toPx()),
                 )
                 drawRoundRect(
-                    color = Teal, topLeft = Offset(margin, margin), size = Size(w, h),
+                    color = com.drishtisaathi.ui.LightColors.primary, topLeft = Offset(margin, margin), size = Size(w, h),
                     cornerRadius = CornerRadius(3.dp.toPx()), style = Stroke(width = 2.dp.toPx()),
                 )
                 // Thick handle on the edge being matched.
-                drawLine(UrgentRed, Offset(margin, margin + h), Offset(margin + w, margin + h), strokeWidth = 4.dp.toPx())
+                drawLine(com.drishtisaathi.ui.LightColors.urgent, Offset(margin, margin + h), Offset(margin + w, margin + h), strokeWidth = 4.dp.toPx())
                 drawCircle(Color.White, radius = 10.dp.toPx(), center = Offset(margin + w / 2, margin + h))
-                drawCircle(UrgentRed, radius = 10.dp.toPx(), center = Offset(margin + w / 2, margin + h), style = Stroke(3.dp.toPx()))
+                drawCircle(com.drishtisaathi.ui.LightColors.urgent, radius = 10.dp.toPx(), center = Offset(margin + w / 2, margin + h), style = Stroke(3.dp.toPx()))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

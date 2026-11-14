@@ -23,8 +23,23 @@ import com.drishtisaathi.UiState
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
 import com.drishtisaathi.i18n.SShop
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 
-/** Home: two big buttons for the counter, a small "Shop tools" link, and a reminder while phone setup is not done. */
+/**
+ * Home: a large hero card "Start new customer", three tiles (past sessions, shop tools, frames), the optometrist
+ * bridge chip (Connected / Offline – queued N), and a reminder while phone setup is not done.
+ */
 @Composable
 fun HomeScreen(
     state: UiState,
@@ -34,29 +49,81 @@ fun HomeScreen(
     onShopTools: () -> Unit,
     setupDone: Boolean = true,
     onSetup: () -> Unit = {},
+    onFrames: () -> Unit = {},
+    bridgeOnline: Boolean = false,
+    queued: Int = 0,
+    onBridgeChip: () -> Unit = {},
 ) {
     val l = state.lang
+    val c = DS.colors
+    val P = com.drishtisaathi.i18n.SProfile
     AppScaffold(l, onLang) { pad ->
         Column(
-            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(DS.screen),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.height(24.dp))
-            Text(S.appName[l], style = MaterialTheme.typography.headlineMedium, color = Teal)
-            Text(S.tagline[l], style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+            Text(S.appName[l], style = MaterialTheme.typography.displaySmall, color = c.ink)
+            Text(S.tagline[l], style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
+            // optometrist bridge status
+            val chipText = when {
+                bridgeOnline && queued == 0 -> P.bridgeConnected[l]
+                bridgeOnline -> P.bridgeConnected[l] + " · " + queued
+                queued > 0 -> P.bridgeOffline.format(queued)[l]
+                else -> P.bridgeOfflineNone[l]
+            }
+            androidx.compose.material3.Surface(
+                onClick = onBridgeChip, shape = DS.pill, color = if (bridgeOnline) c.successSoft else c.warningSoft,
+                modifier = Modifier.heightIn(min = DS.minTouch),
+            ) {
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(10.dp).background(if (bridgeOnline) c.success else c.warning, CircleShape))
+                    Text(com.drishtisaathi.i18n.SBridge.cardTitle[l] + ": " + chipText, color = if (bridgeOnline) c.successInk else c.warningInk,
+                        style = MaterialTheme.typography.labelMedium)
+                }
+            }
             if (!setupDone) {
                 SectionCard(SShop.phoneSetup[l], container = RoutineBg,
                     modifier = Modifier.fillMaxWidth().clickable(onClick = onSetup)) {
                     Text(SShop.setupReminder[l], color = RoutineAmber, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            BigButton(S.startNew[l], onStart, container = Teal)
-            BigButton(S.history[l], onHistory)
-            TextButton(onClick = onShopTools) { Text(SShop.shopTools[l], style = MaterialTheme.typography.titleMedium) }
-            Text(S.privacyNote[l], style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+            // hero card
+            androidx.compose.material3.Surface(
+                onClick = onStart, shape = DS.card, color = c.primary,
+                modifier = Modifier.fillMaxWidth().shadow(14.dp, DS.card, ambientColor = Color(0x14000000), spotColor = Color(0x14000000))
+                    .semantics { role = Role.Button },
+            ) {
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(S.startNew[l], style = MaterialTheme.typography.headlineMedium, color = c.onPrimary)
+                    Text(P.homeHeroLine[l], style = MaterialTheme.typography.bodyLarge, color = c.onPrimary.copy(alpha = 0.85f))
+                    Spacer(Modifier.height(8.dp))
+                    Text(P.homeHeroCta[l] + "  →", style = MaterialTheme.typography.labelLarge, color = c.onPrimary)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HomeTile(S.history[l], c.work, onHistory, Modifier.weight(1f))
+                HomeTile(SShop.shopTools[l], c.mobility, onShopTools, Modifier.weight(1f))
+                HomeTile(P.homeFrames[l], c.leisure, onFrames, Modifier.weight(1f))
+            }
+            Text(S.privacyNote[l], style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
             Disclaimer()
+        }
+    }
+}
+
+@Composable
+private fun HomeTile(label: String, accent: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = DS.colors
+    androidx.compose.material3.Surface(
+        onClick = onClick, shape = DS.card, color = c.surface, border = BorderStroke(1.dp, c.hairline),
+        modifier = modifier.heightIn(min = 112.dp).semantics { role = Role.Button },
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(28.dp).background(accent.copy(alpha = 0.22f), CircleShape), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(12.dp).background(accent, CircleShape))
+            }
+            Text(label, style = MaterialTheme.typography.labelMedium, color = c.ink)
         }
     }
 }

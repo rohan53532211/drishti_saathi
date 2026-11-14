@@ -149,7 +149,7 @@ fun LandmarkOverlay(frame: FaceFrame?, passed: Boolean, modifier: Modifier = Mod
     Canvas(modifier) {
         val f = frame ?: return@Canvas
         val t = PreviewTransform.forFrame(f, size.width, size.height)
-        val colour = if (passed) OkGreen else UrgentRed
+        val colour = if (passed) com.drishtisaathi.ui.LightColors.success else com.drishtisaathi.ui.LightColors.urgent
         drawFaceBox(t, FaceMetrics.faceBox(f), colour)
         if (FaceMetrics.hasIris(f)) {
             listOf(FaceMetrics.RIGHT_IRIS.first, FaceMetrics.LEFT_IRIS.first).forEach { i ->

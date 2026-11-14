@@ -414,3 +414,32 @@ def test_key_is_not_in_any_api_response(tmp_path):
     assert s.status_code == 200 and KEY not in s.text and s.json()["tts_error"] == "TTS_FAILED"
     r = turn(c, s.json()["session_id"])
     assert r.status_code == 502 and KEY not in r.text and r.json() == {"detail": {"code": "SARVAM_AUTH"}}
+
+
+def test_survey_topics_are_optional_extract_only_and_never_asked():
+    """Vision-profile survey: the fields are extractable, the topics never use up one of the 8 questions."""
+    from app import anamnesis as an
+    opt = [t for t in an.TOPICS if t.optional]
+    assert {t.id for t in opt} == {"driving", "sun_time", "work_day"}
+    assert all(set(t.fields) <= an.KNOWN_FIELDS for t in opt)
+    assert an.ENUMS["driveFrequency"] == ["DAILY", "WEEKLY", "MONTHLY", "NEVER"]
+    assert an.INTS["screenHoursDay"] == (0, 16) and an.INTS["outdoorHours"] == (0, 14)
+    tr = an.CoverageTracker()
+    asked = []
+    while True:
+        nxt = tr.next_topic()
+        if nxt is None:
+            break
+        asked.append(nxt)
+        tr.asks[nxt] += 1
+        tr.asked += 1
+        for f in an.TOPIC_BY_ID[nxt].fields:
+            tr.answers[f] = False if f in an.BOOLS else None
+        if nxt == "existing_glasses":
+            tr.answers["wearsGlasses"] = False
+    assert asked[an.RED_FLAG_POSITION - 1] == "red_flags"          # still question 3
+    assert not (set(asked) & {"driving", "sun_time", "work_day"})
+    assert len(asked) <= an.MAX_QUESTIONS
+    assert not (set(tr.missing()) & {"driving", "sun_time", "work_day"})
+    # the built-in copy and the shared file agree
+    assert [t.id for t in an.BUILTIN_TOPICS if t.optional] == [t.id for t in opt]

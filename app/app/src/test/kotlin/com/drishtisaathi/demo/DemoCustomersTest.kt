@@ -44,7 +44,7 @@ class DemoCustomersTest {
 
     private fun text(blocks: List<Block>) = blocks.joinToString("\n") {
         when (it) {
-            is Block.Title -> it.text; is Block.Heading -> it.text; is Block.Para -> it.text; is Block.Bullet -> it.text; is Block.FrameRow -> it.name + " " + it.line; Block.Rule -> "---"
+            is Block.Title -> it.text; is Block.Heading -> it.text; is Block.Para -> it.text; is Block.Bullet -> it.text; is Block.FrameRow -> it.name + " " + it.line; is Block.Rings -> it.rings.joinToString(" ") { r -> r.title + " " + r.label }; Block.Rule -> "---"
         }
     }
 

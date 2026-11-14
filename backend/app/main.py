@@ -61,12 +61,39 @@ class ProfileIn(BaseModel):
     power: dict[str, Any] = Field(default_factory=dict)
     measurements: dict[str, Any] = Field(default_factory=dict)
     estimates: dict[str, Any] = Field(default_factory=dict)
+    # Vision-profile app: how the report is marked (URGENT / CHILD_MYOPIA / ROUTINE) with the red-flag reasons,
+    # the profile rings, the screening tests and the suggested lens family. Older apps do not send these.
+    triage: Optional[dict[str, Any]] = None
+    visionProfile: Optional[dict[str, Any]] = None
+    screening: Optional[dict[str, Any]] = None
+    lens: Optional[dict[str, Any]] = None
+    survey: Optional[dict[str, Any]] = None
+
+
+class ConfirmedPower(BaseModel):
+    """The power the optometrist confirms or corrects, as written (e.g. "-4.25 / -0.50 x 180"). All optional."""
+    model_config = ConfigDict(extra="forbid")
+    right: Optional[str] = Field(default=None, max_length=40)
+    left: Optional[str] = Field(default=None, max_length=40)
+    add: Optional[str] = Field(default=None, max_length=20)
 
 
 class ReviewIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     advice: str = Field(min_length=1, max_length=4000)
     needsInPersonExam: bool
+    confirmedPower: Optional[ConfirmedPower] = None
+
+
+TAGS = ("URGENT", "CHILD_MYOPIA", "ROUTINE")
+
+
+def tag_of(profile: dict[str, Any]) -> str:
+    """URGENT / CHILD_MYOPIA / ROUTINE. The app's own tag when it is valid; an urgent referral level is always URGENT."""
+    tag = ((profile.get("triage") or {}).get("tag") or "").upper()
+    if (profile.get("estimates") or {}).get("referralLevel") == "URGENT":
+        return "URGENT"
+    return tag if tag in TAGS else "ROUTINE"
 
 
 def case_id(pid: str) -> str:
@@ -128,8 +155,11 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
 
     with db() as con:
         con.executescript(SCHEMA)
+        # v1.2: the optometrist's confirmed power (JSON); older databases get the column
+        if "confirmed" not in [r["name"] for r in con.execute("PRAGMA table_info(reviews)").fetchall()]:
+            con.execute("ALTER TABLE reviews ADD COLUMN confirmed TEXT")
 
-    app = FastAPI(title="Drishti Saathi Remote Optometrist Bridge", version="1.1")
+    app = FastAPI(title="Drishti Saathi Remote Optometrist Bridge", version="1.2")
     voice = anamnesis.AnamnesisService(sarvam or SarvamClient())
 
     def check_token(x_bridge_token: Optional[str] = Header(default=None)) -> None:
@@ -143,8 +173,11 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
         r = con.execute("SELECT * FROM reviews WHERE profile_id = ?", (pid,)).fetchone()
         if r is None:
             return {"status": "WAITING"}
-        return {"status": "REVIEWED", "advice": r["advice"], "needsInPersonExam": bool(r["needs_in_person"]),
-                "reviewedAt": r["reviewed_at"]}
+        out = {"status": "REVIEWED", "advice": r["advice"], "needsInPersonExam": bool(r["needs_in_person"]),
+               "reviewedAt": r["reviewed_at"]}
+        if r["confirmed"]:
+            out["confirmedPower"] = json.loads(r["confirmed"])
+        return out
 
     def get_row(con: sqlite3.Connection, pid: str) -> sqlite3.Row:
         row = con.execute("SELECT * FROM profiles WHERE id = ?", (pid,)).fetchone()
@@ -205,15 +238,21 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
                     "dominantZone": fp.get("dominant"), "impliedLens": fp.get("impliedLens"),
                     "referralLevel": est.get("referralLevel"), "referralReasons": est.get("referralReasons") or [],
                     "needsInPersonExam": rv.get("needsInPersonExam"),
+                    "tag": tag_of(p),
+                    "redFlagReasons": (p.get("triage") or {}).get("redFlagReasons") or [],
+                    "lensIds": (p.get("lens") or {}).get("ids") or [],
                 })
+            # URGENT first, then CHILD_MYOPIA, then ROUTINE; the newest first inside each group
+            out.sort(key=lambda x: (TAGS.index(x["tag"]), -x["receivedAt"]))
             return out
 
     @app.get("/profiles/{pid}", dependencies=[Depends(check_token)])
     def get_profile(pid: str) -> dict[str, Any]:
         with db() as con:
             r = get_row(con, pid)
-            return {"id": pid, "caseId": case_id(pid), "receivedAt": r["received_at"], "profile": json.loads(r["payload"]),
-                    "review": review_of(con, pid)}
+            profile = json.loads(r["payload"])
+            return {"id": pid, "caseId": case_id(pid), "receivedAt": r["received_at"], "profile": profile,
+                    "tag": tag_of(profile), "review": review_of(con, pid)}
 
     @app.delete("/profiles/{pid}", status_code=204, dependencies=[Depends(check_token)])
     def delete_profile(pid: str) -> Response:
@@ -227,11 +266,13 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
     def post_review(pid: str, review: ReviewIn) -> dict[str, Any]:
         with db() as con:
             get_row(con, pid)
+            cp = review.confirmedPower
+            confirmed = {k: v.strip() for k, v in (cp.model_dump() if cp else {}).items() if v and v.strip()}
             con.execute(
-                "INSERT INTO reviews (profile_id, advice, needs_in_person, reviewed_at) VALUES (?, ?, ?, ?) "
+                "INSERT INTO reviews (profile_id, advice, needs_in_person, reviewed_at, confirmed) VALUES (?, ?, ?, ?, ?) "
                 "ON CONFLICT(profile_id) DO UPDATE SET advice = excluded.advice, "
-                "needs_in_person = excluded.needs_in_person, reviewed_at = excluded.reviewed_at",
-                (pid, review.advice.strip(), int(review.needsInPersonExam), now_ms()),
+                "needs_in_person = excluded.needs_in_person, reviewed_at = excluded.reviewed_at, confirmed = excluded.confirmed",
+                (pid, review.advice.strip(), int(review.needsInPersonExam), now_ms(), json.dumps(confirmed) if confirmed else None),
             )
             return review_of(con, pid)
 

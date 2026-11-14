@@ -11,6 +11,7 @@ import com.drishtisaathi.ui.Fmt
 import com.drishtisaathi.ui.PowerPathText
 import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.ui.answerText
+import com.drishtisaathi.profile.gate
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,11 +25,16 @@ sealed class Block {
     data object Rule : Block()
     /** A saved frame: thumbnail (looked up by [frameId] when the exporter has one), name and one detail line. */
     data class FrameRow(val frameId: String, val name: String, val line: String) : Block()
+    /** The four profile rings: title, label, score 0–100 (negative = not answered) and colour (RGB). */
+    data class Rings(val rings: List<RingSpec>) : Block()
+    data class RingSpec(val title: String, val label: String, val score: Int, val rgb: Int)
 }
 
 enum class Tone { NORMAL, MUTED, URGENT, ROUTINE, ACCENT }
 
 object PdfContent {
+    /** The section colours of the rings (the design tokens: work, digital, mobility, leisure). */
+    val RING_RGB = mapOf("WORK" to 0x2F80ED, "DIGITAL" to 0xA3D33A, "MOBILITY" to 0x6B7785, "LEISURE" to 0xF2A93B)
 
     private fun date(ms: Long?) = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US).format(Date(ms ?: System.currentTimeMillis()))
 
@@ -63,7 +69,9 @@ object PdfContent {
     }
 
     fun shopCopy(state: UiState, rules: RulesConfig, ctx: ChoiceContext, l: Lang,
-                 saved: List<com.drishtisaathi.data.SavedFrameEntity> = emptyList()): List<Block> {
+                 saved: List<com.drishtisaathi.data.SavedFrameEntity> = emptyList(),
+                 /** The profile rings and the lens suggestion (Phase E); null = left out. */
+                 view: com.drishtisaathi.profile.ProfileView? = null): List<Block> {
         val r = state.result ?: return emptyList()
         val a = r.assessment
         val out = mutableListOf<Block>()
@@ -71,11 +79,22 @@ object PdfContent {
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${state.sessionId?.let { S.sessionNo.format(it.toInt())[l] + " · " } ?: ""}${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
-        val urgent = a.referral.level == ReferralLevel.URGENT
-        if (urgent) {
+        val gate = state.gate(rules)
+        val P = com.drishtisaathi.i18n.SProfile
+        val urgent = a.referral.level == ReferralLevel.URGENT || gate.urgent
+        out += Block.Para(P.reportTagLine.format(P.tag(gate.tag)[l])[l], bold = true,
+            tone = when (gate.tag) { com.drishtisaathi.engine.profile.ReportTag.URGENT -> Tone.URGENT; com.drishtisaathi.engine.profile.ReportTag.CHILD_MYOPIA -> Tone.ROUTINE; else -> Tone.MUTED })
+        if (gate.urgent) {
+            out += Block.Para(P.seeDoctorToday[l], bold = true, tone = Tone.URGENT)
+            gate.redFlags.forEach { out += Block.Bullet(P.redFlag(it)[l], Tone.URGENT) }
+            out += Block.Para(P.noLensToday[l], bold = true)
+        } else if (urgent) {
             out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
             reasonGroups(a.referral, rules, l, out)
-            out += Block.Para(com.drishtisaathi.i18n.SShop.afterDoctor[l], bold = true)
+        }
+        if (gate.childMyopia) {
+            out += Block.Para(P.childMyopiaTitle[l], bold = true, tone = Tone.ROUTINE)
+            out += Block.Para(P.childMyopiaBody[l])
         }
         out += Block.Rule
 
@@ -83,7 +102,42 @@ object PdfContent {
         val quick = PowerPathText.quickLines(state)
         if (quick.isNotEmpty()) {
             out += Block.Heading(com.drishtisaathi.i18n.SShop.eyeCheckTitle[l])
+            if (gate.powerForOptometristOnly) out += Block.Para(P.forOptometristOnly[l], bold = true, tone = Tone.URGENT)
             quick.forEach { out += Block.Bullet(it[l]) }
+        }
+
+        // Screening tests, always labelled "Screening, not a diagnosis".
+        val screening = com.drishtisaathi.profile.ScreeningText.lines(state, rules)
+        if (screening.isNotEmpty()) {
+            out += Block.Heading(P.screeningTitle[l])
+            out += Block.Para(P.screeningLabel[l], tone = Tone.MUTED)
+            screening.forEach {
+                out += Block.Bullet(it.text[l], when (it.status) {
+                    com.drishtisaathi.profile.ScreenLine.Status.URGENT -> Tone.URGENT
+                    com.drishtisaathi.profile.ScreenLine.Status.WATCH -> Tone.ROUTINE
+                    com.drishtisaathi.profile.ScreenLine.Status.NOT_DONE -> Tone.MUTED
+                    else -> Tone.NORMAL
+                })
+            }
+        }
+
+        // The vision profile rings and the suggested lens family with its reasons.
+        if (view != null) {
+            out += Block.Heading(P.profileTitle[l])
+            out += Block.Rings(view.profile.rings.map { (id, r) ->
+                Block.RingSpec(com.drishtisaathi.profile.LensText.ringTitle(id)[l], (if (r.known) P.ringLabel(r.label) else P.ringNotAnswered)[l],
+                    if (r.known) r.score else -1, RING_RGB.getValue(id))
+            })
+            com.drishtisaathi.profile.LensText.ringLines(view.profile).forEach { out += Block.Bullet(it[l]) }
+            if (view.plan.allowed) {
+                out += Block.Heading(P.lensLabel[l])
+                if (view.plan.optometristConfirms) out += Block.Para(P.optometristConfirms[l], bold = true, tone = Tone.ROUTINE)
+                view.plan.all.forEach { s ->
+                    out += Block.Para("${com.drishtisaathi.profile.LensText.kind(s.kind)[l]}: ${s.name}", bold = true, tone = Tone.ACCENT)
+                    out += Block.Para(s.what, tone = Tone.MUTED)
+                    com.drishtisaathi.profile.LensText.why(s).forEach { out += Block.Bullet(it[l]) }
+                }
+            }
         }
 
         if (!urgent) {
@@ -93,8 +147,10 @@ object PdfContent {
         }
         if (state.glassesOn) out += Block.Para(com.drishtisaathi.i18n.SFlow.glassesOnNote[l], bold = true, tone = Tone.ROUTINE)
 
-        val adv = a.advice
-        if (adv == null) {
+        val adv = a.advice.takeIf { gate.lensAllowed }
+        if (!gate.lensAllowed) {
+            // a red flag or child myopia: referral only, no lens or frame suggestion
+        } else if (adv == null) {
             out += Block.Para(S.adviceWithheld[l], bold = true)
         } else {
             out += Block.Heading(S.startingTrialLens[l])
@@ -191,11 +247,20 @@ object PdfContent {
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
         out += Block.Para(S.disclaimerBoth, bold = true)
-        val urgent = a.referral.level == ReferralLevel.URGENT
-        if (urgent) {
+        val gate = state.gate(rules)
+        val P = com.drishtisaathi.i18n.SProfile
+        val urgent = a.referral.level == ReferralLevel.URGENT || gate.urgent
+        if (gate.urgent) {
+            out += Block.Para(P.seeDoctorToday[l], bold = true, tone = Tone.URGENT)
+            gate.redFlags.forEach { out += Block.Bullet(P.redFlag(it)[l], Tone.URGENT) }
+            out += Block.Para(P.noLensToday[l], bold = true)
+        } else if (urgent) {
             out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
             reasonGroups(a.referral, rules, l, out)
-            out += Block.Para(com.drishtisaathi.i18n.SShop.afterDoctor[l], bold = true)
+        }
+        if (gate.childMyopia) {
+            out += Block.Para(P.childMyopiaTitle[l], bold = true, tone = Tone.ROUTINE)
+            out += Block.Para(P.childMyopiaBody[l])
         }
         out += Block.Para(S.customerIntro[l])
         out += Block.Rule
@@ -208,7 +273,7 @@ object PdfContent {
         }
         if (!urgent) reasonGroups(a.referral, rules, l, out)
 
-        a.advice?.let { adv ->
+        a.advice?.takeIf { gate.lensAllowed }?.let { adv ->
             out += Block.Heading(S.lensPackage[l])
             out += Block.Bullet("${S.lensType[l]}: ${S.lensType(adv.lensType.value)[l]}")
             out += Block.Bullet("${S.material[l]}: ${S.material(adv.materialId.value)[l]}")

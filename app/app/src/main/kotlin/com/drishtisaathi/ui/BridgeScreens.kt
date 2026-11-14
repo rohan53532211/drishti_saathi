@@ -98,6 +98,8 @@ fun RemoteReviewCard(
     onSend: () -> Unit,
     onCheck: () -> Unit,
     onPoll: () -> Unit = onCheck,
+    /** The report is in the queue (no server set, or offline): it goes out when the backend connects. */
+    queued: Boolean = false,
 ) {
     val l = state.lang
     val r = state.remote
@@ -117,11 +119,13 @@ fun RemoteReviewCard(
             notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    SectionCard(SBridge.cardTitle[l], container = if (r?.needsInPersonExam == true) UrgentBg else androidx.compose.ui.graphics.Color.White) {
+    SectionCard(SBridge.cardTitle[l], container = if (r?.needsInPersonExam == true) UrgentBg else androidx.compose.ui.graphics.Color.Unspecified) {
         when {
             r == null -> {
-                if (configured) BigButton(SBridge.send[l], onSend, enabled = !state.bridgeBusy)
-                else Text(SBridge.notConfigured[l], style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                if (queued) Text(com.drishtisaathi.i18n.SProfile.reportQueued[l], style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                if (!configured) Text(SBridge.notConfigured[l], style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                // always on: with no server set it explains what is missing
+                BigButton(com.drishtisaathi.i18n.SProfile.reportSendNow[l], onSend, enabled = !state.bridgeBusy)
             }
             !r.reviewed -> {
                 Text(SBridge.sentCase.format(r.caseId)[l], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
