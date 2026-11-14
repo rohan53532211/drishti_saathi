@@ -186,9 +186,10 @@ object ColourPlates {
     fun series(cfg: ColourConfig, rnd: Random): List<PlateSpec> {
         var last = -1
         fun digit(): Int { while (true) { val d = DIGITS[rnd.nextInt(DIGITS.size)]; if (d != last) { last = d; return d } } }
-        fun plates(type: PlateType, n: Int) = List(n) { PlateSpec(type, digit(), rnd.nextLong()) }
-        return plates(PlateType.CONTROL, cfg.controlPlates) +
-            (plates(PlateType.RED_GREEN, cfg.redGreenPlates) + plates(PlateType.BLUE_YELLOW, cfg.blueYellowPlates)).shuffled(rnd)
+        // the order of the kinds is mixed first, then the digits are dealt, so no digit comes twice in a row
+        val kinds = List(cfg.controlPlates) { PlateType.CONTROL } +
+            (List(cfg.redGreenPlates) { PlateType.RED_GREEN } + List(cfg.blueYellowPlates) { PlateType.BLUE_YELLOW }).shuffled(rnd)
+        return kinds.map { PlateSpec(it, digit(), rnd.nextLong()) }
     }
 
     /** The dot pattern of [spec] (the same seed always gives the same plate). */
@@ -200,11 +201,12 @@ object ColourPlates {
         val n = (1.0 / cell).toInt() + 1
         val grid = HashMap<Int, MutableList<PlateDot>>()
         var attempts = 0
-        while (out.size < cfg.dots && attempts < cfg.dots * 40) {
+        val maxAttempts = cfg.dots * 40
+        while (out.size < cfg.dots && attempts < maxAttempts) {
             attempts++
-            // big dots first, small ones fill the gaps
-            val t = out.size.toDouble() / cfg.dots
-            val r = cfg.maxDotRadius - (cfg.maxDotRadius - cfg.minDotRadius) * minOf(1.0, t * 1.4) * rnd.nextDouble(0.6, 1.0)
+            // big dots first; as the tries go on the dots get smaller and fill the gaps
+            val t = attempts.toDouble() / maxAttempts
+            val r = cfg.minDotRadius + (cfg.maxDotRadius - cfg.minDotRadius) * (1.0 - t) * (1.0 - t) * rnd.nextDouble(0.5, 1.0)
             val x = rnd.nextDouble(); val y = rnd.nextDouble()
             val dx = x - 0.5; val dy = y - 0.5
             if (dx * dx + dy * dy > (0.5 - r) * (0.5 - r)) continue

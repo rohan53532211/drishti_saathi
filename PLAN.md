@@ -212,8 +212,8 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 |---|---|---|
 | A | Safety rules: full check for everyone, red flags, emergency short path, child myopia, report always queued for the optometrist | Done |
 | B | Lens-assisted mode (over-refraction) for strong minus powers | Done |
-| C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Next: engine logic written, screens to do |
-| D | Survey upgrade (sections, skip logic, "Why we ask") | Survey engine, questions and screen written in phase A; skip tests, Sarvam topics to do |
+| C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Done |
+| D | Survey upgrade (sections, skip logic, "Why we ask") | Next: survey engine, questions and screen written in phase A; Sarvam topics to do |
 | E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | To do |
 | F | Premium UI redesign (tokens, fonts, all screens) | Tokens written; screens to do |
 | G | QR, WhatsApp share, PDF additions, backend page | To do |
@@ -244,6 +244,17 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 - Every output (result screen, shop PDF, optometrist report) states the method, e.g. "Measured through −2.00 D lens, residual −2.25 D, total −4.25 D (range −4.00 to −4.50)".
 - Learning loop: the phone-model correction is applied to the residual only; lens, residual (raw and rounded), first pass and method are stored with the session, and a verified lens-assisted eye gives a pair for the residual.
 - Tests: `LensAssistedTest` (engine), `LensAssistedFlowTest` (app).
+
+### Phase C: screening tests (done)
+- The screening stage runs after the power of each eye: full brightness, a note for staff to turn off Night light / Eye comfort mode, then one eye at a time with a live distance pill (green inside the range, amber outside), a 3-2-1 countdown and Skip on every test. System bars are hidden.
+- **Grid (Amsler):** squares of 5 real mm from the display dpi or the bank-card scale, centre dot, starts only at 27–33 cm. "Are any lines wavy, missing, blurred or broken?" by voice or tap; on yes the person taps the squares. Any yes is a red flag and the tapped squares are stored and sent.
+  - A phone screen is narrower than 10 cm, so whole columns are left out at the sides (e.g. 12 × 20 on a 66 mm screen); the squares are never scaled and the screen says which grid was shown.
+- **Contrast:** one Sloan letter at 0.5 logMAR for the measured distance, steps 100 / 50 / 25 / 12.5 / 6 / 3 / 1.5 %, 2 of 3 right passes a step. Result: lowest step passed, Normal (3 % or better) or Reduced. Reduced with age 50+ or low-light / glare complaints adds "Suggest cataract / eye-health check".
+- **Colour:** our own generated dot plates (`ColourPlates`, no copied test images): 1 control + 5 red-green + 2 blue-yellow, digit by voice or pad. Normal / possible red-green / possible blue-yellow, "confirm with optometrist" and "Ask about colour needs for driving licence/work". A missed control plate gives "Test not valid, repeat". Palettes are in `rules.json` and are not clinically validated.
+- **E test and clock dial:** the earlier screens run after the colour test; the dial is placed from the power check's far point.
+- All results show on the result screen (status dots), the shop PDF and the optometrist report under "Screening, not a diagnosis".
+- Emergency short path: the grid only.
+- Tests: `ScreeningTest` (engine), `ScreeningFlowTest` (app).
 
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.
