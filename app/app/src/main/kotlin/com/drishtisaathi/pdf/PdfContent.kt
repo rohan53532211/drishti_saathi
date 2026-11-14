@@ -64,7 +64,9 @@ object PdfContent {
     }
 
     fun shopCopy(state: UiState, rules: RulesConfig, ctx: ChoiceContext, l: Lang,
-                 saved: List<com.drishtisaathi.data.SavedFrameEntity> = emptyList()): List<Block> {
+                 saved: List<com.drishtisaathi.data.SavedFrameEntity> = emptyList(),
+                 /** The profile rings and the lens suggestion (Phase E); null = left out. */
+                 view: com.drishtisaathi.profile.ProfileView? = null): List<Block> {
         val r = state.result ?: return emptyList()
         val a = r.assessment
         val out = mutableListOf<Block>()
@@ -111,6 +113,21 @@ object PdfContent {
                     com.drishtisaathi.profile.ScreenLine.Status.NOT_DONE -> Tone.MUTED
                     else -> Tone.NORMAL
                 })
+            }
+        }
+
+        // The vision profile rings and the suggested lens family with its reasons.
+        if (view != null) {
+            out += Block.Heading(P.profileTitle[l])
+            com.drishtisaathi.profile.LensText.ringLines(view.profile).forEach { out += Block.Bullet(it[l]) }
+            if (view.plan.allowed) {
+                out += Block.Heading(P.lensLabel[l])
+                if (view.plan.optometristConfirms) out += Block.Para(P.optometristConfirms[l], bold = true, tone = Tone.ROUTINE)
+                view.plan.all.forEach { s ->
+                    out += Block.Para("${com.drishtisaathi.profile.LensText.kind(s.kind)[l]}: ${s.name}", bold = true, tone = Tone.ACCENT)
+                    out += Block.Para(s.what, tone = Tone.MUTED)
+                    com.drishtisaathi.profile.LensText.why(s).forEach { out += Block.Bullet(it[l]) }
+                }
             }
         }
 

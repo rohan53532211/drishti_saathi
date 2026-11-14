@@ -158,6 +158,68 @@ object SProfile {
     val eyeR = tx("R", "दाईं")
     val eyeL = tx("L", "बाईं")
 
+    // ---- Phase E: vision profile rings and lens cards ----
+    val profileTitle = tx("Your Vision Profile", "आपकी विज़न प्रोफ़ाइल")
+    val ringWork = tx("Work", "काम")
+    val ringDigital = tx("Digital", "डिजिटल")
+    val ringMobility = tx("Mobility", "सफ़र")
+    val ringLeisure = tx("Leisure", "फ़ुर्सत")
+    val ringNotAnswered = tx("not answered", "जवाब नहीं दिया")
+    val nightGlare = tx("Night-glare sensitive", "रात की चौंध से परेशानी")
+    private val RING_LABEL = mapOf(
+        "NEAR_FOCUSED" to tx("Near-focused", "पास का काम ज़्यादा"), "BALANCED" to tx("Balanced", "संतुलित"),
+        "DISTANCE_FOCUSED" to tx("Distance-focused", "दूर का काम ज़्यादा"),
+        "LIGHT" to tx("Light", "हल्का इस्तेमाल"), "CONNECTED" to tx("Connected", "जुड़े हुए"), "DIGITAL_NATIVE" to tx("Digital Native", "डिजिटल नेटिव"),
+        "RARELY" to tx("Rarely", "कभी-कभार"), "WEEKLY" to tx("Weekly", "हर हफ़्ते"), "DAILY" to tx("Daily", "रोज़"),
+        "LOW" to tx("Low Sun & UV Exposure", "धूप और UV कम"), "MEDIUM" to tx("Medium Sun & UV Exposure", "धूप और UV मध्यम"),
+        "HIGH" to tx("High Sun & UV Exposure", "धूप और UV ज़्यादा"),
+    )
+    fun ringLabel(code: String): Txt = RING_LABEL.getValue(code)
+    val lensLabel = tx("Suggested ZEISS lens family – optician confirms", "सुझाया गया ZEISS लेंस परिवार – ऑप्टिशियन पक्का करेंगे")
+    val lensMain = tx("Your lens", "आपका लेंस")
+    val lensSecond = tx("A second pair", "दूसरा चश्मा")
+    val whyForYou = tx("Why for you", "आपके लिए क्यों")
+    val lensDesign = tx("Design", "डिज़ाइन")
+    val lensMaterial = tx("In the lens", "लेंस में")
+    val lensCoating = tx("Coating", "कोटिंग")
+    val lensMore = tx("More on zeiss.co.in", "zeiss.co.in पर और जानें")
+    val measurementsTitle = tx("Measurements", "नाप")
+    val wordFar = tx("far", "दूर")
+    val wordNear = tx("near", "पास")
+    val wordTired = tx("tired eyes", "आँखों की थकान")
+    val wordHeadache = tx("headaches", "सिरदर्द")
+    val wordNeck = tx("neck pain", "गर्दन दर्द")
+    val wordStrain = tx("eye strain", "आँखों पर ज़ोर")
+    private val BUDGET = mapOf("LOW" to tx("low", "कम"), "MID" to tx("medium", "मध्यम"), "HIGH" to tx("high", "ज़्यादा"))
+    private val DRIVE = mapOf("DAILY" to tx("every day", "रोज़"), "WEEKLY" to tx("every week", "हर हफ़्ते"), "MONTHLY" to tx("now and then", "कभी-कभी"), "NEVER" to tx("never", "कभी नहीं"))
+    private val REASON = mapOf(
+        "BUDGET" to tx("Fits your budget (%s)", "आपके बजट (%s) में"),
+        "AGE_NEAR_FOCUS" to tx("At %s, focusing up close starts to need help", "%s की उम्र में पास देखने के लिए मदद की ज़रूरत पड़ने लगती है"),
+        "CHILD" to tx("Made for children's eyes and frames", "बच्चों की आँखों और फ़्रेम के लिए बना"),
+        "DRIVES" to tx("You drive %s", "आप %s गाड़ी चलाते हैं"),
+        "GLARE" to tx("Oncoming headlights dazzle you", "सामने की लाइट से आपकी आँखें चौंधियाती हैं"),
+        "LOW_LIGHT" to tx("Seeing in low light is hard for you", "कम रोशनी में आपको देखने में दिक्कत होती है"),
+        "BUSY_WORK" to tx("Your work is visually busy", "आपके काम में आँखों पर बहुत ज़ोर पड़ता है"),
+        "FOCUS" to tx("You struggle to refocus", "नज़र बदलने पर साफ़ देखने में आपको दिक्कत होती है"),
+        "FIRST_PROGRESSIVE" to tx("Your first lens with far and near in one: easy to get used to", "दूर और पास वाला आपका पहला लेंस: आदत जल्दी पड़ती है"),
+        "DIGITAL" to tx("You use screens %s h a day", "आप रोज़ %s घंटे स्क्रीन देखते हैं"),
+        "DRIVESAFE_DESIGN" to tx("Goes with the DriveSafe lens", "DriveSafe लेंस के साथ आती है"),
+        "PUBLIC_FACING" to tx("You deal with people all day", "आप दिन भर लोगों से मिलते हैं"),
+        "DRIVES_DAY" to tx("You drive in daylight", "आप दिन में गाड़ी चलाते हैं"),
+        "WATER" to tx("You are often near water", "आप अक्सर पानी के पास रहते हैं"),
+        "OUTDOOR_SPORT" to tx("You do outdoor sport", "आप बाहर खेलते हैं"),
+        "FIELD_WORK" to tx("You work in the fields", "आप खेत में काम करते हैं"),
+        "OUTDOOR_HOURS" to tx("You are outdoors %s h a day", "आप रोज़ %s घंटे बाहर रहते हैं"),
+    )
+    /** A lens-engine reason code with its numbers, in words. */
+    fun reason(code: String, args: List<String>): Txt {
+        val t = REASON.getValue(code)
+        val a = args.firstOrNull() ?: return t
+        val word = when (code) { "BUDGET" -> BUDGET[a]; "DRIVES" -> DRIVE[a]; else -> null }
+        return Txt(t.en.format(word?.en ?: a), t.hi.format(word?.hi ?: a))
+    }
+    val reasonCodes: Set<String> get() = REASON.keys
+
     // ---- report queue / bridge chip ----
     val bridgeConnected = tx("Connected", "जुड़ा है")
     val bridgeOffline = tx("Offline – queued %d", "ऑफ़लाइन – %d कतार में")
@@ -196,5 +258,6 @@ object SProfile {
     /** Every fixed string (for tests). */
     fun touchAll() {
         ReportTag.entries.forEach(::tag); RedFlag.entries.forEach(::redFlag); Freq.entries.forEach(::freq)
+        reasonCodes.forEach { reason(it, listOf("LOW")) }
     }
 }

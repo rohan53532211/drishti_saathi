@@ -61,6 +61,8 @@ fun ResultScreen(
     savedFrames: @Composable () -> Unit = {},
     /** Phase A safety gate: red flags and child myopia hide every lens suggestion. */
     gate: com.drishtisaathi.engine.profile.SafetyGate = state.gate(rules),
+    /** Phase E: the profile rings and the suggested lens family. */
+    view: com.drishtisaathi.profile.ProfileView? = null,
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -100,6 +102,11 @@ fun ResultScreen(
             }
             // A red flag or child myopia: the referral card replaces every lens and frame suggestion.
             if (!gate.lensAllowed) com.drishtisaathi.profile.ReferralCard(l, gate)
+            // "Your Vision Profile" rings, then the lens cards (hidden after a red flag or for child myopia).
+            view?.let {
+                com.drishtisaathi.profile.VisionProfileCard(l, it.profile)
+                com.drishtisaathi.profile.LensCards(l, it.plan)
+            }
             SectionCard(SAnamnesis.profileTitle[l]) {
                 PowerPathText.profileLines(state, rules).forEach { Text(it[l], style = MaterialTheme.typography.bodyLarge) }
             }

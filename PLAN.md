@@ -214,8 +214,8 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 | B | Lens-assisted mode (over-refraction) for strong minus powers | Done |
 | C | Screening tests: Amsler grid, contrast, colour plates (E test and clock dial kept) | Done |
 | D | Survey upgrade (sections, skip logic, "Why we ask") | Done |
-| E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | Next |
-| F | Premium UI redesign (tokens, fonts, all screens) | Tokens written; screens to do |
+| E | Vision profile rings + ZEISS lens engine from `lens_catalog.json` | Done |
+| F | Premium UI redesign (tokens, fonts, all screens) | Next: tokens, survey, screening and profile cards written; theme, fonts, home, result layout, old screens to do |
 | G | QR, WhatsApp share, PDF additions, backend page | To do |
 | H | All tests, APK, README, architecture doc | To do |
 
@@ -263,6 +263,23 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 - Age, first glasses, known power and budget stay in the core / later questions and are not asked again. The survey fills the older headache, screen-hours, outdoor-work and occupation questions, so nobody is asked twice. Planned time: 22 questions × 10 s, inside the 4-minute limit.
 - **Sarvam coverage tracker:** three optional topics (driving, sun time, work day) and their fields (`driveFrequency`, `glareOncoming`, `tiredEyes`, `indoorOutdoor`, `screenHoursDay`, `workHours`, `outdoorHours`). They are extract-only: picked up when the customer mentions them, never asked, so the interview keeps its 8 questions and the red-flag question stays question 3. The phone's survey then asks only what is still open.
 - Tests: `SurveyTest` (engine), `SurveyBridgeTest` (app), `test_survey_topics_are_optional_extract_only_and_never_asked` (backend).
+
+### Phase E: vision profile and lens engine (done)
+- **Rings** (`engine/profile/VisionProfile.kt`, `rules.json` → `visionProfile`), score 0–100 and a label each:
+  - Work: Near-focused / Balanced / Distance-focused (share of near work in the activities)
+  - Digital: Light / Connected / Digital Native (under 3, 3–6, over 6 screen hours)
+  - Mobility: Rarely / Weekly / Daily, plus "Night-glare sensitive"
+  - Leisure: Low / Medium / High Sun & UV Exposure
+  - a ring whose questions were not answered says "not answered" (never an invented score).
+- **Lens engine** (`engine/profile/LensEngine.kt`): reads the products, texts, "why" templates and links from `lens_catalog.json` (unchanged) and follows its selection order: safety gate → lens type → design → materials (UVProtect always) → coating → up to 2 second pairs. The numbers of the trigger rules are in `rules.json` → `lensEngine`.
+  - Each of the 27 catalogue entries has one trigger in `LensEngine.triggers`; a test fails when the catalogue and the engine differ.
+  - Budget: low → ClearView / Light 2 + Chrome; mid → SmartLife + Silver (Platinum for heavy screen users, AntiVirus Platinum UV for public-facing work); high → ClearMind (busy work or focus complaints) or SmartLife + Gold. An unknown budget counts as mid.
+  - DriveSafe is the main design for daily drivers with glare or poor low-light vision (with its own coating) and a second pair for weekly drivers. A reduced contrast test counts as poor low-light vision.
+  - Exclusions: never BlueProtect with BlueGuard (or PhotoFusion X, which contains it); PhotoFusion X only for outdoor hours + "one pair" wish, never for night glare; myopia management is a referral, never a lens.
+  - Our own choices where the catalogue leaves room: DriveSafe main vs second pair, one sun lens per customer (polarised first), a mid-budget progressive gets Light 2 only as a first progressive.
+- Each suggestion has the product name, what it does (catalogue text, English), 1–2 "Why for you" lines from this customer's answers (Hindi and English) and the ZEISS link. Label: "Suggested ZEISS lens family – optician confirms".
+- The result screen shows the rings card and the lens cards; the shop PDF and the optometrist report carry the rings, lens ids and reasons. Red flag or child myopia: rings stay, lens cards are replaced by the referral card.
+- Tests: `LensEngineTest` (one per trigger and exclusion, 5 personas: 25-year student, 35-year IT worker, 52-year shopkeeper who drives at night, 60-year farmer, 10-year child with −2.00), `ProfileViewTest`.
 
 ## Open items
 1. ~~Install the latest APK on the S23 FE and confirm voice works~~ **Done (11 Nov 2026):** voice works on the S23 FE.

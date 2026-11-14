@@ -520,6 +520,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             val gate = androidx.compose.runtime.remember(state.answers, state.survey, state.quick, state.tests, state.screening) { vm.safety(state) }
             ResultScreen(
                 state, vm.rules, vm::setLang, gate = gate,
+                view = androidx.compose.runtime.remember(state.answers, state.survey, state.quick, state.tests, state.screening, state.result) { vm.profileView(state) },
                 onSaveVerification = vm::saveVerification,
                 onDelete = { vm.deleteCurrentSession { goHome() } },
                 onDone = { goHome() },

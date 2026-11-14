@@ -65,7 +65,11 @@ object BridgeProfile {
     private val json = Json { encodeDefaults = true; explicitNulls = false }
     private fun <T> enc(s: KSerializer<T>, v: T?): JsonElement = if (v == null) JsonNull else json.encodeToJsonElement(s, v)
 
-    fun build(state: UiState, rules: RulesConfig, consent: BridgeConsent, appVersion: String): JsonObject {
+    fun build(
+        state: UiState, rules: RulesConfig, consent: BridgeConsent, appVersion: String,
+        /** The profile rings and the lens suggestion (Phase E); null = not sent. */
+        view: com.drishtisaathi.profile.ProfileView? = null,
+    ): JsonObject {
         require(consent.complete) { "spoken and tapped consent are both required" }
         val r = requireNotNull(state.result) { "no result yet" }
         val a = r.assessment
@@ -125,6 +129,32 @@ object BridgeProfile {
                     }))
                     put("results", enc(com.drishtisaathi.engine.profile.ScreeningResults.serializer(), sc))
                 })
+            }
+            if (view != null) {
+                put("visionProfile", buildJsonObject {
+                    view.profile.rings.forEach { (id, r) ->
+                        put(id.lowercase(), buildJsonObject {
+                            put("score", r.score); put("label", com.drishtisaathi.i18n.SProfile.ringLabel(r.label).en); put("answered", r.known)
+                        })
+                    }
+                    put("overall", view.profile.overall)
+                    put("nightGlareSensitive", view.profile.nightGlareSensitive)
+                })
+                put("lens", buildJsonObject {
+                    put("label", com.drishtisaathi.i18n.SProfile.lensLabel.en)
+                    put("suggested", view.plan.allowed)
+                    put("optometristConfirms", view.plan.optometristConfirms)
+                    put("ids", kotlinx.serialization.json.JsonArray(view.plan.ids.map(::JsonPrimitive)))
+                    put("items", kotlinx.serialization.json.JsonArray(view.plan.all.map { s ->
+                        buildJsonObject {
+                            put("kind", s.kind.name); put("id", s.id); put("product", s.name)
+                            put("why", kotlinx.serialization.json.JsonArray(com.drishtisaathi.profile.LensText.why(s).map { JsonPrimitive(it.en) }))
+                            s.url?.let { put("url", it) }
+                        }
+                    }))
+                    view.plan.referralInfo?.let { put("referralInfo", it.name) }
+                })
+                if (state.survey.values.isNotEmpty()) put("survey", enc(com.drishtisaathi.engine.profile.SurveyAnswers.serializer(), state.survey))
             }
             put("estimates", buildJsonObject {
                 put("referralLevel", a.referral.level.name)

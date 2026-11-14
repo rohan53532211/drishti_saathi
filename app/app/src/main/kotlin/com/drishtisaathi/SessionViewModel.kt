@@ -265,7 +265,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         val cfg = bridgeSettings.config.value
         _state.update { it.copy(bridgeBusy = true, bridgeError = null) }
         try {
-            val profile = BridgeProfile.build(s, rules, consent, appVersion)
+            val profile = BridgeProfile.build(s, rules, consent, appVersion, profileView(s))
             val created = withContext(Dispatchers.IO) { BridgeClient(cfg).send(profile) }
             val e = RemoteReviewEntity(id, created.id, cfg.baseUrl, System.currentTimeMillis(), consent.consentAt, created.status)
             remoteDao.upsert(e)
@@ -387,6 +387,16 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
 
     val surveyFile: com.drishtisaathi.engine.profile.SurveyFile by lazy { com.drishtisaathi.interview.QuestionBank.survey }
 
+    /** Phase E: the lens catalogue asset and the engine that reads it. */
+    val lensCatalog: com.drishtisaathi.engine.profile.LensCatalog by lazy {
+        com.drishtisaathi.engine.profile.LensCatalog.parse(asset(com.drishtisaathi.engine.profile.LensCatalog.ASSET))
+    }
+    private val lensEngine by lazy { com.drishtisaathi.engine.profile.LensEngine(lensCatalog, rules.lensEngine) }
+
+    /** The profile rings and the lens suggestion for a session (nothing is suggested after a red flag or for child myopia). */
+    fun profileView(s: UiState = _state.value): com.drishtisaathi.profile.ProfileView =
+        com.drishtisaathi.profile.ProfileView.build(s, rules, lensEngine)
+
     /** Red flags, emergency, child myopia and the report tag for everything gathered so far. */
     fun safety(s: UiState = _state.value): com.drishtisaathi.engine.profile.SafetyGate =
         com.drishtisaathi.engine.profile.Safety.gate(s.answers, s.survey, rules.safety, s.quick, s.tests.takeIf { s.testsDone }, s.screening)
@@ -422,7 +432,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         val st = loaded(UiState(lang = runCatching { Lang.valueOf(e.lang) }.getOrDefault(Lang.HI)), e, null)
         val consentAt = e.consentAt ?: e.createdAt
         return try {
-            val profile = BridgeProfile.build(st, rules, BridgeConsent(consentAt, spoken = true, tapped = true), appVersion)
+            val profile = BridgeProfile.build(st, rules, BridgeConsent(consentAt, spoken = true, tapped = true), appVersion, profileView(st))
             val old = remoteDao.get(id)
             val created = withContext(Dispatchers.IO) {
                 // an edited session replaces its earlier copy on the server
@@ -807,7 +817,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         runCatching {
             withContext(Dispatchers.IO) {
                 val saved = st.sessionId?.let { savedDao.forSession(it) }.orEmpty()
-                val blocks = if (customer) PdfContent.customerCopy(st, rules, saved) else PdfContent.shopCopy(st, rules, choiceContext, st.lang, saved)
+                val blocks = if (customer) PdfContent.customerCopy(st, rules, saved) else PdfContent.shopCopy(st, rules, choiceContext, st.lang, saved, profileView(st))
                 val thumbs = if (customer) emptyMap() else savedThumbs(saved)
                 val name = PdfExporter.prefix(st.sessionId) + (if (st.demo) "DEMO_" else "") + (if (customer) "customer_hi" else "shop_${st.lang.name.lowercase()}") + ".pdf"
                 PdfExporter.write(app, blocks, File(PdfExporter.dir(app), name), thumbs)
