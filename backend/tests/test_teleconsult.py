@@ -359,3 +359,31 @@ def test_portal_pages_are_served(client):
     assert client.get("/portal/assets/..%2F..%2Fmain.py").status_code == 404
     # the older bridge page and API still work
     assert client.get("/").status_code == 200 and client.get("/health").json()["ok"] is True
+
+
+# ---- demo data ----
+
+def test_seed_script_makes_marked_demo_accounts_once(client, db_path):
+    from app import seed_demo
+    made = seed_demo.seed(db_path, "demo-pass-123")
+    assert made == {"optometrists": 3, "patients": 3, "consultations": 3}
+    assert seed_demo.seed(db_path, "demo-pass-123") == {"optometrists": 0, "patients": 0, "consultations": 0}    # nothing twice
+
+    admin = login(client, ADMIN)
+    everyone = client.get("/api/admin/optometrists", headers=admin).json()
+    assert sorted(o["status"] for o in everyone) == ["APPROVED", "APPROVED", "PENDING"]
+    assert all(o["name"].startswith("DEMO ") and o["demo"] for o in everyone)
+
+    optom = login(client, {"role": "optometrist", "identifier": "9000000101", "password": "demo-pass-123"})
+    queue = client.get("/api/consultations", headers=optom).json()
+    assert [c["priority"] for c in queue] == ["URGENT", "CHILD_MYOPIA", "ROUTINE"]
+    assert all(c["patient"]["name"].startswith("DEMO ") for c in queue)
+    assert client.get(f"/api/consultations/{queue[0]['id']}", headers=optom).json()["report"]["triage"]["emergency"] is True
+    pending = login(client, {"role": "optometrist", "identifier": "9000000103", "password": "demo-pass-123"})
+    assert client.get("/api/consultations", headers=pending).status_code == 403
+    patient = login(client, {"role": "patient", "identifier": "9000000203", "password": "demo-pass-123"})
+    assert len(client.get("/api/consultations", headers=patient).json()) == 1
+    assert len(client.get("/api/optometrists", headers=patient).json()) == 2
+    # the sample reports pass the same privacy check as real ones
+    from app.main import privacy_problems
+    assert all(privacy_problems(seed_demo.report(k, 30)) == [] for k in ("URGENT", "CHILD_MYOPIA", "ROUTINE"))

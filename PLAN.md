@@ -346,6 +346,17 @@ Patient registers in the app, takes the test, asks for a consultation; a verifie
 - **Advice / e-prescription:** sphere, cylinder, axis per eye, add, PD, lens advice, referral advice, follow-up date, notes, optometrist name + registration number → PDF (fpdf2, the app's Inter + Devanagari font).
 - Tests: `backend/tests/test_teleconsult.py` (13): auth, roles, approval gate, consultation flow, chat pictures, data deletion. Backend total 96.
 
+### Teleconsult phase 2: optometrist web portal (done)
+- `backend/app/static/portal.html`, served at `/portal` and `/portal/admin`: one page, no build step, no outside scripts. Same design tokens as the app (Inter + Devanagari font served from the backend, #1A5CFF, 24 px cards, light / dark, works on a phone).
+- Register, login, "pending approval" screen (checks again every 10 s).
+- Dashboard: tabs Urgent | Child myopia | Routine | My active | Completed with counts, urgent cases with a red edge, refresh every 10 s, NEW badge and a sound for a new case (after "Sound: on"), availability switch.
+- Case view: patient name, age, language; rings, power with the method, PD, screening lines, the grid with the marked squares, red-flag reasons, lens suggestions with their reasons, interview answers; Accept.
+- After accepting: chat (polls every 3 s, pictures), WhatsApp button, video call (Jitsi room, link posted into the chat), prescription form with the lens catalogue as chips → PDF, close.
+- Profile page (fee, clinic, languages, WhatsApp permission). Admin page: approve / reject.
+- `python -m app.seed_demo`: 2 approved + 1 pending optometrist and 3 patients, all named DEMO, with one URGENT, one CHILD_MYOPIA and one ROUTINE request. Password from `DEMO_PASSWORD`.
+- Tried in Chrome against the running backend: queue, accept, chat, prescription, admin page. All text is inserted as text nodes (no HTML from patients or chat).
+- Backend tests: 97.
+
 ### Vision profile branch: open items
 1. **Tried once on a phone (15 Nov), fixes above.** Still to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
 2. Colour-plate palettes, contrast steps and the "Normal at 3 %" limit are our own starting values: an optometrist should review them. A phone display cannot guarantee low contrast levels.

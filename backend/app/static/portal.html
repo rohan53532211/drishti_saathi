@@ -1,1 +1,568 @@
-<html></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drishti Saathi · Optometrist portal</title>
+<style>
+@font-face { font-family: "Inter Deva"; src: url("/portal/assets/inter_deva_regular.ttf"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Inter Deva"; src: url("/portal/assets/inter_deva_semibold.ttf"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Inter Deva"; src: url("/portal/assets/inter_deva_bold.ttf"); font-weight: 700; font-display: swap; }
+:root {
+  --bg:#F7F9FC; --surface:#FFFFFF; --hairline:#E3E8EF; --ink:#0B1B2B; --ink2:#5A6B7D;
+  --primary:#1A5CFF; --primary-pressed:#0B3FCC; --on-primary:#FFFFFF; --primary-soft:#E8EFFF;
+  --success:#1E9E6A; --success-ink:#136B47; --success-soft:#E5F6EE;
+  --warning:#E8A317; --warning-ink:#8A5A00; --warning-soft:#FFF4DC;
+  --urgent:#D93838; --urgent-ink:#B32424; --urgent-soft:#FDEAEA;
+  --work:#2F80ED; --digital:#A3D33A; --mobility:#6B7785; --leisure:#F2A93B;
+  --shadow:0 12px 32px rgba(11,27,43,.08);
+}
+:root[data-theme="dark"] {
+  --bg:#0A121C; --surface:#131E2B; --hairline:#243243; --ink:#EEF3F9; --ink2:#9FB0C2;
+  --primary:#6C96FF; --primary-pressed:#4C7BF2; --on-primary:#05122B; --primary-soft:#16284A;
+  --success:#45C48E; --success-ink:#6FDBA9; --success-soft:#11301F;
+  --warning:#F2B93B; --warning-ink:#F2B93B; --warning-soft:#33290F;
+  --urgent:#FF6B6B; --urgent-ink:#FF8A8A; --urgent-soft:#3A1717;
+  --work:#5B9BF3; --digital:#B5E04F; --mobility:#94A0AE; --leisure:#F5B95A;
+  --shadow:0 12px 32px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 "Inter Deva", Inter, system-ui, -apple-system, "Segoe UI", "Noto Sans Devanagari", sans-serif; }
+h1,h2,h3 { margin:0; font-weight:600; letter-spacing:-.01em; text-wrap:balance; }
+h1 { font-size:28px; } h2 { font-size:20px; } h3 { font-size:16px; }
+p { margin:0; }
+a { color:var(--primary); }
+.muted { color:var(--ink2); }
+.small { font-size:13px; }
+.num { font-variant-numeric: tabular-nums; }
+.wrap { max-width:1120px; margin:0 auto; padding:16px; }
+.narrow { max-width:520px; }
+header.top { position:sticky; top:0; z-index:5; background:var(--surface); border-bottom:1px solid var(--hairline); }
+header.top .wrap { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding-top:10px; padding-bottom:10px; }
+.brand { font-weight:700; font-size:18px; color:var(--primary); margin-right:auto; cursor:pointer; }
+.brand span { color:var(--ink2); font-weight:400; font-size:14px; margin-left:6px; }
+.card { background:var(--surface); border:1px solid var(--hairline); border-radius:24px; padding:20px; }
+.card.hero { box-shadow:var(--shadow); }
+.stack { display:flex; flex-direction:column; gap:12px; }
+.stack.lg { gap:16px; }
+.row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.row > .grow { flex:1 1 0; min-width:0; }
+.grid2 { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+.cols { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; align-items:start; }
+@media (max-width: 860px) { .cols { grid-template-columns:1fr; } }
+@media (max-width: 520px) { .grid2 { grid-template-columns:1fr; } h1 { font-size:24px; } .card { padding:16px; border-radius:20px; } }
+button, .btn { font:inherit; font-weight:600; border:1px solid transparent; border-radius:16px; min-height:48px; padding:10px 18px; cursor:pointer;
+  background:var(--primary); color:var(--on-primary); text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+button:hover, .btn:hover { background:var(--primary-pressed); }
+button:disabled { opacity:.5; cursor:not-allowed; }
+button.ghost, .btn.ghost { background:var(--surface); color:var(--ink); border-color:var(--hairline); }
+button.ghost:hover, .btn.ghost:hover { background:var(--primary-soft); }
+button.soft { background:var(--primary-soft); color:var(--primary); }
+button.danger { background:var(--urgent); color:#fff; }
+button.ok, .btn.ok { background:var(--success); color:#fff; }
+button.ok:hover, .btn.ok:hover { background:var(--success-ink); }
+button.link { background:none; color:var(--primary); border:none; min-height:0; padding:4px; }
+button.sm, .btn.sm { min-height:40px; padding:6px 14px; border-radius:12px; font-size:14px; }
+:focus-visible { outline:3px solid var(--primary); outline-offset:2px; }
+label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--ink2); font-weight:600; }
+label.check { flex-direction:row; align-items:center; gap:10px; font-size:15px; color:var(--ink); font-weight:400; }
+input, select, textarea { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:11px 12px; width:100%; min-height:46px; }
+input[type=checkbox] { width:20px; height:20px; min-height:0; accent-color:var(--primary); flex:none; }
+textarea { min-height:84px; resize:vertical; }
+.pill { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 12px; font-size:13px; font-weight:600; white-space:nowrap; }
+.pill.urgent { background:var(--urgent-soft); color:var(--urgent-ink); }
+.pill.child { background:var(--warning-soft); color:var(--warning-ink); }
+.pill.routine { background:var(--primary-soft); color:var(--primary); }
+.pill.ok { background:var(--success-soft); color:var(--success-ink); }
+.pill.grey { background:var(--bg); color:var(--ink2); border:1px solid var(--hairline); }
+.tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
+.tab { background:var(--surface); color:var(--ink2); border:1px solid var(--hairline); border-radius:999px; min-height:44px; white-space:nowrap; }
+.tab:hover { background:var(--primary-soft); }
+.tab[aria-selected=true] { background:var(--primary); color:var(--on-primary); border-color:var(--primary); }
+.tab.urgent[aria-selected=true] { background:var(--urgent); border-color:var(--urgent); color:#fff; }
+.tab .count { background:rgba(127,127,127,.18); border-radius:999px; padding:0 8px; font-size:13px; }
+.tab .dot { width:8px; height:8px; border-radius:50%; background:var(--urgent); }
+.case { cursor:pointer; text-align:left; width:100%; background:var(--surface); color:var(--ink); border:1px solid var(--hairline); border-radius:20px; padding:16px; display:block; font-weight:400; min-height:0; }
+.case:hover { background:var(--surface); border-color:var(--primary); }
+.case.urgent { border-left:6px solid var(--urgent); }
+.case.new { box-shadow:0 0 0 2px var(--primary-soft); }
+.banner { background:var(--urgent); color:#fff; border-radius:20px; padding:16px 20px; }
+.banner ul { margin:6px 0 0; padding-left:20px; }
+.note { background:var(--warning-soft); color:var(--warning-ink); border-radius:16px; padding:12px 16px; font-size:14px; }
+.error { background:var(--urgent-soft); color:var(--urgent-ink); border-radius:12px; padding:10px 14px; font-size:14px; }
+.kv { display:grid; grid-template-columns:minmax(120px, 38%) 1fr; gap:4px 12px; font-size:14px; }
+.kv dt { color:var(--ink2); } .kv dd { margin:0; overflow-wrap:anywhere; }
+.line { display:flex; gap:10px; align-items:flex-start; padding:4px 0; }
+.dot { width:10px; height:10px; border-radius:50%; margin-top:7px; flex:none; background:var(--hairline); }
+.dot.OK { background:var(--success); } .dot.WATCH { background:var(--warning); } .dot.URGENT { background:var(--urgent); }
+.rings { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; text-align:center; }
+@media (max-width: 520px) { .rings { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+.ring svg { width:76px; height:76px; }
+.eye { background:var(--bg); border-radius:16px; padding:14px; }
+.eye b { font-size:15px; }
+.chat { display:flex; flex-direction:column; gap:8px; max-height:420px; overflow-y:auto; padding:4px; }
+.msg { max-width:82%; padding:10px 14px; border-radius:16px; background:var(--bg); align-self:flex-start; overflow-wrap:anywhere; white-space:pre-wrap; }
+.msg.me { background:var(--primary); color:var(--on-primary); align-self:flex-end; }
+.msg.me a { color:var(--on-primary); }
+.msg.sys { align-self:center; background:none; color:var(--ink2); font-size:13px; padding:2px 8px; text-align:center; }
+.msg img { max-width:100%; border-radius:10px; display:block; }
+.msg time { display:block; font-size:11px; opacity:.7; margin-top:2px; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; }
+.chip { border:1px solid var(--hairline); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 12px; font-size:13px; min-height:36px; font-weight:400; }
+.chip[aria-pressed=true] { background:var(--primary-soft); border-color:var(--primary); color:var(--primary); font-weight:600; }
+.chip:hover { background:var(--primary-soft); }
+table.rx { width:100%; border-collapse:collapse; }
+table.rx th { font-size:13px; color:var(--ink2); text-align:left; padding:4px; font-weight:600; }
+table.rx td { padding:4px; }
+details summary { cursor:pointer; color:var(--primary); font-weight:600; padding:6px 0; }
+.avatar { width:48px; height:48px; border-radius:50%; background:var(--primary-soft); color:var(--primary); display:grid; place-items:center; font-weight:700; flex:none; object-fit:cover; }
+.switch { display:inline-flex; flex-direction:row; align-items:center; gap:10px; font-weight:600; font-size:14px; color:var(--ink); }
+.switch input { appearance:none; width:46px; height:28px; min-height:0; border-radius:999px; background:var(--hairline); position:relative; cursor:pointer; border:none; padding:0; }
+.switch input::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:transform .15s; }
+.switch input:checked { background:var(--success); }
+.switch input:checked::after { transform:translateX(18px); }
+.toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:999px; font-size:14px; z-index:20; max-width:90vw; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+// ---------- tiny DOM helper: text always goes in as text nodes, never as HTML ----------
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "value") e.value = v;
+    else if (k === "checked" || k === "disabled" || k === "selected") e[k] = !!v;
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat(Infinity)) if (kid != null && kid !== false) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return e;
+}
+const svgNS = "http://www.w3.org/2000/svg";
+function s(tag, attrs, ...kids) {
+  const e = document.createElementNS(svgNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  for (const kid of kids.flat()) if (kid != null) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return e;
+}
+const $app = document.getElementById("app");
+const ADMIN_PAGE = location.pathname.replace(/\/$/, "").endsWith("/admin");
+const KEY = ADMIN_PAGE ? "ds_admin_token" : "ds_portal_token";
+
+// ---------- state ----------
+const st = { token: localStorage.getItem(KEY), me: null, view: "queue", tab: "URGENT", cases: [], seen: null, caseId: null, c: null,
+             msgs: [], lastMsg: 0, lens: null, timers: [], authMode: "login", error: null, rxOpen: false, soundOn: false };
+const theme = localStorage.getItem("ds_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+document.documentElement.dataset.theme = theme;
+
+// ---------- api ----------
+async function api(path, opts = {}) {
+  const headers = { ...(opts.body ? { "Content-Type": "application/json" } : {}), ...(st.token ? { Authorization: "Bearer " + st.token } : {}) };
+  const r = await fetch("/api" + path, { method: opts.method || "GET", headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  if (r.status === 401 && st.token && !opts.auth) { logout(); throw new Error("Please log in again."); }
+  if (opts.blob && r.ok) return r.blob();
+  const data = r.status === 204 ? null : await r.json().catch(() => null);
+  if (!r.ok) throw new Error(errText(data, r.status));
+  return data;
+}
+function errText(data, status) {
+  const d = data && data.detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) return d.map(x => (x.loc ? x.loc.slice(1).join(".") + ": " : "") + x.msg).join("; ");
+  if (d) return JSON.stringify(d);
+  return "Something went wrong (" + status + ").";
+}
+function logout() { localStorage.removeItem(KEY); st.token = null; st.me = null; stopTimers(); render(); }
+function stopTimers() { st.timers.forEach(clearInterval); st.timers = []; }
+function toast(text) { const t = h("div", { class: "toast", role: "status" }, text); document.body.append(t); setTimeout(() => t.remove(), 3500); }
+function fmtTime(ms) { return new Date(ms).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); }
+function ago(ms) { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; }
+function beep() {
+  if (!st.soundOn) return;
+  try {
+    const ctx = st.audio || (st.audio = new (window.AudioContext || window.webkitAudioContext)());
+    [880, 1175].forEach((f, i) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(.12, ctx.currentTime + i * .18); g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + i * .18 + .16);
+      o.start(ctx.currentTime + i * .18); o.stop(ctx.currentTime + i * .18 + .17); });
+  } catch (e) { /* no sound on this browser */ }
+}
+
+// ---------- shell ----------
+function shell(...content) {
+  const me = st.me;
+  const themeBtn = h("button", { class: "ghost sm", "aria-label": "Switch light and dark theme", onclick: () => {
+    const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; localStorage.setItem("ds_theme", t); } }, "Light / dark");
+  const bar = h("header", { class: "top" }, h("div", { class: "wrap" },
+    h("div", { class: "brand", onclick: () => { if (me) go("queue"); } }, "Drishti Saathi", h("span", {}, ADMIN_PAGE ? "Admin" : "Optometrist portal")),
+    me && me.role === "optometrist" && me.status === "APPROVED" ? [
+      h("label", { class: "switch" }, h("input", { type: "checkbox", checked: me.available, "aria-label": "Available for new cases", onchange: async ev => {
+        try { st.me = await api("/me", { method: "PATCH", body: { available: ev.target.checked } }); toast(st.me.available ? "You are available: patients can choose you." : "You are not available for new requests."); }
+        catch (e) { toast(e.message); } render(); } }), me.available ? "Available" : "Not available"),
+      h("button", { class: "ghost sm", onclick: () => { st.soundOn = !st.soundOn; if (st.soundOn) beep(); render(); } }, st.soundOn ? "Sound: on" : "Sound: off"),
+      h("button", { class: "ghost sm", onclick: () => go("profile") }, "Profile"),
+    ] : null,
+    themeBtn,
+    me ? h("button", { class: "ghost sm", onclick: logout }, "Log out") : null));
+  $app.replaceChildren(bar, h("main", { class: "wrap stack lg" }, content));
+}
+function go(view, extra = {}) { stopTimers(); Object.assign(st, { view, error: null, rxOpen: false }, extra); start(); }
+
+// ---------- auth ----------
+function field(label, attrs) { return h("label", {}, label, h("input", attrs)); }
+function authView() {
+  const role = ADMIN_PAGE ? "admin" : "optometrist";
+  const err = st.error ? h("div", { class: "error", role: "alert" }, st.error) : null;
+  if (st.authMode === "register" && !ADMIN_PAGE) {
+    const f = h("form", { class: "stack", onsubmit: async ev => {
+      ev.preventDefault(); const d = Object.fromEntries(new FormData(f));
+      const body = { name: d.name, phone: d.phone, email: d.email, password: d.password, qualification: d.qualification, registrationNo: d.registrationNo,
+        clinicName: d.clinicName, city: d.city, languages: d.languages.split(",").map(x => x.trim()).filter(Boolean), fee: Number(d.fee || 0), allowWhatsapp: !!d.allowWhatsapp };
+      try { const r = await api("/auth/register/optometrist", { method: "POST", body, auth: true }); signedIn(r); } catch (e) { st.error = e.message; render(); }
+    } },
+      h("div", { class: "grid2" }, field("Full name", { name: "name", required: true, maxlength: 80, autocomplete: "name" }), field("Mobile number", { name: "phone", required: true, inputmode: "tel", autocomplete: "tel", placeholder: "10 digits" })),
+      h("div", { class: "grid2" }, field("Email", { name: "email", type: "email", required: true, autocomplete: "email" }), field("Password (8 or more characters)", { name: "password", type: "password", required: true, minlength: 8, autocomplete: "new-password" })),
+      h("div", { class: "grid2" }, field("Qualification", { name: "qualification", required: true, placeholder: "e.g. B.Optom, M.Optom" }), field("Council / registration number", { name: "registrationNo", required: true })),
+      h("div", { class: "grid2" }, field("Clinic name", { name: "clinicName", required: true }), field("City", { name: "city", required: true })),
+      h("div", { class: "grid2" }, field("Languages (comma separated)", { name: "languages", required: true, value: "Hindi, English" }), field("Consultation fee (₹, shown to patients only)", { name: "fee", type: "number", min: 0, max: 100000, value: 0 })),
+      h("label", { class: "check" }, h("input", { type: "checkbox", name: "allowWhatsapp" }), "Patients whose case I accept may message me on WhatsApp"),
+      err, h("button", { type: "submit" }, "Create account"),
+      h("p", { class: "muted small" }, "An admin checks your registration number before you can see cases."),
+      h("button", { type: "button", class: "link", onclick: () => { st.authMode = "login"; st.error = null; render(); } }, "I already have an account"));
+    return shell(h("div", { class: "card hero narrow stack", style: "margin:24px auto; max-width:760px" }, h("h1", {}, "Register as an optometrist"), f));
+  }
+  const f = h("form", { class: "stack", onsubmit: async ev => {
+    ev.preventDefault(); const d = Object.fromEntries(new FormData(f));
+    try { signedIn(await api("/auth/login", { method: "POST", body: { role, identifier: d.identifier, password: d.password }, auth: true })); } catch (e) { st.error = e.message; render(); }
+  } },
+    field(ADMIN_PAGE ? "Admin email" : "Mobile number or email", { name: "identifier", required: true, autocomplete: "username" }),
+    field("Password", { name: "password", type: "password", required: true, autocomplete: "current-password" }),
+    err, h("button", { type: "submit" }, "Log in"),
+    ADMIN_PAGE ? h("a", { href: "/portal", class: "small" }, "Optometrist portal") :
+      h("button", { type: "button", class: "link", onclick: () => { st.authMode = "register"; st.error = null; render(); } }, "New here? Register as an optometrist"));
+  shell(h("div", { class: "card hero narrow stack", style: "margin:48px auto" },
+    h("h1", {}, ADMIN_PAGE ? "Admin login" : "Optometrist login"),
+    h("p", { class: "muted" }, ADMIN_PAGE ? "Approve or reject optometrist registrations." : "Review eye-screening reports from Drishti Saathi patients and consult by chat, WhatsApp or video."), f));
+}
+function signedIn(r) { st.token = r.token; localStorage.setItem(KEY, r.token); st.me = r.user; st.error = null; st.view = "queue"; start(); }
+
+function pendingView() {
+  const rejected = st.me.status === "REJECTED";
+  shell(h("div", { class: "card hero narrow stack", style: "margin:48px auto" },
+    h("span", { class: "pill " + (rejected ? "urgent" : "child") }, rejected ? "Not approved" : "Pending approval"),
+    h("h1", {}, rejected ? "Your registration was not approved" : "Thank you, " + st.me.name),
+    h("p", { class: "muted" }, rejected ? "Please contact the Drishti Saathi admin if you think this is a mistake."
+      : "An admin is checking your registration number (" + st.me.registrationNo + "). You will see patient cases here as soon as you are approved."),
+    h("button", { class: "ghost", onclick: start }, "Check again")));
+  st.timers.push(setInterval(async () => { try { const me = await api("/me"); if (me.status !== st.me.status) { st.me = me; start(); } } catch (e) {} }, 10000));
+}
+
+// ---------- queue ----------
+const TABS = [["URGENT", "Urgent"], ["CHILD_MYOPIA", "Child myopia"], ["ROUTINE", "Routine"], ["ACTIVE", "My active"], ["DONE", "Completed"]];
+function inTab(c, tab) {
+  const mine = c.optometrist && c.optometrist.id === st.me.id;
+  if (tab === "ACTIVE") return mine && (c.status === "ACCEPTED" || c.status === "IN_PROGRESS");
+  if (tab === "DONE") return mine && (c.status === "COMPLETED" || c.status === "CLOSED");
+  return c.status === "REQUESTED" && c.priority === tab;
+}
+function prioPill(p) { return h("span", { class: "pill " + (p === "URGENT" ? "urgent" : p === "CHILD_MYOPIA" ? "child" : "routine") }, p === "CHILD_MYOPIA" ? "CHILD MYOPIA" : p); }
+function statusPill(x) { return h("span", { class: "pill " + (x === "COMPLETED" ? "ok" : "grey") }, x.replace("_", " ")); }
+async function loadQueue(first) {
+  try {
+    const cases = await api("/consultations");
+    const open = cases.filter(c => c.status === "REQUESTED").map(c => c.id);
+    if (st.seen && open.some(id => !st.seen.has(id))) { beep(); st.fresh = new Set(open.filter(id => !st.seen.has(id))); document.title = "● New case · Drishti Saathi"; }
+    st.seen = new Set([...(st.seen || []), ...open]);
+    st.cases = cases; st.error = null;
+  } catch (e) { st.error = e.message; }
+  if (st.view === "queue") queueView();
+}
+function queueView() {
+  const count = t => st.cases.filter(c => inTab(c, t)).length;
+  const list = st.cases.filter(c => inTab(c, st.tab));
+  const tabs = h("div", { class: "tabs", role: "tablist" }, TABS.map(([id, label]) =>
+    h("button", { class: "tab" + (id === "URGENT" ? " urgent" : ""), role: "tab", "aria-selected": String(st.tab === id), onclick: () => { st.tab = id; st.fresh = null; document.title = "Drishti Saathi · Optometrist portal"; queueView(); } },
+      id === "URGENT" && count(id) > 0 && st.tab !== id ? h("span", { class: "dot" }) : null, label, h("span", { class: "count num" }, count(id)))));
+  const cards = list.map(c => h("button", { class: "case" + (c.priority === "URGENT" ? " urgent" : "") + (st.fresh && st.fresh.has(c.id) ? " new" : ""), onclick: () => go("case", { caseId: c.id }) },
+    h("div", { class: "row" }, h("b", { class: "grow" }, c.patient ? c.patient.name : "Patient", h("span", { class: "muted" }, c.patient && c.patient.age ? " · " + c.patient.age + " y" : "")),
+      st.fresh && st.fresh.has(c.id) ? h("span", { class: "pill routine" }, "NEW") : null, prioPill(c.priority), statusPill(c.status)),
+    h("div", { class: "muted small" }, "Case #" + c.caseId + " · " + ago(c.createdAt) + (c.patient && c.patient.language ? " · " + (c.patient.language === "HI" ? "Hindi" : "English") : "") +
+      (c.requestedOptometristId === st.me.id && c.status === "REQUESTED" ? " · asked for you" : "") + (c.messageCount ? " · " + c.messageCount + " messages" : "")),
+    c.redFlagReasons.length ? h("div", { style: "color:var(--urgent-ink); margin-top:6px; font-weight:600" }, c.redFlagReasons.join(" · ")) : null));
+  shell(
+    h("div", { class: "row" }, h("h1", { class: "grow" }, "Cases"), h("span", { class: "muted small" }, "Refreshes every 10 s")),
+    st.error ? h("div", { class: "error", role: "alert" }, st.error) : null,
+    !st.me.available ? h("div", { class: "note" }, "You are marked not available: patients cannot choose you. Open requests for any optometrist are still listed.") : null,
+    tabs,
+    list.length ? h("div", { class: "stack" }, cards) : h("div", { class: "card", style: "text-align:center" }, h("p", { class: "muted" },
+      st.tab === "ACTIVE" ? "No active consultations. Accept a case from the queue." : st.tab === "DONE" ? "Completed consultations appear here." : "No waiting cases in this queue.")));
+}
+
+// ---------- case ----------
+function ring(title, r, colour) {
+  const score = r && r.answered ? r.score : null, C = 2 * Math.PI * 30;
+  return h("div", { class: "ring" },
+    s("svg", { viewBox: "0 0 76 76", role: "img", "aria-label": title + (score == null ? " not answered" : " " + score) },
+      s("circle", { cx: 38, cy: 38, r: 30, fill: "none", stroke: colour, "stroke-opacity": .18, "stroke-width": 8 }),
+      score == null ? null : s("circle", { cx: 38, cy: 38, r: 30, fill: "none", stroke: colour, "stroke-width": 8, "stroke-linecap": "round", "stroke-dasharray": (C * score / 100) + " " + C, transform: "rotate(-90 38 38)" }),
+      s("text", { x: 38, y: 43, "text-anchor": "middle", "font-size": 16, "font-weight": 600, fill: "currentColor" }, score == null ? "–" : score)),
+    h("div", { class: "small muted" }, title), h("div", { class: "small", style: "font-weight:600" }, r ? (r.answered ? r.label : "not answered") : "–"));
+}
+function amslerGrid(a) {
+  const cols = a.columns || 12, rows = a.rows || 20, q = 8;
+  const g = s("svg", { viewBox: `0 0 ${cols * q} ${rows * q}`, style: "width:120px; background:#fff; border:1px solid var(--hairline)", role: "img",
+    "aria-label": "Grid, " + (a.eye === "RIGHT" ? "right" : "left") + " eye, " + (a.cells || []).length + " squares marked" });
+  (a.cells || []).forEach(c => g.append(s("rect", { x: c.col * q, y: c.row * q, width: q, height: q, fill: "#D93838", "fill-opacity": .55 })));
+  for (let i = 0; i <= cols; i++) g.append(s("line", { x1: i * q, y1: 0, x2: i * q, y2: rows * q, stroke: "#9AA5B1", "stroke-width": .5 }));
+  for (let j = 0; j <= rows; j++) g.append(s("line", { x1: 0, y1: j * q, x2: cols * q, y2: j * q, stroke: "#9AA5B1", "stroke-width": .5 }));
+  g.append(s("circle", { cx: cols * q / 2, cy: rows * q / 2, r: 2, fill: "#000" }));
+  return h("div", {}, h("div", { class: "small muted" }, (a.eye === "RIGHT" ? "Right eye" : "Left eye") + (a.distortion ? ": marked" : ": straight")), g);
+}
+function nice(k) { return String(k).replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase(); }
+function show(v) { return v == null ? "–" : typeof v === "boolean" ? (v ? "yes" : "no") : typeof v === "object" ? JSON.stringify(v) : String(v); }
+function reportView(c) {
+  const p = c.report || {}, tri = p.triage || {}, vp = p.visionProfile, pr = (p.power || {}).phoneRange || {}, known = (p.power || {}).knownPower;
+  const pd = (p.measurements || {}).pdMm, scr = p.screening, lens = p.lens, est = p.estimates || {};
+  const out = [];
+  if (c.priority === "URGENT") out.push(h("div", { class: "banner", role: "alert" }, h("b", {}, "URGENT: red-flag signs reported"),
+    c.redFlagReasons.length ? h("ul", {}, c.redFlagReasons.map(r => h("li", {}, r))) : null,
+    h("div", { class: "small", style: "margin-top:6px" }, "The patient has been told to see an eye doctor today. A teleconsult never replaces an urgent visit." + (tri.path ? " " + tri.path + "." : ""))));
+  if (c.priority === "CHILD_MYOPIA") out.push(h("div", { class: "note" }, "Child with a minus power: no lens was suggested in the app; referral for myopia control."));
+  if (vp) out.push(h("div", { class: "card stack" }, h("h3", {}, "Vision profile"),
+    h("div", { class: "rings" }, ring("Work", vp.work, "var(--work)"), ring("Digital", vp.digital, "var(--digital)"), ring("Mobility", vp.mobility, "var(--mobility)"), ring("Leisure", vp.leisure, "var(--leisure)")),
+    vp.nightGlareSensitive ? h("div", { class: "small", style: "color:var(--warning-ink)" }, "Night-glare sensitive") : null));
+  const power = [];
+  if (pr.right || pr.left) power.push(h("div", { class: "grid2" },
+    h("div", { class: "eye" }, h("div", { class: "small muted" }, "Right eye"), h("b", {}, pr.right || "–")),
+    h("div", { class: "eye" }, h("div", { class: "small muted" }, "Left eye"), h("b", {}, pr.left || "–"))));
+  if (pr.near) power.push(h("p", { class: "small" }, pr.near));
+  if (known) power.push(h("p", { class: "small" }, "Known power from the patient: " + ["right", "left"].map(k => known[k] ? k[0].toUpperCase() + " " + show(known[k].sph) + (known[k].cyl ? " / " + known[k].cyl + " × " + (known[k].axis ?? "?") : "") : null).filter(Boolean).join(" · ")));
+  if (pd && pd.value != null) power.push(h("p", { class: "small" }, "PD: about " + (Math.round(pd.value * 10) / 10) + " mm (" + nice(pd.source || "") + ")"));
+  out.push(h("div", { class: "card stack" }, h("div", { class: "row" }, h("h3", { class: "grow" }, "Power (phone measurement, with the method)"), tri.powerLabel ? h("span", { class: "pill urgent" }, tri.powerLabel) : null),
+    power.length ? power : h("p", { class: "muted small" }, "No power was measured."),
+    h("p", { class: "muted small" }, "Phone estimates as ranges. They must be confirmed with a trial lens.")));
+  if (scr) {
+    const grids = ((scr.results || {}).amsler || []);
+    out.push(h("div", { class: "card stack" }, h("div", { class: "row" }, h("h3", { class: "grow" }, "Screening tests"), h("span", { class: "pill grey" }, scr.label || "Screening")),
+      (scr.lines || []).map(l => h("div", { class: "line" }, h("span", { class: "dot " + l.status }), h("span", {}, l.text))),
+      grids.length ? h("div", { class: "row", style: "align-items:flex-start" }, grids.map(amslerGrid)) : null));
+  }
+  if (lens) out.push(h("div", { class: "card stack" }, h("h3", {}, "Lens suggestion from the app"),
+    lens.suggested === false || !(lens.items || []).length ? h("p", { class: "muted small" }, est.suggestionsNote || "No lens was suggested.")
+      : (lens.items || []).map(i => h("div", {}, h("b", {}, i.product), h("span", { class: "muted small" }, " · " + nice(i.kind || "")),
+          (i.why || []).length ? h("ul", { class: "small", style: "margin:2px 0 6px; padding-left:20px" }, i.why.map(w => h("li", {}, w))) : null)),
+    lens.optometristConfirms ? h("span", { class: "pill child" }, "Optometrist confirms") : null));
+  const a = p.answers || {};
+  const rows = Object.entries(a).filter(([, v]) => v != null && typeof v !== "object");
+  out.push(h("div", { class: "card" }, h("details", {}, h("summary", {}, "Interview answers and referral notes"),
+    h("dl", { class: "kv" }, rows.map(([k, v]) => [h("dt", {}, nice(k)), h("dd", {}, show(v))]),
+      est.referralLevel ? [h("dt", {}, "referral level"), h("dd", {}, est.referralLevel)] : null,
+      (est.referralReasons || []).length ? [h("dt", {}, "referral reasons"), h("dd", {}, est.referralReasons.map(nice).join(", "))] : null,
+      (est.notes || []).length ? [h("dt", {}, "notes"), h("dd", {}, est.notes.map(nice).join(", "))] : null))));
+  return out;
+}
+
+async function openCase() {
+  try { st.c = await api("/consultations/" + st.caseId); st.error = null; }
+  catch (e) { st.error = e.message; st.c = null; }
+  st.msgs = []; st.lastMsg = 0;
+  caseView();
+  if (st.c && mine(st.c)) {
+    await pollMsgs();
+    st.timers.push(setInterval(pollMsgs, 3000));
+    st.timers.push(setInterval(async () => { try { const c = await api("/consultations/" + st.caseId); if (c.status !== st.c.status || c.hasPrescription !== st.c.hasPrescription) { st.c = c; if (!st.rxOpen) caseView(); } } catch (e) {} }, 10000));
+  }
+}
+function mine(c) { return c.optometrist && c.optometrist.id === st.me.id; }
+async function pollMsgs() {
+  try {
+    const more = await api("/consultations/" + st.caseId + "/messages?after=" + st.lastMsg);
+    if (!more.length) return;
+    const hadSome = st.lastMsg > 0;
+    st.msgs.push(...more); st.lastMsg = more[more.length - 1].id;
+    if (hadSome && more.some(m => m.senderRole === "patient")) beep();
+    drawChat();
+  } catch (e) { /* keep the last messages on a network error */ }
+}
+function linkify(text) {
+  return String(text).split(/(https?:\/\/\S+)/g).map(part => /^https?:\/\//.test(part) ? h("a", { href: part, target: "_blank", rel: "noopener" }, part) : part);
+}
+function drawChat() {
+  const box = document.getElementById("chat"); if (!box) return;
+  const atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  box.replaceChildren(...(st.msgs.length ? st.msgs.map(m => {
+    const sys = m.senderRole === "system";
+    const el = h("div", { class: "msg" + (sys ? " sys" : m.senderRole === "optometrist" ? " me" : "") });
+    if (m.kind === "VIDEO") el.append("Video call: ", h("a", { href: m.text, target: "_blank", rel: "noopener" }, m.text));
+    else if (m.text) el.append(...linkify(m.text));
+    if (m.hasImage) { const img = h("img", { alt: "Picture sent in the chat" }); el.append(img);
+      api("/consultations/" + st.caseId + "/messages/" + m.id + "/image", { blob: true }).then(b => { img.src = URL.createObjectURL(b); }).catch(() => { img.alt = "Picture could not be loaded"; }); }
+    if (!sys) el.append(h("time", {}, fmtTime(m.createdAt)));
+    return el;
+  }) : [h("div", { class: "msg sys" }, "No messages yet. Say hello to the patient.")]));
+  if (atEnd) box.scrollTop = box.scrollHeight;
+}
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => { const k = Math.min(1, 1280 / Math.max(img.width, img.height)); const cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      resolve(cv.toDataURL("image/jpeg", .8).split(",")[1]); URL.revokeObjectURL(img.src); };
+    img.onerror = () => reject(new Error("This file is not a picture."));
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function act(fn) { try { await fn(); } catch (e) { toast(e.message); } }
+
+function caseView() {
+  const c = st.c;
+  const back = h("button", { class: "ghost sm", style: "align-self:flex-start", onclick: () => go("queue") }, "← All cases");
+  if (!c) return shell(back, h("div", { class: "error", role: "alert" }, st.error || "This case is not available any more (another optometrist may have accepted it)."));
+  const p = c.patient || {}, isMine = mine(c), open = c.status !== "CLOSED";
+  const head = h("div", { class: "card hero stack" },
+    h("div", { class: "row" }, h("div", { class: "avatar", "aria-hidden": "true" }, (p.name || "?").trim().charAt(0).toUpperCase()),
+      h("div", { class: "grow" }, h("h1", {}, p.name || "Patient"),
+        h("div", { class: "muted" }, [p.age ? p.age + " years" : null, p.gender, p.language === "HI" ? "Hindi" : p.language === "EN" ? "English" : p.language, "Case #" + c.caseId].filter(Boolean).join(" · "))),
+      prioPill(c.priority), statusPill(c.status)),
+    h("div", { class: "muted small" }, "Requested " + fmtTime(c.createdAt) + (c.acceptedAt ? " · accepted " + fmtTime(c.acceptedAt) : "") + (c.completedAt ? " · completed " + fmtTime(c.completedAt) : "") +
+      " · Fee: ₹" + (c.fee ?? 0) + " · Payment: " + c.paymentStatus),
+    c.status === "REQUESTED" ? h("div", { class: "row" },
+      h("button", { class: "ok", onclick: () => act(async () => { st.c = await api("/consultations/" + c.id + "/accept", { method: "POST" }); toast("Case accepted. You can now chat with the patient."); stopTimers(); openCase(); }) }, "Accept this case"),
+      h("span", { class: "muted small" }, "Chat, WhatsApp, video and the prescription open after you accept.")) : null);
+
+  const side = [];
+  if (isMine) {
+    side.push(h("div", { class: "card stack" }, h("h3", {}, "Talk to the patient"),
+      h("div", { class: "row" },
+        c.whatsappUrl ? h("a", { class: "btn ok sm", href: c.whatsappUrl, target: "_blank", rel: "noopener" }, "WhatsApp") : null,
+        open ? h("button", { class: "sm", onclick: () => { const w = window.open("about:blank", "_blank"); act(async () => {
+          try { const r = await api("/consultations/" + c.id + "/video", { method: "POST" }); if (w) w.location = r.url; else toast("Video link posted in the chat."); st.c.videoUrl = r.url; pollMsgs(); }
+          catch (e) { if (w) w.close(); throw e; } }); } }, c.videoUrl ? "Join video call" : "Start video call") : null,
+        p.phone ? h("span", { class: "muted small num" }, "Phone: " + p.phone) : null),
+      h("div", { class: "chat", id: "chat", "aria-live": "polite" }),
+      open ? (() => {
+        const input = h("input", { placeholder: "Write a message", "aria-label": "Message", maxlength: 2000 });
+        const file = h("input", { type: "file", accept: "image/*", style: "display:none", onchange: () => act(async () => {
+          if (!file.files[0]) return; const b64 = await shrinkImage(file.files[0]); file.value = "";
+          await api("/consultations/" + c.id + "/messages", { method: "POST", body: { imageBase64: b64, imageMime: "image/jpeg" } }); pollMsgs(); }) });
+        return h("form", { class: "row", onsubmit: ev => { ev.preventDefault(); const text = input.value.trim(); if (!text) return; input.value = "";
+          act(async () => { await api("/consultations/" + c.id + "/messages", { method: "POST", body: { text } }); pollMsgs(); }); } },
+          h("div", { class: "grow" }, input), file, h("button", { type: "button", class: "ghost sm", onclick: () => file.click() }, "Picture"), h("button", { type: "submit", class: "sm" }, "Send"));
+      })() : h("p", { class: "muted small" }, "This consultation is closed.")));
+    side.push(rxCard(c));
+    if (open) side.push(h("button", { class: "ghost", onclick: () => { if (confirm("Close this consultation? Chat stops for both sides.")) act(async () => { st.c = await api("/consultations/" + c.id + "/close", { method: "POST" }); caseView(); pollMsgs(); }); } }, "Close consultation"));
+  }
+  shell(back, head, h("div", { class: "cols" }, h("div", { class: "stack lg" }, reportView(c)), h("div", { class: "stack lg" }, side)));
+  drawChat();
+}
+
+async function openPdf(cid) {
+  const w = window.open("about:blank", "_blank");
+  try { const b = await api("/consultations/" + cid + "/prescription.pdf", { blob: true }); const url = URL.createObjectURL(b); if (w) w.location = url; else location.href = url; }
+  catch (e) { if (w) w.close(); toast(e.message); }
+}
+function rxCard(c) {
+  const open = c.status !== "CLOSED";
+  if (!st.rxOpen) return h("div", { class: "card stack" }, h("h3", {}, "Advice / e-prescription"),
+    c.hasPrescription ? h("p", { class: "small", style: "color:var(--success-ink); font-weight:600" }, "Sent to the patient.") : h("p", { class: "muted small" }, "Sending it marks the consultation completed. The patient sees it in the app as a PDF."),
+    h("div", { class: "row" },
+      open ? h("button", { class: c.hasPrescription ? "ghost sm" : "sm", onclick: () => act(async () => {
+        if (!st.lens) st.lens = await api("/lens-catalog").catch(() => []);
+        st.rx = c.hasPrescription ? await api("/consultations/" + c.id + "/prescription") : null; st.rxOpen = true; caseView(); }) }, c.hasPrescription ? "Edit and send again" : "Write advice / e-prescription") : null,
+      c.hasPrescription ? h("button", { class: "soft sm", onclick: () => openPdf(c.id) }, "View PDF") : null));
+  const rx = st.rx || {}, pd = ((c.report || {}).measurements || {}).pdMm;
+  const picked = new Set(rx.lensAdvice || []);
+  const num = (name, v, attrs) => h("input", { name, type: "number", step: "0.25", value: v ?? "", inputmode: "decimal", "aria-label": name, ...attrs });
+  const eyeRow = (label, key) => h("tr", {}, h("th", { scope: "row" }, label),
+    h("td", {}, num(key + "_sph", (rx[key] || {}).sph, { min: -30, max: 30 })), h("td", {}, num(key + "_cyl", (rx[key] || {}).cyl, { min: -10, max: 10 })),
+    h("td", {}, num(key + "_axis", (rx[key] || {}).axis, { step: "1", min: 0, max: 180 })));
+  const groups = {}; (st.lens || []).forEach(l => (groups[l.group] = groups[l.group] || []).push(l));
+  const chips = Object.entries(groups).map(([g, items]) => h("div", {}, h("div", { class: "small muted" }, nice(g)), h("div", { class: "chips" }, items.map(l =>
+    h("button", { type: "button", class: "chip", "aria-pressed": String(picked.has(l.name)), onclick: ev => { picked.has(l.name) ? picked.delete(l.name) : picked.add(l.name); ev.currentTarget.setAttribute("aria-pressed", String(picked.has(l.name))); } }, l.name)))));
+  const known = new Set((st.lens || []).map(l => l.name));
+  const err = h("div", {});
+  const f = h("form", { class: "stack", onsubmit: ev => { ev.preventDefault(); const d = Object.fromEntries(new FormData(f));
+    const n = k => d[k] === "" || d[k] == null ? null : Number(d[k]);
+    const extra = (d.lensOther || "").split(",").map(x => x.trim()).filter(Boolean);
+    const body = { right: { sph: n("right_sph"), cyl: n("right_cyl"), axis: n("right_axis") }, left: { sph: n("left_sph"), cyl: n("left_cyl"), axis: n("left_axis") },
+      add: n("add"), pdMm: n("pdMm"), lensAdvice: [...[...picked].filter(x => known.has(x)), ...extra], referralAdvice: d.referralAdvice || null,
+      needsInPersonExam: !!d.needsInPersonExam, followUpDate: d.followUpDate || null, notes: d.notes || null };
+    act(async () => { try { await api("/consultations/" + c.id + "/prescription", { method: "POST", body }); } catch (e) { err.replaceChildren(h("div", { class: "error", role: "alert" }, e.message)); return; }
+      st.rxOpen = false; st.c = await api("/consultations/" + c.id); toast("Sent to the patient. Consultation completed."); caseView(); pollMsgs(); }); } },
+    h("table", { class: "rx" }, h("thead", {}, h("tr", {}, h("th", {}, "Eye"), h("th", {}, "Sphere (D)"), h("th", {}, "Cylinder (D)"), h("th", {}, "Axis (°)"))),
+      h("tbody", {}, eyeRow("Right", "right"), eyeRow("Left", "left"))),
+    h("div", { class: "grid2" }, h("label", {}, "Near addition (D)", num("add", rx.add, { min: 0, max: 4 })), h("label", {}, "PD (mm)", num("pdMm", rx.pdMm ?? (pd && pd.value != null ? Math.round(pd.value * 2) / 2 : null), { step: "0.5", min: 40, max: 80 }))),
+    chips.length ? h("div", { class: "stack" }, h("div", { class: "small", style: "font-weight:600; color:var(--ink2)" }, "Lens advice (from the lens catalogue)"), chips) : null,
+    h("label", {}, "Other lens advice (comma separated)", h("input", { name: "lensOther", value: (rx.lensAdvice || []).filter(x => !known.has(x)).join(", ") })),
+    h("label", {}, "Referral advice", h("textarea", { name: "referralAdvice", maxlength: 1000 }, rx.referralAdvice || "")),
+    h("label", { class: "check" }, h("input", { type: "checkbox", name: "needsInPersonExam", checked: rx.needsInPersonExam ?? c.priority === "URGENT" }), "An in-person eye examination is advised"),
+    h("div", { class: "grid2" }, h("label", {}, "Follow-up date", h("input", { type: "date", name: "followUpDate", value: rx.followUpDate || "" })), h("div", {})),
+    h("label", {}, "Notes for the patient", h("textarea", { name: "notes", maxlength: 2000 }, rx.notes || "")),
+    h("p", { class: "muted small" }, "Signed as " + st.me.name + ", registration no. " + st.me.registrationNo + ", with today's date."),
+    err,
+    h("div", { class: "row" }, h("button", { type: "submit", class: "ok" }, "Send to patient and complete"), h("button", { type: "button", class: "ghost", onclick: () => { st.rxOpen = false; caseView(); } }, "Cancel")));
+  return h("div", { class: "card stack" }, h("h3", {}, "Advice / e-prescription"), f);
+}
+
+// ---------- profile ----------
+function profileView() {
+  const me = st.me, err = h("div", {});
+  const f = h("form", { class: "stack", onsubmit: ev => { ev.preventDefault(); const d = Object.fromEntries(new FormData(f));
+    act(async () => { try { st.me = await api("/me", { method: "PATCH", body: { name: d.name, qualification: d.qualification, clinicName: d.clinicName, city: d.city,
+        languages: d.languages.split(",").map(x => x.trim()).filter(Boolean), fee: Number(d.fee || 0), allowWhatsapp: !!d.allowWhatsapp } }); toast("Profile saved."); profileView(); }
+      catch (e) { err.replaceChildren(h("div", { class: "error", role: "alert" }, e.message)); } }); } },
+    h("div", { class: "grid2" }, field("Full name", { name: "name", required: true, value: me.name }), field("Qualification", { name: "qualification", required: true, value: me.qualification })),
+    h("div", { class: "grid2" }, field("Clinic name", { name: "clinicName", required: true, value: me.clinicName }), field("City", { name: "city", required: true, value: me.city })),
+    h("div", { class: "grid2" }, field("Languages (comma separated)", { name: "languages", required: true, value: (me.languages || []).join(", ") }), field("Consultation fee (₹, display only)", { name: "fee", type: "number", min: 0, max: 100000, value: me.fee })),
+    h("label", { class: "check" }, h("input", { type: "checkbox", name: "allowWhatsapp", checked: me.allowWhatsapp }), "Patients whose case I accept may message me on WhatsApp"),
+    h("dl", { class: "kv" }, h("dt", {}, "Registration no."), h("dd", {}, me.registrationNo), h("dt", {}, "Mobile"), h("dd", { class: "num" }, me.phone), h("dt", {}, "Email"), h("dd", {}, me.email), h("dt", {}, "Status"), h("dd", {}, me.status)),
+    h("p", { class: "muted small" }, "Payments are not collected in this demo: the fee is shown to patients only."),
+    err, h("button", { type: "submit" }, "Save profile"));
+  shell(h("button", { class: "ghost sm", style: "align-self:flex-start", onclick: () => go("queue") }, "← All cases"), h("div", { class: "card hero stack", style: "max-width:760px" }, h("h1", {}, "My profile"), f));
+}
+
+// ---------- admin ----------
+async function adminView() {
+  let list = [], sum = null, err = null;
+  try { [list, sum] = await Promise.all([api("/admin/optometrists"), api("/admin/summary")]); } catch (e) { err = e.message; }
+  if (!st.token) return;
+  const order = { PENDING: 0, APPROVED: 1, REJECTED: 2 };
+  list.sort((a, b) => order[a.status] - order[b.status] || b.createdAt - a.createdAt);
+  const setStatus = (o, what) => act(async () => { await api("/admin/optometrists/" + o.id + "/" + what, { method: "POST" }); toast(o.name + (what === "approve" ? " approved." : " rejected.")); adminView(); });
+  shell(h("div", { class: "row" }, h("h1", { class: "grow" }, "Optometrist registrations"),
+      sum ? h("span", { class: "muted small num" }, sum.patients + " patients · " + Object.values(sum.consultations).reduce((a, b) => a + b, 0) + " consultations") : null),
+    err ? h("div", { class: "error", role: "alert" }, err) : null,
+    list.length ? list.map(o => h("div", { class: "card stack" },
+      h("div", { class: "row" }, h("div", { class: "grow" }, h("h2", {}, o.name, o.demo ? h("span", { class: "muted small" }, " (demo data)") : null), h("div", { class: "muted small" }, o.qualification + " · " + o.clinicName + ", " + o.city)),
+        h("span", { class: "pill " + (o.status === "APPROVED" ? "ok" : o.status === "PENDING" ? "child" : "urgent") }, o.status)),
+      h("dl", { class: "kv" }, h("dt", {}, "Registration no."), h("dd", {}, o.registrationNo), h("dt", {}, "Mobile"), h("dd", { class: "num" }, o.phone), h("dt", {}, "Email"), h("dd", {}, o.email),
+        h("dt", {}, "Languages"), h("dd", {}, (o.languages || []).join(", ")), h("dt", {}, "Fee"), h("dd", { class: "num" }, "₹" + o.fee), h("dt", {}, "Registered"), h("dd", {}, fmtTime(o.createdAt))),
+      h("div", { class: "row" }, o.status !== "APPROVED" ? h("button", { class: "ok sm", onclick: () => setStatus(o, "approve") }, "Approve") : null,
+        o.status !== "REJECTED" ? h("button", { class: "ghost sm", onclick: () => setStatus(o, "reject") }, o.status === "APPROVED" ? "Remove approval" : "Reject") : null)))
+      : h("div", { class: "card" }, h("p", { class: "muted" }, "No optometrist has registered yet.")));
+}
+
+// ---------- start ----------
+function render() { if (!st.token || !st.me) return authView(); start(); }
+async function start() {
+  stopTimers();
+  if (!st.token) return authView();
+  if (!st.me) { try { st.me = await api("/me"); } catch (e) { return authView(); } }
+  if (ADMIN_PAGE) { if (st.me.role !== "admin") { st.error = "This page is for the admin."; return logout(); } await adminView(); st.timers.push(setInterval(adminView, 15000)); return; }
+  if (st.me.role !== "optometrist") { st.error = "This portal is for optometrists."; return logout(); }
+  if (st.me.status !== "APPROVED") return pendingView();
+  if (st.view === "case") return openCase();
+  if (st.view === "profile") return profileView();
+  st.view = "queue"; queueView(); await loadQueue(true);
+  st.timers.push(setInterval(loadQueue, 10000));
+}
+document.addEventListener("click", () => { if (st.audio && st.audio.state === "suspended") st.audio.resume(); }, true);
+start();
+</script>
+</body>
+</html>
