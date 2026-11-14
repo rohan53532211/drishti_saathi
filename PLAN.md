@@ -317,8 +317,77 @@ Rules for this branch: push only `feature/vision-profile`; thresholds live in `r
 - Debug APK: `D:\drishti-data\drishti-vision-profile.apk` (85.7 MB, not in git).
 - `README.md` (features, safety rules, lens-assisted mode, screening tests, new flow) and `docs/ARCHITECTURE.md` (section 6) updated.
 
+### Phase I: fixes from the first phone test (done, 15 Nov 2026)
+Found on the phone in reports S2 (routine) and S32 (emergency short path). Each fix has a unit test in `PhoneTestFixesTest` (engine) and `PhoneTestFixesAppTest` (app).
+1. **Both eyes always printed.** A skipped eye is stored with its reason and every output (result screen, PDF, WhatsApp picture, QR, optometrist report) shows "L: not measured – skipped". The eye check's last screen lists both eyes and its main button goes back to the eye that has no reading.
+2. **Lens-assisted mode.** The suggested lens stays about 2 D weaker than the first pass (`lensAssisted.suggestOffsetD`). New: if the residual through the lens is still at or beyond `repeatIfResidualFromSeD` (−3.75 D), staff are asked for a stronger lens (about 2 D weaker than the new total) and the test is repeated, at most `maxStrongerRepeats` (1) times.
+3. **Near point of a short-sighted customer.** "Possible long-sightedness" is never shown next to a measured minus power (also for sessions stored earlier). Staff are asked to put the distance glasses or trial lens on for the near check; with the correction on the far power counts as 0 D, without it the near point is not judged.
+4. **Contrast.** Failing even the 100 % step = "Test not valid – repeat with glasses/trial lens on" (no "Reduced", no cataract note, and it no longer counts as poor low-light vision for the lens engine); the screen offers the repeat at once. An eye with 1.00 D or more (`screening.contrast.wearCorrectionFromAbsD`) is told to wear its correction first. `rules.json` must start the steps at 100 %.
+5. **Ring labels.** The Leisure label now comes from the ring's own score (`visionProfile.leisure.mediumFromScore` 34, `highFromScore` 67), so 17 is "Low".
+6. **Report header and disclaimer.** The header has the date, the age band and the session's language. The disclaimer is printed once (top of each PDF, end of the WhatsApp picture).
+7. **Grid red flag.** `AMSLER_DISTORTION` comes only from a grid result and names the eye ("… on the grid test – left eye"). The customer's own answer "straight lines look bent" is a separate flag, `BENT_LINES_REPORTED`, worded as an answer, so the referral is not lost.
+8. **Emergency short path.** Rings say "Skipped – emergency short path"; the header says "Short path (emergency)".
+9. **URGENT and CHILD_MYOPIA reports.** The power lines read "For the optometrist only: R … D" instead of "Your approximate power…", and that result is not read aloud during the check.
+- Tests: engine 383, app 379, backend 83 = 845, all passing.
+- Debug APK rebuilt: `D:\drishti-data\drishti-vision-profile.apk`; pre-release v1.1 asset replaced.
+- Still to check on the phone: the stronger-lens repeat, the "glasses on" step before the near check, the contrast repeat screen. S2's own case (−1.50 lens, residual −3.25 D) is below the −3.75 D repeat limit: lower `repeatIfResidualFromSeD` (for example to −3.00) if the optometrist wants a repeat there too.
+
+## Teleconsult (`feature/teleconsult`, from `feature/vision-profile`, 15 Nov 2026)
+Patient registers in the app, takes the test, asks for a consultation; a verified optometrist accepts in a web portal, talks by chat / WhatsApp / video, and sends advice or an e-prescription the patient sees in the app. Payments are a placeholder. Demo runs on the laptop over LAN (http); production needs HTTPS hosting, real OTP login and payment integration.
+
+### Teleconsult phase 1: backend accounts and data (done)
+- `backend/app/teleconsult.py`, mounted under `/api` by `create_app`. Tables `tc_users`, `tc_consultations`, `tc_messages`, `tc_prescriptions`, `tc_settings` in the same SQLite file.
+- **Roles:** patient, optometrist, admin. Passwords hashed with bcrypt; JWT (HS256, 7 days) in `Authorization: Bearer`; a role check on every endpoint. The JWT key is `JWT_SECRET`, or a random one kept in the database.
+- **Patient:** name, phone, age, gender, language; the consent sentence is stored with its time. `DELETE /api/me` removes the account with every consultation, report, message and prescription.
+- **Optometrist:** registers as PENDING; only APPROVED ones see cases or are offered to patients. Phone and email are never shown to patients.
+- **Admin:** one account from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `backend/.env` (never committed); approve / reject endpoints.
+- **Consultation:** REQUESTED → ACCEPTED → IN_PROGRESS → COMPLETED / CLOSED; priority from the report's own tag; `payment_status = "not_required (demo)"`. The report is the app's existing optometrist report and passes the same privacy check (no name, photo or phone inside it). The patient's phone is shown only to the optometrist who accepted.
+- **Chat** (text, optional picture up to 600 KB), **video** (a `meet.jit.si/drishti-<12 chars>` room posted into the chat), **WhatsApp** links (`wa.me`, prefilled Hindi / English greeting with the case number; to the optometrist only if they allow it).
+- **Advice / e-prescription:** sphere, cylinder, axis per eye, add, PD, lens advice, referral advice, follow-up date, notes, optometrist name + registration number → PDF (fpdf2, the app's Inter + Devanagari font).
+- Tests: `backend/tests/test_teleconsult.py` (13): auth, roles, approval gate, consultation flow, chat pictures, data deletion. Backend total 96.
+
+### Teleconsult phase 2: optometrist web portal (done)
+- `backend/app/static/portal.html`, served at `/portal` and `/portal/admin`: one page, no build step, no outside scripts. Same design tokens as the app (Inter + Devanagari font served from the backend, #1A5CFF, 24 px cards, light / dark, works on a phone).
+- Register, login, "pending approval" screen (checks again every 10 s).
+- Dashboard: tabs Urgent | Child myopia | Routine | My active | Completed with counts, urgent cases with a red edge, refresh every 10 s, NEW badge and a sound for a new case (after "Sound: on"), availability switch.
+- Case view: patient name, age, language; rings, power with the method, PD, screening lines, the grid with the marked squares, red-flag reasons, lens suggestions with their reasons, interview answers; Accept.
+- After accepting: chat (polls every 3 s, pictures), WhatsApp button, video call (Jitsi room, link posted into the chat), prescription form with the lens catalogue as chips → PDF, close.
+- Profile page (fee, clinic, languages, WhatsApp permission). Admin page: approve / reject.
+- `python -m app.seed_demo`: 2 approved + 1 pending optometrist and 3 patients, all named DEMO, with one URGENT, one CHILD_MYOPIA and one ROUTINE request. Password from `DEMO_PASSWORD`.
+- Tried in Chrome against the running backend: queue, accept, chat, prescription, admin page. All text is inserted as text nodes (no HTML from patients or chat).
+- Backend tests: 97.
+
+### Teleconsult phase 3: patient side in the Android app (done)
+- New package `com.drishtisaathi.teleconsult` (`TeleApi.kt`, `TeleScreens.kt`) and strings in `i18n/STele.kt` (Hindi + English). The server address is the one in the optometrist bridge settings; the patient's login token is kept in app preferences (backups are off).
+- **Home → Patient mode:** register (name, mobile, password, age, gender, language, the consent box is required) or log in; profile; "Take the eye test"; "My consultations"; log out; "Delete my account and data".
+- **Result screen → "Consult an optometrist":** approved, available optometrists (name, qualification, clinic and city, languages, registration number, fee) or "Any available" → the request goes out with the session's own optometrist report (no name, photo or phone inside it; the name comes from the account).
+- **My consultations:** status of each, refreshed every 15 s. One consultation: chat (every 5 s), "Join video call" (the Jitsi link opens in the Jitsi app or the browser), WhatsApp to the optometrist only if they allowed it, the advice in words and as a PDF (opened through the FileProvider), close / cancel.
+- **Urgent reports:** "Please see an eye doctor today" comes first on the result card, the choice screen and the consultation, followed by "A teleconsult never replaces an urgent visit."
+- Wording: in the app the optometrist's document is called "advice" (the Section 6 word list still applies; `StringsWordingTest` covers `STele`). Only `https://meet.jit.si/` and `https://wa.me/` links from the server are opened.
+- The shop / staff flow is unchanged: Patient mode is one extra card on Home and one extra card on the result screen.
+- Tests: `TeleTextTest` (7). App total 386, engine 383.
+- **Not tried on a phone yet:** the patient screens were compiled and unit-tested only.
+
+### Teleconsult phase 4: demo data and finish (done, 15 Nov 2026)
+- `python -m app.seed_demo` (`--reset` deletes only the demo rows and makes them again): 2 approved optometrists, 1 pending, 3 patients, all named DEMO, with one URGENT, one CHILD_MYOPIA and one ROUTINE request. The admin comes from `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+- `README.md` and `backend/README.md`: how to run, the URLs (`/portal`, `/portal/admin`), the demo logins (placeholders from `.env.example`), the demo steps, and what production needs (HTTPS hosting, real OTP login, payment integration).
+- Checked end to end against the running backend: the portal in Chrome (queue, accept, chat, prescription, admin), and the app's own client code (register, log in, list optometrists, send a real report, chat, close, delete the account).
+- Tests: engine 383, app 386, backend 97 = 866, all passing.
+- Debug APK: `D:\drishti-data\drishti-teleconsult.apk` (not in git); pre-release v1.2.
+
+### Teleconsult: open items
+1. **The patient screens have not been tried on a phone.** Check first: register and log in on the phone's keyboard, the "Consult an optometrist" card on the result, the chat with the keyboard open, "Join video call" (Jitsi app or browser), the PDF opening in a viewer, Hindi layout, dark theme.
+2. Login is a mobile number and a password: no OTP, no password reset, no limit on wrong attempts. The login token lasts 7 days and cannot be withdrawn early.
+3. Plain http on the LAN. Production needs HTTPS hosting, real OTP login and payment integration (the fee is display only, `payment_status = "not_required (demo)"`).
+4. An admin approves by reading the registration number; nothing checks it against a council register.
+5. The app has no notifications for teleconsult: updates arrive by polling while a consultation screen is open (15 s; chat 5 s).
+6. The app sends text only in the chat (it shows pictures the optometrist sends). The patient cannot edit the profile in the app after registering (the API allows it).
+7. Video uses the public `meet.jit.si` service: the room name is random but anyone with the link can join, and the public service may ask the first person to sign in as the host.
+8. The e-prescription PDF is in English; Hindi notes are printed with the Devanagari font but without proper conjunct shaping.
+9. One shared SQLite file, no audit log, no retention rule; a DPDP Act review is needed before real patients.
+
 ### Vision profile branch: open items
-1. **Nothing on this branch has been tried on a phone.** First things to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
+1. **Tried once on a phone (15 Nov), fixes above.** Still to check on the S23 FE: the survey by voice, the lens-assisted steps, the grid's real square size (5 mm with a ruler) and the 27–33 cm gate, the contrast letters at 3 % and 1.5 % (Night light off), the colour plates, the dark theme, font scale 1.3, the QR scan and the WhatsApp picture.
 2. Colour-plate palettes, contrast steps and the "Normal at 3 %" limit are our own starting values: an optometrist should review them. A phone display cannot guarantee low contrast levels.
 3. A phone screen is narrower than 10 cm, so the grid shows fewer columns than 20 (the rows are complete).
 4. Lens triggers are our own rules. Lens product descriptions on the cards are English only (the reasons are in Hindi too).

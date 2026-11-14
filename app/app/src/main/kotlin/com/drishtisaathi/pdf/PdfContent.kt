@@ -78,15 +78,19 @@ object PdfContent {
         out += Block.Title("${if (state.demo) "DEMO · " else ""}${S.appName[l]} · ${S.shopSummary[l]}")
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         out += Block.Para("${state.sessionId?.let { S.sessionNo.format(it.toInt())[l] + " · " } ?: ""}${S.generatedOn[l]}: ${date(state.createdAt)}", tone = Tone.MUTED)
-        out += Block.Para(S.disclaimerBoth, bold = true)
         val gate = state.gate(rules)
         val P = com.drishtisaathi.i18n.SProfile
+        // header: date, age band and the session's language; the emergency short path is named
+        out += Block.Para(com.drishtisaathi.profile.QrPayload.headerLine(state)[l], tone = Tone.MUTED)
+        if (gate.emergency) out += Block.Para(P.shortPathHeader[l], bold = true, tone = Tone.URGENT)
+        // the disclaimer is printed once, at the top
+        out += Block.Para(S.disclaimerBoth, bold = true)
         val urgent = a.referral.level == ReferralLevel.URGENT || gate.urgent
         out += Block.Para(P.reportTagLine.format(P.tag(gate.tag)[l])[l], bold = true,
             tone = when (gate.tag) { com.drishtisaathi.engine.profile.ReportTag.URGENT -> Tone.URGENT; com.drishtisaathi.engine.profile.ReportTag.CHILD_MYOPIA -> Tone.ROUTINE; else -> Tone.MUTED })
         if (gate.urgent) {
             out += Block.Para(P.seeDoctorToday[l], bold = true, tone = Tone.URGENT)
-            gate.redFlags.forEach { out += Block.Bullet(P.redFlag(it)[l], Tone.URGENT) }
+            P.redFlagLines(gate).forEach { out += Block.Bullet(it[l], Tone.URGENT) }
             out += Block.Para(P.noLensToday[l], bold = true)
         } else if (urgent) {
             out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
@@ -99,7 +103,7 @@ object PdfContent {
         out += Block.Rule
 
         // The eye check (compulsory): the known power if any, the phone ranges, the near result.
-        val quick = PowerPathText.quickLines(state)
+        val quick = PowerPathText.quickLines(state, gate.powerForOptometristOnly)
         if (quick.isNotEmpty()) {
             out += Block.Heading(com.drishtisaathi.i18n.SShop.eyeCheckTitle[l])
             if (gate.powerForOptometristOnly) out += Block.Para(P.forOptometristOnly[l], bold = true, tone = Tone.URGENT)
@@ -125,10 +129,10 @@ object PdfContent {
         if (view != null) {
             out += Block.Heading(P.profileTitle[l])
             out += Block.Rings(view.profile.rings.map { (id, r) ->
-                Block.RingSpec(com.drishtisaathi.profile.LensText.ringTitle(id)[l], (if (r.known) P.ringLabel(r.label) else P.ringNotAnswered)[l],
+                Block.RingSpec(com.drishtisaathi.profile.LensText.ringTitle(id)[l], com.drishtisaathi.profile.LensText.ringLabel(r, gate.emergency)[l],
                     if (r.known) r.score else -1, RING_RGB.getValue(id))
             })
-            com.drishtisaathi.profile.LensText.ringLines(view.profile).forEach { out += Block.Bullet(it[l]) }
+            com.drishtisaathi.profile.LensText.ringLines(view.profile, gate.emergency).forEach { out += Block.Bullet(it[l]) }
             if (view.plan.allowed) {
                 out += Block.Heading(P.lensLabel[l])
                 if (view.plan.optometristConfirms) out += Block.Para(P.optometristConfirms[l], bold = true, tone = Tone.ROUTINE)
@@ -229,7 +233,6 @@ object PdfContent {
 
         out += Block.Rule
         if (!urgent) out += Block.Para(com.drishtisaathi.i18n.SShop.phoneCheckNote[l], bold = true)
-        out += Block.Para(S.disclaimerBoth, bold = true)
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         return out
     }
@@ -252,7 +255,7 @@ object PdfContent {
         val urgent = a.referral.level == ReferralLevel.URGENT || gate.urgent
         if (gate.urgent) {
             out += Block.Para(P.seeDoctorToday[l], bold = true, tone = Tone.URGENT)
-            gate.redFlags.forEach { out += Block.Bullet(P.redFlag(it)[l], Tone.URGENT) }
+            P.redFlagLines(gate).forEach { out += Block.Bullet(it[l], Tone.URGENT) }
             out += Block.Para(P.noLensToday[l], bold = true)
         } else if (urgent) {
             out += Block.Para(com.drishtisaathi.i18n.SShop.urgentTop[l], bold = true, tone = Tone.URGENT)
@@ -293,7 +296,6 @@ object PdfContent {
         out += Block.Rule
         if (!urgent) out += Block.Para(com.drishtisaathi.i18n.SShop.phoneCheckNote[l], bold = true)
         out += Block.Para(S.privacyNote[l], tone = Tone.MUTED)
-        out += Block.Para(S.disclaimerBoth, bold = true)
         if (state.demo) out += Block.Para(com.drishtisaathi.i18n.SFlow.demoPdfLine[l], bold = true, tone = Tone.URGENT)
         return out
     }

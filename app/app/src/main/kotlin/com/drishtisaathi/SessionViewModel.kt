@@ -235,6 +235,20 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Remote Optometrist Bridge ------------------------------------------------------------
 
     val bridgeSettings = BridgeSettings(app)
+
+    /** Teleconsult, patient side: the patient's login and calls to the same server as the bridge. */
+    val tele = com.drishtisaathi.teleconsult.TeleController(app, bridgeSettings)
+
+    /**
+     * The report a patient sends with a consultation request: the same report the optometrist bridge gets (numbers
+     * and answers only; the name comes from the patient's account, shared with their stored consent). Null = no
+     * finished test in this session.
+     */
+    fun teleReport(s: UiState = _state.value): kotlinx.serialization.json.JsonObject? {
+        if (s.result == null) return null
+        val consentAt = tele.user.value?.consentAt ?: System.currentTimeMillis()
+        return runCatching { BridgeProfile.build(s, rules, BridgeConsent(consentAt, spoken = true, tapped = true), appVersion, profileView(s)) }.getOrNull()
+    }
     private val remoteDao = db.remoteReviews()
     val appVersion: String = runCatching {
         app.packageManager.getPackageInfo(app.packageName, 0).versionName

@@ -68,6 +68,8 @@ fun ResultScreen(
     qr: Pair<String, Boolean>? = null,
     /** Phase G: shares the summary picture (called after the consent checkbox). */
     onShareImage: (() -> Unit)? = null,
+    /** Teleconsult: the "Consult an optometrist" card. */
+    teleCard: @Composable () -> Unit = {},
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -92,7 +94,8 @@ fun ResultScreen(
                 }
             }
             // "Your Vision Profile": the rings.
-            view?.let { com.drishtisaathi.profile.VisionProfileCard(l, it.profile) }
+            Text(com.drishtisaathi.profile.QrPayload.headerLine(state)[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            view?.let { com.drishtisaathi.profile.VisionProfileCard(l, it.profile, emergency = gate.emergency) }
             // Measurements: power per eye in large numerals with its range and method, PD, trial-lens start, screening.
             MeasurementsCard(state, rules, gate)
             // A red flag or child myopia: the referral card replaces every lens and frame suggestion; else the lens cards.
@@ -141,6 +144,7 @@ fun ResultScreen(
             // QR card, then the optometrist card ("Send to optometrist" is always on) and the share action
             qr?.let { com.drishtisaathi.profile.QrCard(l, it.first, it.second) }
             remoteCard()
+            teleCard()
             if (onShareImage != null) {
                 var askShare by remember { mutableStateOf(false) }
                 BigButton(com.drishtisaathi.i18n.SProfile.shareWhatsApp[l], { askShare = true })
@@ -324,13 +328,18 @@ fun MeasurementsCard(state: UiState, rules: RulesConfig, gate: com.drishtisaathi
         if (gate.powerForOptometristOnly) Text(P.forOptometristOnly[l], style = MaterialTheme.typography.labelLarge, color = c.urgentInk,
             modifier = Modifier.background(c.urgentSoft, DS.pill).padding(horizontal = 12.dp, vertical = 6.dp))
         PowerPathText.knownLine(state)?.let { Text(it[l], style = MaterialTheme.typography.bodyLarge, color = c.ink) }
-        val eyes = state.quick?.eyes.orEmpty()
+        // both eyes, always: an eye without a reading shows a dash and the reason
+        val eyes = state.quick?.bothEyes.orEmpty()
         if (eyes.isNotEmpty()) androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            eyes.forEach { (eye, e) ->
+            eyes.forEach { (eye, e, why) ->
                 Column(Modifier.weight(1f).background(c.background, DS.button).padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text((if (eye == Eye.RIGHT) SShop.rightEye else SShop.leftEye)[l], style = MaterialTheme.typography.labelMedium, color = c.inkSecondary)
-                    val se = e.seD
-                    if (se == null || e.noMyopiaAtReach) {
+                    val se = e?.seD
+                    if (e == null) {
+                        Text("—", style = MaterialTheme.typography.displaySmall, color = c.inkSecondary)
+                        Text(P.notMeasured.format(P.notMeasuredReason(why ?: com.drishtisaathi.engine.NotMeasured.NOT_DONE)[l])[l],
+                            style = MaterialTheme.typography.bodySmall, color = c.warningInk)
+                    } else if (se == null || e.noMyopiaAtReach) {
                         Text("0.00", style = MaterialTheme.typography.displaySmall, color = c.ink)
                         Text(SAnamnesis.quickNoMyopia[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
                     } else {
@@ -345,7 +354,7 @@ fun MeasurementsCard(state: UiState, rules: RulesConfig, gate: com.drishtisaathi
             }
         }
         // the full sentence per eye (method, residual, total, range), and the near result
-        PowerPathText.quickLines(state).drop(if (PowerPathText.knownLine(state) != null) 1 else 0).forEach {
+        PowerPathText.quickLines(state, gate.powerForOptometristOnly).drop(if (PowerPathText.knownLine(state) != null) 1 else 0).forEach {
             Text(it[l], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
         }
         HorizontalDivider(color = c.hairline)

@@ -53,6 +53,9 @@ fun HomeScreen(
     bridgeOnline: Boolean = false,
     queued: Int = 0,
     onBridgeChip: () -> Unit = {},
+    /** Patient mode: register / log in, take the test, consult an optometrist. [patientName]: logged in as. */
+    onPatient: () -> Unit = {},
+    patientName: String? = null,
 ) {
     val l = state.lang
     val c = DS.colors
@@ -106,6 +109,7 @@ fun HomeScreen(
                 HomeTile(SShop.shopTools[l], c.mobility, onShopTools, Modifier.weight(1f))
                 HomeTile(P.homeFrames[l], c.leisure, onFrames, Modifier.weight(1f))
             }
+            com.drishtisaathi.teleconsult.PatientModeCard(l, patientName, onPatient)
             Text(S.privacyNote[l], style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
             Disclaimer()
         }
