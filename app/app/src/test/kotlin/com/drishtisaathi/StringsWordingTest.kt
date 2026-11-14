@@ -23,7 +23,7 @@ class StringsWordingTest {
     private val bannedHi = listOf("पर्चा", "निदान", "पावर है", "आपका नंबर")
 
     /** The disclaimer itself, and the brief's own question about the customer's existing slip. */
-    private val allowed = setOf(S.disclaimer, S.qKnownRx)
+    private val allowed = setOf(S.disclaimer, S.qKnownRx, com.drishtisaathi.i18n.SProfile.screeningLabel)
 
     private fun violations(t: Txt): List<String> =
         listOfNotNull(bannedEn.find(t.en)?.value) + bannedHi.filter { it in t.hi }

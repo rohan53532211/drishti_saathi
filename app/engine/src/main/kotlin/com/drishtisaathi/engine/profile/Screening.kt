@@ -1,6 +1,9 @@
 package com.drishtisaathi.engine.profile
 
+import com.drishtisaathi.engine.Confidence
 import com.drishtisaathi.engine.Eye
+import com.drishtisaathi.engine.MeasuredEye
+import com.drishtisaathi.engine.VisionTests
 import com.drishtisaathi.engine.config.AmslerConfig
 import com.drishtisaathi.engine.config.ColourConfig
 import com.drishtisaathi.engine.config.ContrastConfig
@@ -241,14 +244,36 @@ object ColourPlates {
 
 // ---- All screening results of a session ----------------------------------------------------------
 
+/** Tumbling-E near acuity of one eye ([eye] null = both eyes together), kept from the earlier test flow. */
+@Serializable
+data class ETestEyeResult(val eye: Eye?, val logMar: Double, val belowLimit: Boolean)
+
+/** Fogged clock dial of one eye, kept from the earlier test flow: darker lines = possible astigmatism. */
+@Serializable
+data class DialEyeResult(val eye: Eye, val astigmatismFlag: Boolean, val axisDeg: Int? = null, val confidence: Confidence = Confidence.MEDIUM)
+
 @Serializable
 data class ScreeningResults(
     val amsler: List<AmslerEyeResult> = emptyList(),
     val contrast: List<ContrastEyeResult> = emptyList(),
     val colour: ColourResult? = null,
+    val eTest: List<ETestEyeResult> = emptyList(),
+    val clockDial: List<DialEyeResult> = emptyList(),
     /** Tests the customer or staff skipped ("AMSLER_RIGHT", "CONTRAST_LEFT", "COLOUR", …). */
     val skipped: List<String> = emptyList(),
 ) {
     val amslerAbnormal: Boolean get() = amsler.any { it.distortion }
     val contrastReduced: Boolean get() = contrast.any { it.reduced }
+
+    /**
+     * What the rules engine needs from the screening stage: the grid (urgent when abnormal), the E test's "below the
+     * safe limit", and the dial's astigmatism flag per eye. No far-point power: that comes from the power check.
+     */
+    fun toVisionTests(): VisionTests {
+        fun dial(e: Eye) = clockDial.firstOrNull { it.eye == e }?.let { MeasuredEye(null, it.confidence, astigmatismFlag = it.astigmatismFlag, astigmatismAxisDeg = it.axisDeg) }
+        return VisionTests(
+            right = dial(Eye.RIGHT), left = dial(Eye.LEFT),
+            nearAcuityBelowThreshold = eTest.any { it.belowLimit }, amslerAbnormal = amslerAbnormal,
+        )
+    }
 }

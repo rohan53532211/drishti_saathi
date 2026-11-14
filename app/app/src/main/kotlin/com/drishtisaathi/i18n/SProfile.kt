@@ -90,6 +90,74 @@ object SProfile {
     )
     val padDelete = tx("Delete", "मिटाएँ")
 
+    // ---- Phase C: screening tests ----
+    /** The label the screening results carry everywhere (the one place this word is allowed, like the disclaimer). */
+    val screeningLabel = tx("Screening, not a diagnosis", "यह स्क्रीनिंग है, निदान नहीं")
+    val screeningTitle = tx("Screening tests", "स्क्रीनिंग जाँच")
+    val setupTitle = tx("Before the screening tests", "स्क्रीनिंग जाँच से पहले")
+    val setupBody = tx(
+        "The screen is now at full brightness. Staff: please turn off Night light / Eye comfort mode in the phone's quick settings, so colours and contrast are shown correctly. One eye is tested at a time.",
+        "स्क्रीन की चमक अब पूरी है। स्टाफ़: फ़ोन की क्विक सेटिंग में नाइट लाइट / आई कम्फ़र्ट मोड बंद कर दें, ताकि रंग और कंट्रास्ट सही दिखें। एक बार में एक आँख की जाँच होगी।",
+    )
+    val setupStart = tx("Night light is off: start", "नाइट लाइट बंद है: शुरू करें")
+    val skipTest = tx("Skip this test", "यह जाँच छोड़ें")
+    val distanceCm = tx("%d cm", "%d cm")
+    val holdRange = tx("Hold at %d–%d cm", "%d–%d cm पर रखें")
+    val noFace = tx("Face not seen", "चेहरा नहीं दिखा")
+    val coverEye = tx("Cover your %s eye with your palm.", "अपनी %s आँख हथेली से ढकें।")
+    val amslerTitle = tx("Grid test", "ग्रिड जाँच")
+    val amslerHold = tx(
+        "Hold the phone at 30 cm and keep looking at the dot in the middle.",
+        "फ़ोन 30 cm पर रखें और बीच के बिंदु को देखते रहें।",
+    )
+    val amslerQuestion = tx("Are any lines wavy, missing, blurred or broken?", "क्या कोई लकीर टेढ़ी, ग़ायब, धुंधली या टूटी दिखती है?")
+    val amslerNo = tx("No, all lines are straight", "नहीं, सब लकीरें सीधी हैं")
+    val amslerYes = tx("Yes, some lines look wrong", "हाँ, कुछ लकीरें ठीक नहीं दिखतीं")
+    val amslerTap = tx("Tap the places on the grid where the lines look wrong, then Done.", "ग्रिड पर वहाँ दबाएँ जहाँ लकीरें ठीक नहीं दिखतीं, फिर 'हो गया' दबाएँ।")
+    val done = tx("Done", "हो गया")
+    val amslerNarrow = tx("Grid shown: %d × %d squares of 5 mm (this screen is narrower than 10 cm)", "ग्रिड: 5 mm के %d × %d खाने (यह स्क्रीन 10 cm से कम चौड़ी है)")
+    val amslerTooSmall = tx("This screen is too small for the grid test.", "ग्रिड जाँच के लिए यह स्क्रीन बहुत छोटी है।")
+    val contrastTitle = tx("Contrast test", "कंट्रास्ट जाँच")
+    val contrastInstruction = tx("Which letter do you see? It gets fainter each time.", "कौन-सा अक्षर दिख रहा है? हर बार यह हल्का होता जाएगा।")
+    val cantSee = tx("I can't see a letter", "कोई अक्षर नहीं दिखता")
+    val colourTitle = tx("Colour test", "रंग जाँच")
+    val colourInstruction = tx("Keep both eyes open. Which number do you see in the dots?", "दोनों आँखें खुली रखें। बिंदुओं में कौन-सा अंक दिखता है?")
+    val noNumber = tx("I can't see a number", "कोई अंक नहीं दिखता")
+    val plateOf = tx("Plate %d of %d", "प्लेट %d / %d")
+    val classicTitle = tx("E test and clock dial", "E जाँच और घड़ी डायल")
+    /** Spoken digits 0–9 (Hindi, Hinglish, English). */
+    val sayDigits = listOf(
+        listOf("शून्य", "zero", "shunya", "0"), listOf("एक", "one", "ek", "1"), listOf("दो", "two", "do", "2"), listOf("तीन", "three", "teen", "3"),
+        listOf("चार", "four", "chaar", "char", "4"), listOf("पाँच", "पांच", "five", "paanch", "5"), listOf("छह", "छः", "six", "chhah", "6"),
+        listOf("सात", "seven", "saat", "7"), listOf("आठ", "eight", "aath", "8"), listOf("नौ", "nine", "nau", "9"),
+    )
+    // results
+    val resGrid = tx("Grid", "ग्रिड")
+    val resGridOk = tx("lines straight", "लकीरें सीधी")
+    val resGridBad = tx("wavy or missing lines reported (%d square(s) marked)", "टेढ़ी या ग़ायब लकीरें बताईं (%d खाने चिह्नित)")
+    val resContrast = tx("Contrast", "कंट्रास्ट")
+    val resContrastStep = tx("lowest step seen %s%% – %s", "सबसे हल्का दिखा %s%% – %s")
+    val resContrastNone = tx("no step seen – %s", "कोई स्तर नहीं दिखा – %s")
+    val normal = tx("Normal", "सामान्य")
+    val reduced = tx("Reduced", "कम")
+    val eyeHealthNote = tx("Suggest cataract / eye-health check", "मोतियाबिंद / आँखों की सेहत की जाँच की सलाह")
+    val resColour = tx("Colour", "रंग")
+    val colourNormal = tx("Normal", "सामान्य")
+    val colourRedGreen = tx("Possible red-green deficiency – confirm with optometrist", "लाल-हरे रंग की कमी हो सकती है – ऑप्टोमेट्रिस्ट से पक्का करें")
+    val colourBlueYellow = tx("Possible blue-yellow deficiency – confirm with optometrist", "नीले-पीले रंग की कमी हो सकती है – ऑप्टोमेट्रिस्ट से पक्का करें")
+    val colourBoth = tx("Possible red-green and blue-yellow deficiency – confirm with optometrist", "लाल-हरे और नीले-पीले रंग की कमी हो सकती है – ऑप्टोमेट्रिस्ट से पक्का करें")
+    val colourInvalid = tx("Test not valid, repeat", "जाँच मान्य नहीं, दोबारा करें")
+    val colourNeeds = tx("Ask about colour needs for driving licence/work", "ड्राइविंग लाइसेंस / काम के लिए रंग की ज़रूरत के बारे में पूछें")
+    val resETest = tx("E test (near)", "E जाँच (पास)")
+    val resETestLine = tx("about logMAR %s%s", "लगभग logMAR %s%s")
+    val resBelowLimit = tx(" – below the safe limit", " – सुरक्षित सीमा से कम")
+    val resDial = tx("Clock dial", "घड़ी डायल")
+    val resDialOk = tx("all lines equally dark", "सब लकीरें बराबर गहरी")
+    val resDialFlag = tx("some lines darker: possible astigmatism, axis about %d°", "कुछ लकीरें ज़्यादा गहरी: एस्टिग्मैटिज़्म हो सकता है, एक्सिस लगभग %d°")
+    val resSkipped = tx("not done", "नहीं हुई")
+    val eyeR = tx("R", "दाईं")
+    val eyeL = tx("L", "बाईं")
+
     // ---- report queue / bridge chip ----
     val bridgeConnected = tx("Connected", "जुड़ा है")
     val bridgeOffline = tx("Offline – queued %d", "ऑफ़लाइन – %d कतार में")

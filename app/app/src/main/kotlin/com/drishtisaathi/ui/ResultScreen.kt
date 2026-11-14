@@ -92,6 +92,12 @@ fun ResultScreen(
                     style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = UrgentRed)
                 eyeLines.forEach { Text("• " + it[l], style = MaterialTheme.typography.bodyLarge) }
             }
+            // Screening tests (grid, contrast, colour, E test, clock dial): results with status dots.
+            val screenLines = com.drishtisaathi.profile.ScreeningText.lines(state, rules)
+            if (screenLines.isNotEmpty()) SectionCard(com.drishtisaathi.i18n.SProfile.screeningTitle[l]) {
+                Text(com.drishtisaathi.i18n.SProfile.screeningLabel[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                screenLines.forEach { com.drishtisaathi.profile.ScreenLineRow(it, l) }
+            }
             // A red flag or child myopia: the referral card replaces every lens and frame suggestion.
             if (!gate.lensAllowed) com.drishtisaathi.profile.ReferralCard(l, gate)
             SectionCard(SAnamnesis.profileTitle[l]) {

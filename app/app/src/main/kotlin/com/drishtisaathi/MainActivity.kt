@@ -111,7 +111,6 @@ private object Routes {
     const val BRIDGE_SETTINGS = "bridgeSettings"
     // Vision profile: survey, the red banner, screening tests
     const val SURVEY = "survey"
-    const val RED_FLAG = "redFlag"
     const val SCREENING = "screening"
 
     fun tryOn(frameId: String?) = "tryOn" + (frameId?.let { "?frame=$it" } ?: "")
@@ -186,15 +185,14 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     // ---- Phase A: the red banner comes first, the check continues behind it ----
     /** Red flags the banner has already been shown for in this session. */
     var bannerFor by remember { mutableStateOf(emptyList<com.drishtisaathi.engine.profile.RedFlag>()) }
-    /** What runs after the banner's "Continue the check". */
-    var afterBanner by remember { mutableStateOf<() -> Unit>({}) }
+    /** The banner is up (over whatever screen is open); the value is what runs after "Continue the check". */
+    var afterBanner by remember { mutableStateOf<(() -> Unit)?>(null) }
     /** Shows the red banner when a red flag was found that it has not been shown for yet, then [next]. */
     fun withBanner(next: () -> Unit) {
         val gate = vm.safety()
         if (gate.urgent && !bannerFor.containsAll(gate.redFlags)) {
             bannerFor = gate.redFlags
             afterBanner = next
-            nav.navigate(Routes.RED_FLAG)
         } else next()
     }
 
@@ -259,7 +257,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.HOME) {
             HomeScreen(
                 state, vm::setLang,
-                onStart = { precisionRun = false; vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
+                onStart = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onHistory = { nav.navigate(Routes.HISTORY) },
                 onShopTools = { vm.avatarStaffDefault = true; nav.navigate(Routes.SHOP_TOOLS) },
                 setupDone = setupDone,
@@ -306,7 +304,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             DiagnosticsScreen(
                 state.lang, vm::setLang,
                 onCamera = { nav.navigate(Routes.CAMERA_DEBUG) },
-                onPrecision = { precisionRun = true; vm.startNew(); nav.navigate(Routes.CONSENT) },
+                onPrecision = { precisionRun = true; bannerFor = emptyList(); vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onAlign3D = { vm.loadCatalog3D(); nav.navigate(Routes.live3d(null, debug = true)) },
                 onBack = { nav.popBackStack() },
             )
@@ -409,16 +407,18 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 voice = voice,
             )
         }
-        composable(Routes.RED_FLAG) {
-            val gate = androidx.compose.runtime.remember(state.answers, state.survey, state.screening) { vm.safety() }
-            com.drishtisaathi.profile.RedFlagBannerScreen(
-                state.lang, gate, speak = { voice.instructionSpeaker.speak(it, state.lang) },
-                onContinue = { val next = afterBanner; nav.popBackStack(); next() },
-            )
-        }
         composable(Routes.SCREENING) {
-            // Phase C adds the screening tests here; until then the flow goes straight on.
-            androidx.compose.runtime.LaunchedEffect(Unit) { nav.popBackStack(); afterScreening() }
+            val l = state.lang
+            val emergency = androidx.compose.runtime.remember { vm.safety().emergency }
+            var finished by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+            if (!finished) com.drishtisaathi.profile.CameraScreeningFlow(
+                l, vm.rules, vm.calibration, state.answers, state.quick, emergency,
+                onDone = { r -> finished = true; vm.setScreening(r); afterScreening() },
+                onSkip = { finished = true; vm.setScreening(null); afterScreening() },
+                modifier = Modifier.fillMaxSize(), voice = voice,
+                speak = { voice.instructionSpeaker.speak(it, l) },
+                allowDemoWithoutCamera = state.demo || state.precision,
+            )
         }
         composable(Routes.OLD_NUMBERS) {
             OldNumbersScreen(
@@ -741,6 +741,15 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onBack = { nav.popBackStack() },
             )
         }
+    }
+    // Phase A: the red banner comes first, over whatever screen is open; the check continues behind it.
+    afterBanner?.let { next ->
+        androidx.activity.compose.BackHandler { }
+        val gate = androidx.compose.runtime.remember(state.answers, state.survey, state.screening) { vm.safety() }
+        com.drishtisaathi.profile.RedFlagBannerScreen(
+            state.lang, gate, speak = { voice.instructionSpeaker.speak(it, state.lang) },
+            onContinue = { afterBanner = null; next() },
+        )
     }
     if (state.demo) DemoBadge(state.lang, Modifier.align(androidx.compose.ui.Alignment.TopCenter))
     }

@@ -99,6 +99,21 @@ object PdfContent {
             quick.forEach { out += Block.Bullet(it[l]) }
         }
 
+        // Screening tests, always labelled "Screening, not a diagnosis".
+        val screening = com.drishtisaathi.profile.ScreeningText.lines(state, rules)
+        if (screening.isNotEmpty()) {
+            out += Block.Heading(P.screeningTitle[l])
+            out += Block.Para(P.screeningLabel[l], tone = Tone.MUTED)
+            screening.forEach {
+                out += Block.Bullet(it.text[l], when (it.status) {
+                    com.drishtisaathi.profile.ScreenLine.Status.URGENT -> Tone.URGENT
+                    com.drishtisaathi.profile.ScreenLine.Status.WATCH -> Tone.ROUTINE
+                    com.drishtisaathi.profile.ScreenLine.Status.NOT_DONE -> Tone.MUTED
+                    else -> Tone.NORMAL
+                })
+            }
+        }
+
         if (!urgent) {
             out += Block.Heading(S.referral[l])
             out += Block.Para(S.referralLevel(a.referral.level)[l], bold = true, tone = referralTone(a.referral.level))

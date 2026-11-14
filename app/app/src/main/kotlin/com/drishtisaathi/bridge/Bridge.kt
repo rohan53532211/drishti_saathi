@@ -116,6 +116,16 @@ object BridgeProfile {
                 put("screenTests", enc(com.drishtisaathi.engine.VisionTests.serializer(), state.tests.takeIf { state.testsDone }))
                 put("glassesOn", state.glassesOn)
             })
+            // Screening tests: the results in words (always under the label) and the raw results with the tapped grid squares.
+            state.screening?.let { sc ->
+                put("screening", buildJsonObject {
+                    put("label", com.drishtisaathi.i18n.SProfile.screeningLabel.en)
+                    put("lines", kotlinx.serialization.json.JsonArray(com.drishtisaathi.profile.ScreeningText.lines(state, rules).map {
+                        buildJsonObject { put("text", it.text.en); put("status", it.status.name) }
+                    }))
+                    put("results", enc(com.drishtisaathi.engine.profile.ScreeningResults.serializer(), sc))
+                })
+            }
             put("estimates", buildJsonObject {
                 put("referralLevel", a.referral.level.name)
                 put("referralReasons", enc(ListSerializer(com.drishtisaathi.engine.ReferralReason.serializer()), a.referral.reasons))

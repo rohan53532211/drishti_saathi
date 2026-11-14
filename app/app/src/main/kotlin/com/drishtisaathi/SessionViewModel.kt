@@ -400,7 +400,10 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         s.copy(survey = survey, answers = answers, answered = answered, result = null)
     }
 
-    fun setScreening(r: com.drishtisaathi.engine.profile.ScreeningResults?) = _state.update { it.copy(screening = r, result = null) }
+    /** Screening results; the grid, the E test and the dial also feed the rules engine (urgent / routine referral reasons). */
+    fun setScreening(r: com.drishtisaathi.engine.profile.ScreeningResults?) = _state.update {
+        it.copy(screening = r, tests = r?.toVisionTests() ?: VisionTests(), testsDone = r != null, result = null)
+    }
 
     val reportQueue = com.drishtisaathi.bridge.ReportQueue(com.drishtisaathi.bridge.PrefsQueueStore(app))
     private val _bridgeOnline = MutableStateFlow(false)
