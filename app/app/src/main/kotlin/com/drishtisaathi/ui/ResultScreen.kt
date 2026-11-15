@@ -36,6 +36,12 @@ import com.drishtisaathi.i18n.SShop
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import com.drishtisaathi.profile.gate
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.QrCode2
+import androidx.compose.material.icons.rounded.Share
 
 /** M6: one screen with profile, bands + confidence, starting trial lens, lens package, frames, referral status. */
 @Composable
@@ -70,6 +76,8 @@ fun ResultScreen(
     onShareImage: (() -> Unit)? = null,
     /** Teleconsult: the "Consult an optometrist" card. */
     teleCard: @Composable () -> Unit = {},
+    /** The customer's PDF copy (the "PDF" action next to Share). */
+    onPdf: (() -> Unit)? = null,
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -93,8 +101,13 @@ fun ResultScreen(
                     Text("• " + S.referralReason(it, rules)[l], style = MaterialTheme.typography.bodyLarge, color = UrgentRed)
                 }
             }
-            // "Your Vision Profile": the rings.
-            Text(com.drishtisaathi.profile.QrPayload.headerLine(state)[l], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            // Header (date, language), then "Your Vision Profile": the rings.
+            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Event, contentDescription = null,
+                    tint = DS.colors.inkSecondary, modifier = Modifier.padding(top = 1.dp))
+                Text(com.drishtisaathi.profile.QrPayload.headerLine(state)[l], style = MaterialTheme.typography.labelLarge, color = DS.colors.inkSecondary)
+            }
             view?.let { com.drishtisaathi.profile.VisionProfileCard(l, it.profile, emergency = gate.emergency) }
             // Measurements: power per eye in large numerals with its range and method, PD, trial-lens start, screening.
             MeasurementsCard(state, rules, gate)
@@ -141,14 +154,40 @@ fun ResultScreen(
                 savedFrames()
             }
 
-            // QR card, then the optometrist card ("Send to optometrist" is always on) and the share action
-            qr?.let { com.drishtisaathi.profile.QrCard(l, it.first, it.second) }
-            remoteCard()
+            // Actions: Consult an optometrist (primary), then Share and PDF side by side; the QR folds away below
+            com.drishtisaathi.ui.designsystem.SectionTitle(com.drishtisaathi.i18n.SConsult.actions[l])
             teleCard()
-            if (onShareImage != null) {
+            if (onShareImage != null || onPdf != null) {
                 var askShare by remember { mutableStateOf(false) }
-                BigButton(com.drishtisaathi.i18n.SProfile.shareWhatsApp[l], { askShare = true })
-                if (askShare) com.drishtisaathi.profile.ShareConsentDialog(l, onShare = { askShare = false; onShareImage() }, onDismiss = { askShare = false })
+                androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (onShareImage != null) com.drishtisaathi.ui.designsystem.SecondaryButton(
+                        com.drishtisaathi.i18n.SConsult.share[l], { askShare = true }, Modifier.weight(1f),
+                        icon = androidx.compose.material.icons.Icons.Rounded.Share,
+                    )
+                    if (onPdf != null) com.drishtisaathi.ui.designsystem.SecondaryButton(
+                        com.drishtisaathi.i18n.SConsult.pdf[l], onPdf, Modifier.weight(1f),
+                        icon = androidx.compose.material.icons.Icons.Rounded.PictureAsPdf,
+                    )
+                }
+                if (askShare && onShareImage != null) com.drishtisaathi.profile.ShareConsentDialog(l, onShare = { askShare = false; onShareImage() }, onDismiss = { askShare = false })
+            }
+            remoteCard()
+            qr?.let { q ->
+                var qrOpen by remember { mutableStateOf(false) }
+                com.drishtisaathi.ui.designsystem.ListCard(rows = listOf {
+                    com.drishtisaathi.ui.designsystem.ListRow(
+                        (if (qrOpen) com.drishtisaathi.i18n.SConsult.hideQr else com.drishtisaathi.i18n.SConsult.showQr)[l],
+                        icon = androidx.compose.material.icons.Icons.Rounded.QrCode2,
+                        trailing = {
+                            androidx.compose.material3.Icon(
+                                if (qrOpen) androidx.compose.material.icons.Icons.Rounded.ExpandLess else androidx.compose.material.icons.Icons.Rounded.ExpandMore,
+                                contentDescription = null, tint = DS.colors.inkSecondary,
+                            )
+                        },
+                        onClick = { qrOpen = !qrOpen },
+                    )
+                })
+                if (qrOpen) com.drishtisaathi.profile.QrCard(l, q.first, q.second)
             }
 
             // ---- For the shop (folded: the customer may be looking at this screen) ----
@@ -247,9 +286,9 @@ fun ResultScreen(
             state.aiInterview?.let { AiTranscriptCard(it, l) }
             if (state.sessionId != null) VerificationCard(l, state.verification, onSaveVerification)
             onEditAnswers?.let { BigButton(SShop.editAnswers[l], it) }
+            extraActions()
             }
 
-            extraActions()
             BigButton(SShop.finish[l], onDone, container = Teal)
             BigButton(S.deleteSession[l], { confirmDelete = true }, container = UrgentRed)
             if (!urgent) Text(SShop.phoneCheckNote[l], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)

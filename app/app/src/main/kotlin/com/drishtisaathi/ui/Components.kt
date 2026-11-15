@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -47,13 +49,20 @@ fun AppScaffold(
     onLang: (Lang) -> Unit,
     title: String = S.appName[lang],
     onBack: (() -> Unit)? = null,
+    /** Icon actions before the language switch (e.g. Video, WhatsApp on the chat). */
+    actions: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val c = DS.colors
     Scaffold(
         containerColor = c.background,
-        // calm top bar: the page colour, the title in ink, a back arrow, the language switch, a hairline below
-        topBar = { com.drishtisaathi.ui.designsystem.DsTopBar(title, S.back[lang], onBack) { LangToggle(lang, onLang) } },
+        // calm top bar: the page colour, the title in ink, a back arrow, the language switch, a hairline below;
+        // with icon actions the switch becomes one compact button (the other language) so the title keeps its room
+        topBar = {
+            com.drishtisaathi.ui.designsystem.DsTopBar(title, S.back[lang], onBack) {
+                if (actions != null) { actions(); CompactLangButton(lang, onLang) } else LangToggle(lang, onLang)
+            }
+        },
         content = content,
     )
 }
@@ -66,6 +75,22 @@ fun LangToggle(lang: Lang, onLang: (Lang) -> Unit, modifier: Modifier = Modifier
         listOf("हिंदी", if (long) "English" else "EN"), langs.indexOf(lang), { onLang(langs[it]) },
         modifier.padding(end = if (long) 0.dp else 8.dp).then(if (long) Modifier.fillMaxWidth() else Modifier.width(148.dp)),
     )
+}
+
+/** One 48 dp button that switches to the other language ("EN" in Hindi, "हिं" in English). */
+@Composable
+fun CompactLangButton(lang: Lang, onLang: (Lang) -> Unit) {
+    val other = if (lang == Lang.HI) Lang.EN else Lang.HI
+    val c = DS.colors
+    androidx.compose.material3.Surface(
+        onClick = { onLang(other) }, shape = DS.pill, color = c.surfaceAlt,
+        modifier = Modifier.padding(end = 8.dp).heightIn(min = DS.minTouch).widthIn(min = DS.minTouch)
+            .semantics { contentDescription = if (other == Lang.EN) "English" else "हिंदी" },
+    ) {
+        androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 12.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Text(if (other == Lang.EN) "EN" else "हिं", style = MaterialTheme.typography.labelLarge, color = c.ink)
+        }
+    }
 }
 
 /**

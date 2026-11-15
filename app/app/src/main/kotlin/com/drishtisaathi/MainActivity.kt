@@ -711,7 +711,13 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                         onError = { Toast.makeText(context, S.pdfFailed[l], Toast.LENGTH_LONG).show() },
                     )
                     BigButton(S.exportShopPdf[l], { export(customer = false) })
-                    BigButton(S.exportCustomerPdf[l], { export(customer = true) })
+                },
+                onPdf = {
+                    vm.exportPdf(
+                        true,
+                        onReady = { file -> PdfExporter.share(resultContext, file, S.customerCopy[state.lang]) },
+                        onError = { Toast.makeText(resultContext, S.pdfFailed[state.lang], Toast.LENGTH_LONG).show() },
+                    )
                 },
                 onToggleCompare = vm::toggleCompare,
                 onCompare = { nav.navigate(Routes.COMPARE) },

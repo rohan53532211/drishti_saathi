@@ -474,6 +474,13 @@ Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, me
 - Red flag: full-width urgent block (icon in a circle, contrast-picked text in both themes, assertive live region), warning haptic, spoken on show + "Read aloud" button, numbered "What to do now" card, nothing else on the page.
 - The survey already matched the spec from phase 1 (one question per screen, ChoiceCards, sliders, mic FAB with pulse + transcript, "Why we ask?" sheet, section intros in section colour).
 
+### UI phase 5: results, consult, chat (done)
+- Result: date / age / language header → Vision Profile rings → Measurements (big R/L numbers, range, method) → main lens card (illustration, name, why bullets, "Your optician confirms the final lens") → second pairs → "What next": Consult an optometrist (primary), Share + PDF side by side → bridge card → QR folded behind "Show QR code for the shop". The shop PDF moved into the folded "For the shop" section.
+- Choose optometrist: "Any available" first and highlighted (Fastest), then rows with avatar, name, qualification · city, language chips, fee or Free, reg. no.; radio check icon (not colour alone); skeleton while loading, retry on error, info banner when nobody is online; sticky Send bar.
+- Consultation: top bar Video + WhatsApp icons (compact language button so the title fits), pinned "Your optometrist started a video call" card, case header with avatar and status pill, chat bubbles (mine right/primary, theirs left/surface) with times and Today / Yesterday / date separators, waiting empty state, sticky rounded input with a round send button; lazy list with stable keys.
+- Advice: optician-slip card — R/L table SPH / CYL / AXIS, ADD, PD, lens advice, referral, follow-up, notes, optometrist name + qualification + reg. no., trial-lens caveat, Download PDF.
+- `ChooseOptometristContent` / `ConsultationContent` are stateless so the screenshot tests draw them without a server.
+
 ## Test pass before submission (15 Nov)
 
 Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.

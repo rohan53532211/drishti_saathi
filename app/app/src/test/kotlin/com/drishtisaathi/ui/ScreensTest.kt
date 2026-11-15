@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.drishtisaathi.firstrun.LoginScreen
 import com.drishtisaathi.firstrun.PatientStartScreen
@@ -119,6 +120,55 @@ class ScreensTest {
     @Test fun shopHome() = shoot("p3_shop_home") { l, on -> shop(0, l, on, emptyList())() }
     @Test fun shopCustomers() = shoot("p3_shop_customers") { l, on -> shop(1, l, on, listOf(session(12, 0, "URGENT"), session(11, 1), session(10, 3, "ROUTINE")))() }
     @Test fun shopTools() = shoot("p3_shop_tools") { l, on -> shop(2, l, on, emptyList())() }
+
+    // ---- phase 5: results, consult, chat ----
+    private val optometrists = listOf(
+        optometrist,
+        com.drishtisaathi.teleconsult.TeleOptometrist("o2", name = "Dr Arjun Verma", qualification = "M.Optom", city = "Kanpur",
+            languages = listOf("Hindi", "English", "Awadhi"), fee = 200, available = true, registrationNo = "UP-OPT-2291"),
+    )
+    @Test fun chooseOptometrist() = shoot("p5_choose_optometrist") { l, on ->
+        com.drishtisaathi.teleconsult.ChooseOptometristContent(l, on, false, emptyList(), optometrists, null, null, null, false, {}, {}, {}, {})
+    }
+    @Test fun chooseLoading() = shoot("p5_choose_loading", matrix.take(1)) { l, on ->
+        com.drishtisaathi.teleconsult.ChooseOptometristContent(l, on, true, listOf("Sudden loss of vision"), null, null, null, "o1", false, {}, {}, {}, {})
+    }
+    private val now = 1_789_100_000_000L
+    private val chatCase = com.drishtisaathi.teleconsult.TeleConsultation("c1", caseId = "DS-1042", status = "IN_PROGRESS", createdAt = now - 90_000_000,
+        optometrist = optometrist.copy(registrationNo = "UP-OPT-1180"), fee = 0,
+        videoUrl = "https://meet.jit.si/drishti-ds-1042", whatsappUrl = "https://wa.me/919800000000", hasPrescription = true)
+    private val chat = listOf(
+        com.drishtisaathi.teleconsult.TeleMessage(1, "system", text = "Dr Meera Sharma accepted your case.", createdAt = now - 90_000_000),
+        com.drishtisaathi.teleconsult.TeleMessage(2, "optometrist", text = "Namaste. Do your eyes hurt in the evening?", createdAt = now - 89_000_000),
+        com.drishtisaathi.teleconsult.TeleMessage(3, "patient", text = "Only after long work on the phone.", createdAt = now - 3_600_000),
+        com.drishtisaathi.teleconsult.TeleMessage(4, "optometrist", kind = "VIDEO", text = "https://meet.jit.si/drishti-ds-1042", createdAt = now - 600_000),
+    )
+    private val advice = com.drishtisaathi.teleconsult.TeleAdvice(
+        right = com.drishtisaathi.teleconsult.TeleEye(-1.75, -0.5, 180), left = com.drishtisaathi.teleconsult.TeleEye(-1.5, null, null),
+        add = 1.25, pdMm = 62.0, lensAdvice = listOf("Single vision", "Anti-glare"), followUpDate = "2027-05-15",
+        optometristName = "Dr Meera Sharma", registrationNo = "UP-OPT-1180", qualification = "B.Optom", createdAt = now - 1_800_000,
+    )
+    @Test fun consultationChat() = shoot("p5_chat") { l, on ->
+        com.drishtisaathi.teleconsult.ConsultationContent(l, on, chatCase, null, chat, null, "", {}, {}, {}, {}, {}, {}, {}, now = now)
+    }
+    @Test fun consultationWaiting() = shoot("p5_chat_waiting", matrix.take(2)) { l, on ->
+        com.drishtisaathi.teleconsult.ConsultationContent(l, on, consults[1], null, emptyList(), null, "", {}, {}, {}, {}, {}, {}, {}, now = now)
+    }
+    @Test fun adviceCard() = shoot("p5_advice") { l, _ ->
+        Box(Modifier.fillMaxSize().background(DS.colors.background).padding(16.dp)) { com.drishtisaathi.teleconsult.AdviceCard(l, advice) {} }
+    }
+    @Test fun result() {
+        val f = com.drishtisaathi.profile.ProfileFixtures
+        val a = com.drishtisaathi.engine.InterviewAnswers(age = 34, visionProblem = com.drishtisaathi.engine.VisionProblem.DISTANCE,
+            distanceBlur = true, redFlagFlashes = false, redFlagOther = false)
+        val base = f.state(a)
+        val lens = com.drishtisaathi.engine.profile.LensEngine(com.drishtisaathi.engine.profile.LensCatalog.parse(File("src/main/assets/lens_catalog.json").readText()), f.rules.lensEngine)
+        val view = com.drishtisaathi.profile.ProfileView.build(base, f.rules, lens)
+        shoot("p5_result", matrix.filter { it.scale == 1f }) { l, on ->
+            ResultScreen(base.copy(lang = l), f.rules, on, {}, {}, {}, {}, view = view, qr = "DS-TEST" to false, onShareImage = {}, onPdf = {},
+                teleCard = { com.drishtisaathi.teleconsult.ConsultCard(l, false) {} })
+        }
+    }
 
     // ---- phase 4: guided test flow ----
     private val gate = com.drishtisaathi.engine.profile.SafetyGate(

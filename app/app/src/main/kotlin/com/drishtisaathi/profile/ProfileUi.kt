@@ -191,6 +191,7 @@ fun LensCards(lang: Lang, plan: LensPlan) {
             }
         }
         Link(lang, type.url)
+        Text(com.drishtisaathi.i18n.SConsult.opticianConfirms[lang], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
     }
     plan.secondPairs.forEach { s ->
         SoftCard {
