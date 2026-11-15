@@ -96,9 +96,10 @@ fun UrgentTeleNote(lang: Lang, reasons: List<String> = emptyList()) {
         Modifier.fillMaxWidth().background(DS.colors.urgent, DS.card).padding(20.dp).semantics(mergeDescendants = true) {},
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(SProfile.seeDoctorToday[lang], color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        reasons.forEach { Text("•  $it", color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyMedium) }
-        Text(STele.neverReplaces[lang], color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyLarge)
+        val lines = TeleText.urgentLines(reasons)
+        Text(lines.first()[lang], color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        lines.drop(1).dropLast(1).forEach { Text("•  ${it[lang]}", color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyMedium) }
+        Text(lines.last()[lang], color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -109,8 +110,9 @@ fun ConsultCard(lang: Lang, urgent: Boolean, onConsult: () -> Unit) {
     SoftCard {
         Text(STele.consult[lang], style = MaterialTheme.typography.titleLarge, color = c.ink)
         if (urgent) {
-            Text(SProfile.seeDoctorToday[lang], color = c.urgentInk, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(STele.neverReplaces[lang], color = c.urgentInk, style = MaterialTheme.typography.bodyMedium)
+            val lines = TeleText.urgentLines()
+            Text(lines.first()[lang], color = c.urgentInk, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(lines.last()[lang], color = c.urgentInk, style = MaterialTheme.typography.bodyMedium)
         }
         Text(STele.consultLine[lang], style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
         PrimaryButton(STele.consult[lang], onClick = onConsult)

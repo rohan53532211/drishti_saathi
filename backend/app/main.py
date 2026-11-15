@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Iterator, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -137,10 +138,20 @@ CREATE TABLE IF NOT EXISTS reviews (
 """
 
 
+def default_db_file() -> str:
+    return os.environ.get("BRIDGE_DB") or str(Path(__file__).resolve().parent.parent / "bridge.db")
+
+
+def cors_origins() -> list[str]:
+    """CORS_ORIGINS: comma-separated origins allowed to call the API from a browser page on another site; * (the
+    default) allows any. Logins travel in the Authorization header, never in a cookie, so no credentials are allowed."""
+    return [o.strip().rstrip("/") for o in (os.environ.get("CORS_ORIGINS") or "*").split(",") if o.strip()] or ["*"]
+
+
 def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
                sarvam: Optional[SarvamClient] = None, catalog_dir: Optional[str] = None,
                jwt_secret: Optional[str] = None, admin_email: Optional[str] = None, admin_password: Optional[str] = None) -> FastAPI:
-    db_file = db_path or os.environ.get("BRIDGE_DB", str(Path(__file__).resolve().parent.parent / "bridge.db"))
+    db_file = db_path or default_db_file()
     api_token = token if token is not None else os.environ.get("BRIDGE_TOKEN") or None
 
     @contextmanager
@@ -161,6 +172,8 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
             con.execute("ALTER TABLE reviews ADD COLUMN confirmed TEXT")
 
     app = FastAPI(title="Drishti Saathi Remote Optometrist Bridge", version="1.2")
+    app.add_middleware(CORSMiddleware, allow_origins=cors_origins(), allow_credentials=False,
+                       allow_methods=["*"], allow_headers=["*"], max_age=600)
     voice = anamnesis.AnamnesisService(sarvam or SarvamClient())
 
     def check_token(x_bridge_token: Optional[str] = Header(default=None)) -> None:
@@ -310,4 +323,21 @@ def create_app(db_path: Optional[str] = None, token: Optional[str] = None,
     return app
 
 
+def auto_seed_demo(db_file: str) -> Optional[dict[str, int]]:
+    """Demo accounts and cases for a database that has none, so the demo works after every restart on a host whose
+    disk does not last (Render free). Needs DEMO_PASSWORD (8+ characters); AUTO_SEED_DEMO=0 turns it off."""
+    if (os.environ.get("AUTO_SEED_DEMO") or "1").strip().lower() in ("0", "false", "no", "off"):
+        return None
+    password = os.environ.get("DEMO_PASSWORD") or ""
+    if len(password) < 8:
+        return None
+    from . import seed_demo
+    made = seed_demo.seed_if_empty(db_file, password)
+    if made:
+        print(f"Empty database: demo data added ({made['optometrists']} optometrists, {made['patients']} patients, "
+              f"{made['consultations']} consultations).", flush=True)
+    return made
+
+
 app = create_app()
+auto_seed_demo(default_db_file())

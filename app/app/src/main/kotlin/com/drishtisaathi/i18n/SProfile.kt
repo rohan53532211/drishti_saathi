@@ -281,6 +281,7 @@ object SProfile {
         "WATER" to tx("You are often near water", "आप अक्सर पानी के पास रहते हैं"),
         "OUTDOOR_SPORT" to tx("You do outdoor sport", "आप बाहर खेलते हैं"),
         "FIELD_WORK" to tx("You work in the fields", "आप खेत में काम करते हैं"),
+        "FITS_LENS_TYPE" to tx("The design made for this lens type", "इस लेंस प्रकार के लिए बना डिज़ाइन"),
         "OUTDOOR_HOURS" to tx("You are outdoors %s h a day", "आप रोज़ %s घंटे बाहर रहते हैं"),
     )
     /** A lens-engine reason code with its numbers, in words. */

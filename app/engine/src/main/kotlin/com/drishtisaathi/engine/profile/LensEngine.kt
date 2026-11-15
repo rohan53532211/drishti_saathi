@@ -268,7 +268,8 @@ class LensEngine(private val catalog: LensCatalog, private val cfg: LensEngineCo
             else -> "smartlife" to listOfNotNull(Reason("DIGITAL", listOf(hours(i.screenHours))).takeIf { digitalLifestyle(i) }, budgetReason.takeIf { b != Budget.LOW })
         }
         val designId = pick.first.takeIf(::fits) ?: catalog.designs.first { fits(it.id) && it.id != "smartlife_young" }.id
-        val design = design(designId, pick.second)
+        // every card has a "why": when no reason of the customer's own applies, the design is the one made for this lens type
+        val design = design(designId, pick.second.ifEmpty { listOf(Reason("FITS_LENS_TYPE")) })
 
         // 4. materials: UVProtect always; PhotoFusion X already has the blue filter inside, so BlueGuard is not added to it
         val materials = buildList {

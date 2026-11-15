@@ -96,8 +96,15 @@ object PowerRange {
 
     fun around(centre: Double): Range = Range(centre, centre + HALF_D * (if (centre < 0) 1 else -1), centre - HALF_D * (if (centre < 0) 1 else -1))
 
-    /** Far range from the distance (mm) where the letters can no longer be read. */
+    /** Sanity limit, not a clinical rule: nothing is measured closer than 1 cm, so a smaller distance is a faulty reading. */
+    const val MIN_BLUR_MM = 10.0
+
+    /** A blur distance a power can be worked out from: a real length. Zero, a negative, NaN or infinity is a faulty reading. */
+    fun validBlurMm(mm: Double?): Boolean = mm != null && mm.isFinite() && mm >= MIN_BLUR_MM
+
+    /** Far range from the distance (mm) where the letters can no longer be read. A faulty distance is refused: never a guessed or plus power. */
     fun far(blurMm: Double): Range {
+        require(validBlurMm(blurMm)) { "not a blur distance: $blurMm mm" }
         val d = 1000.0 / blurMm
         val centre = -(d / STEP_D).roundToInt() * STEP_D
         return around(centre)
@@ -114,6 +121,9 @@ object PowerRange {
         val r = far(blurMm)
         return QuickEye(r.centreD, (blurMm / 10.0).roundToInt().toDouble(), QuickTarget.WHITE, rangeFromD = r.fromD, rangeToD = r.toD)
     }
+
+    /** [farEye], or null when the distance is not a real length (the tap is then treated as "distance not caught"). */
+    fun farEyeOrNull(blurMm: Double?): QuickEye? = if (validBlurMm(blurMm)) farEye(blurMm!!) else null
 
     /** Two readings of one eye (the one automatic repeat): the mean vergence. */
     fun farEyeMedian(aMm: Double, bMm: Double): QuickEye = farEye(2.0 / (1.0 / aMm + 1.0 / bMm))

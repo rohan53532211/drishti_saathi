@@ -82,6 +82,13 @@ class TeleException(val kind: Kind, val detail: String = "") : IOException("$kin
 
 /** Wording and small rules of the patient side (pure, unit-tested). */
 object TeleText {
+    /**
+     * What an urgent case shows before anything else, in this order: "Please see an eye doctor today", the reasons,
+     * then "A teleconsult never replaces an urgent visit."
+     */
+    fun urgentLines(reasons: List<String> = emptyList()): List<Txt> =
+        listOf(com.drishtisaathi.i18n.SProfile.seeDoctorToday) + reasons.filter { it.isNotBlank() }.map { Txt(it, it) } + STele.neverReplaces
+
     /** Digits of a typed mobile number without a leading +91 / 0; null when it is not a 10-digit number. */
     fun phoneDigits(typed: String): String? {
         var d = typed.filter(Char::isDigit)

@@ -534,7 +534,8 @@ private fun ReadScreen(
 
     val tapNow: () -> Unit = {
         val t = System.currentTimeMillis()
-        val mm = if (simulated) reading?.takeIf { it.faceVisible }?.distanceMm else buffer.atTap(t)
+        // a faulty distance (zero, negative, not a number) is never turned into a power: it counts as "not caught"
+        val mm = (if (simulated) reading?.takeIf { it.faceVisible }?.distanceMm else buffer.atTap(t))?.takeIf { PowerRange.validBlurMm(it) }
         if (mm == null) notCaught = true else { notCaught = false; onTap(mm, t, false) }
     }
     BlurKeyword(voice, tapNow, onNewLetters)

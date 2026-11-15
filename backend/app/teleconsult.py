@@ -16,6 +16,7 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
 import time
 import uuid
 from datetime import date
@@ -35,10 +36,14 @@ PAYMENT_DEMO = "not_required (demo)"
 CONSENT_TEXT = "I agree my report and name are shared with the optometrist I choose"
 URGENT_NOTE = "A teleconsult never replaces an urgent visit. Please see an eye doctor today."
 TOKEN_DAYS = 7
+LOGIN_MAX_FAILURES = 10      # wrong passwords for one account from one address ...
+LOGIN_WINDOW_S = 60          # ... within this many seconds, then 429 until the window passes
 MAX_REPORT_BYTES = 256 * 1024
 MAX_IMAGE_BYTES = 600 * 1024
 IMAGE_MIMES = ("image/jpeg", "image/png", "image/webp")
 DEFAULT_LENS_CATALOG = Path(__file__).resolve().parents[2] / "app" / "app" / "src" / "main" / "assets" / "lens_catalog.json"
+# The same file kept inside backend/: a host that deploys only backend/ (Render root directory) has no app assets.
+BUNDLED_LENS_CATALOG = Path(__file__).parent / "data" / "lens_catalog.json"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tc_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -232,7 +237,8 @@ def greeting(to_name: str, cid: str, from_name: str, lang: str, from_optometrist
 
 def lens_options(path: Optional[Path]) -> list[dict[str, str]]:
     """Lens names the prescription form can pick from: the app's own lens_catalog.json when it is there."""
-    f = Path(os.environ.get("LENS_CATALOG") or path or DEFAULT_LENS_CATALOG)
+    chosen = os.environ.get("LENS_CATALOG") or path
+    f = Path(chosen) if chosen else (DEFAULT_LENS_CATALOG if DEFAULT_LENS_CATALOG.exists() else BUNDLED_LENS_CATALOG)
     if not f.exists():
         return []
     try:
@@ -356,6 +362,24 @@ def router(db: Callable[[], Any], secret: Optional[str] = None, lens_catalog: Op
             elif not check_password(password, row["password_hash"]):
                 con.execute("UPDATE tc_users SET password_hash = ? WHERE id = ?", (hash_password(password), row["id"]))
     jwt_key: str = key
+
+    # ---- login rate limit (in memory: one server process) ----
+    login_failures: dict[tuple[str, str, str], list[float]] = {}
+    login_lock = threading.Lock()
+
+    def login_wait_s(key: tuple[str, str, str]) -> int:
+        """Seconds until this account may be tried again from this address; 0 = allowed now."""
+        now = time.monotonic()
+        with login_lock:
+            if len(login_failures) > 10_000:      # never grows without bound
+                for k in [k for k, v in login_failures.items() if not v or now - v[-1] >= LOGIN_WINDOW_S]:
+                    del login_failures[k]
+            recent = [t for t in login_failures.get(key, []) if now - t < LOGIN_WINDOW_S]
+            if recent:
+                login_failures[key] = recent
+            else:
+                login_failures.pop(key, None)
+            return int(LOGIN_WINDOW_S - (now - recent[0])) + 1 if len(recent) >= LOGIN_MAX_FAILURES else 0
 
     # ---- auth ----
     def make_token(user: sqlite3.Row) -> str:
@@ -516,10 +540,15 @@ def router(db: Callable[[], Any], secret: Optional[str] = None, lens_catalog: Op
         return {"token": make_token(user), "user": me_view(user)}
 
     @r.post("/auth/login")
-    def login(body: Login) -> dict[str, Any]:
+    def login(body: Login, request: Request) -> dict[str, Any]:
         if body.role not in ROLES:
             raise HTTPException(status_code=422, detail="unknown role")
         ident = body.identifier.strip().lower()
+        # brute force: at most LOGIN_MAX_FAILURES wrong passwords a minute for one account from one address
+        attempt_key = (body.role, re.sub(r"\D", "", ident)[-10:] if "@" not in ident else ident, request.client.host if request.client else "")
+        wait = login_wait_s(attempt_key)
+        if wait > 0:
+            raise HTTPException(status_code=429, detail="too many wrong attempts, wait a minute and try again", headers={"Retry-After": str(wait)})
         with db() as con:
             if "@" in ident:
                 user = con.execute("SELECT * FROM tc_users WHERE role = ? AND email = ?", (body.role, ident)).fetchone()
@@ -531,7 +560,11 @@ def router(db: Callable[[], Any], secret: Optional[str] = None, lens_catalog: Op
                 user = con.execute("SELECT * FROM tc_users WHERE role = ? AND phone = ?", (body.role, phone)).fetchone()
         # the same answer for an unknown account and a wrong password
         if user is None or not check_password(body.password, user["password_hash"]):
+            with login_lock:
+                login_failures.setdefault(attempt_key, []).append(time.monotonic())
             raise HTTPException(status_code=401, detail="wrong phone / email or password")
+        with login_lock:
+            login_failures.pop(attempt_key, None)
         return {"token": make_token(user), "user": me_view(user)}
 
     @r.get("/me")

@@ -439,3 +439,11 @@ Patient registers in the app, takes the test, asks for a consultation; a verifie
 2. 9 Nov: record the mid-sprint update with demo mode (try-on uses the live camera).
 3. Fix whatever the phone test finds; re-tune thresholds; native-speaker Hindi pass.
 4. Then: APK size, pilot data for the priors.
+
+## Test pass before submission (15 Nov)
+
+Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.
+
+- New tests: `SafetyMatrixTest`, `StretchTest` (engine), `FullPassAppTest` (app), `backend/tests/test_security.py`; tools `backend/tests/load/loadtest.py` (own server on port 8010, temporary database) and `backend/tests/load/secret_scan.py`.
+- Fixed: login limit (10 wrong passwords a minute per account and address, then 429); a faulty blur distance is refused instead of becoming a power; a design card always has a "why" line.
+- Not run: anything on a phone (no device over adb). Open risks are listed in the report.

@@ -128,6 +128,8 @@ BUILTIN_TOPICS: list[Topic] = [
 # The app's question file: same topics for the phone's scripted questions and the AI interview.
 DEFAULT_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "app", "app", "src", "main", "assets",
                                       "anamnesis_questions.json")
+# The same file kept inside backend/: a host that deploys only backend/ (Render root directory) has no app assets.
+BUNDLED_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), "data", "anamnesis_questions.json")
 KNOWN_FIELDS = set(ENUMS) | set(BOOLS) | set(INTS)
 
 
@@ -137,7 +139,8 @@ def load_topics(path: Optional[str] = None) -> list[Topic]:
     Falls back to [BUILTIN_TOPICS] when the file is missing or invalid: every topic needs an id, known fields,
     and a scripted question in both languages, and red_flags must be there.
     """
-    p = path or os.environ.get("ANAMNESIS_QUESTIONS") or DEFAULT_QUESTIONS_PATH
+    p = path or os.environ.get("ANAMNESIS_QUESTIONS") or (
+        DEFAULT_QUESTIONS_PATH if os.path.exists(DEFAULT_QUESTIONS_PATH) else BUNDLED_QUESTIONS_PATH)
     try:
         with open(p, encoding="utf-8") as f:
             raw = json.load(f)["aiTopics"]

@@ -166,6 +166,19 @@ def seed(db_file: str, password: str, reset: bool = False) -> dict[str, int]:
     return made
 
 
+def seed_if_empty(db_file: str, password: str) -> dict[str, int] | None:
+    """Seeds the demo data when the database has no patient or optometrist yet (a fresh disk, e.g. after a restart
+    on a host without a persistent disk). Returns what was made, or None when there were accounts already."""
+    con = sqlite3.connect(db_file)
+    try:
+        con.executescript(tc.SCHEMA)
+        if con.execute("SELECT 1 FROM tc_users WHERE role != 'admin' LIMIT 1").fetchone():
+            return None
+    finally:
+        con.close()
+    return seed(db_file, password)
+
+
 def main() -> int:
     password = os.environ.get("DEMO_PASSWORD") or ""
     if len(password) < 8:
