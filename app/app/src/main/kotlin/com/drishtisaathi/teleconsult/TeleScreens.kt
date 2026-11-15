@@ -148,6 +148,8 @@ fun PatientScreen(
     onStartTest: () -> Unit, onConsultations: () -> Unit, onServer: () -> Unit, onBack: () -> Unit,
     /** Called right after a login or registration (the result screen sends the patient back to its "Consult" step). */
     onSignedIn: () -> Unit = {},
+    /** "Change who uses this phone" (patient phones only). */
+    onSwitchRole: (() -> Unit)? = null,
 ) {
     val user by tele.user.collectAsState()
     val c = DS.colors
@@ -222,6 +224,9 @@ fun PatientScreen(
                 ErrorLine(lang, error)
                 TextButton(onClick = { tele.logout() }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(STele.logout[lang], color = c.inkSecondary) }
                 TextButton(onClick = { confirmDelete = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(STele.deleteAccount[lang], color = c.urgentInk) }
+                if (onSwitchRole != null) TextButton(onClick = onSwitchRole, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Text(com.drishtisaathi.i18n.SAuth.switchRole[lang], color = c.inkSecondary)
+                }
                 Text(STele.demoNote[lang], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
                 if (confirmDelete) AlertDialog(
                     onDismissRequest = { confirmDelete = false },

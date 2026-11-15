@@ -453,6 +453,14 @@ Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, me
 - Old shared components (AppScaffold, LangToggle, BigButton, AnswerCard, PrimaryButton) now delegate to the design system, so every screen picks up the new look.
 - `DesignTokensTest`: spec hexes, WCAG AA for every text/background pair in both themes, type scale, spacing, motion, no colour literals in the design system.
 
+### UI phase 2: first run and accounts (done)
+- Android 12 SplashScreen API (core-splashscreen): eye mark on brand blue; adaptive launcher icon with a monochrome layer (the app had no icon before).
+- `firstrun/FirstRun.kt`: Welcome (logo, name, bilingual tagline, हिंदी | EN at the top) → "Who is using this phone?" (patient / optical shop / optometrist → opens `/portal` on the hosted server) → patient: Create account / Log in.
+- Sign-up wizard, one step per screen with progress dots: name + mobile → age + gender (optional) → password (show/hide) + consent with a folding "What we share" → "Profile ready" with the first-test CTA. Same validation as before (`TeleText`).
+- Login: mobile + password, show/hide, inline errors, "Forgot password? Ask your shop or optometrist".
+- `RoleStore` remembers the role; the app opens on the role's home (shop home, or the patient's account page / create-account). "Change who uses this phone" on the patient page and in Shop tools. The one-time phone setup now opens only on the shop home. "Consult an optometrist" without a login opens the new Login screen.
+- Screenshot tests: Robolectric 4.17 + Roborazzi 1.77 (`ScreensTest`), light/dark × Hindi/English × font 1.0/1.3, saved to `docs/screens/`.
+
 ## Test pass before submission (15 Nov)
 
 Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.

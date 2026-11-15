@@ -138,6 +138,7 @@ fun ShopToolsScreen(
     lang: Lang, onLang: (Lang) -> Unit, setupDone: Boolean,
     onSetup: () -> Unit, onDemo: () -> Unit, onBridge: () -> Unit, onDiagnostics: () -> Unit, onBack: () -> Unit,
     onCatalogue: () -> Unit = {},
+    onSwitchRole: (() -> Unit)? = null,
 ) {
     val l = lang
     AppScaffold(l, onLang, title = SShop.shopTools[l], onBack = onBack) { pad ->
@@ -150,6 +151,8 @@ fun ShopToolsScreen(
             BigButton(com.drishtisaathi.i18n.SBridge.settingsTitle[l], onBridge)
             BigButton(com.drishtisaathi.i18n.S3D.frameCatalogue[l], onCatalogue)
             BigButton(SShop.diagnostics[l], onDiagnostics)
+            if (onSwitchRole != null) com.drishtisaathi.ui.designsystem.DsTextButton(com.drishtisaathi.i18n.SAuth.switchRole[l], onSwitchRole,
+                Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally), color = DS.colors.inkSecondary)
         }
     }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand primary (ui/Tokens.kt LightColors.primary); the app icon and the splash screen. -->
+    <color name="brand_primary">#1F5EFF</color>
+    <color name="brand_background">#F6F8FB</color>
+</resources>

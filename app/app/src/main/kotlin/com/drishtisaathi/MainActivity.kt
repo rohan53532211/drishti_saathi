@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -72,12 +73,21 @@ import com.drishtisaathi.voice.rememberVoiceController
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Android 12 SplashScreen API: the eye mark on brand blue while the app starts (no extra splash screen).
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent { DrishtiTheme { DrishtiApp() } }
     }
 }
 
 private object Routes {
+    // First run and accounts: welcome → who uses this phone → (patient) create account / log in
+    const val WELCOME = "welcome"
+    const val ROLE = "role"
+    const val PATIENT_START = "patientStart"
+    const val LOGIN = "login"
+    const val SIGNUP = "signup"
+    const val READY = "profileReady"
     const val HOME = "home"
     // Shop tools (no staff switch on the customer path)
     const val SHOP_TOOLS = "shopTools"
@@ -148,7 +158,22 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     // One TTS engine for the whole app: interview questions, camera instructions, test instructions.
     val voice = rememberVoiceController()
 
-    fun goHome() = nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
+    // Who uses this phone: chosen on first run, remembered, changed from Profile / Shop tools.
+    val context = LocalContext.current
+    val roles = remember { com.drishtisaathi.firstrun.RoleStore(context.applicationContext) }
+    val role by roles.role.collectAsStateWithLifecycle()
+    val start = remember {
+        when (roles.role.value) {
+            null -> Routes.WELCOME
+            com.drishtisaathi.firstrun.AppRole.SHOP -> Routes.HOME
+            com.drishtisaathi.firstrun.AppRole.PATIENT -> if (vm.tele.user.value != null) Routes.PATIENT else Routes.PATIENT_START
+        }
+    }
+    /** The home of the current role: the patient's account page or the shop home. */
+    val homeRoute = if (role == com.drishtisaathi.firstrun.AppRole.PATIENT) Routes.PATIENT else Routes.HOME
+    /** Opens [route] as the only screen on the back stack. */
+    fun root(route: String) = nav.navigate(route) { popUpTo(nav.graph.id) { inclusive = true } }
+    fun goHome() = root(homeRoute)
 
     // Tapped a "Reply received" notification: open that session's summary.
     val activity = LocalContext.current as? android.app.Activity
@@ -162,18 +187,10 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val setupDone by vm.phoneSetup.done.collectAsStateWithLifecycle()
 
-    // First launch: the one-time phone setup opens by itself ("Skip for now" leaves a reminder on home).
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        if (!vm.phoneSetup.done.value && !vm.phoneSetup.offered) {
-            vm.phoneSetup.markOffered()
-            nav.navigate(Routes.PHONE_SETUP)
-        }
-    }
-
     /** Runs the engine with everything gathered so far and opens the results (a referral shows at the top there). */
     fun computeAndShow() {
         vm.computeResult()
-        nav.navigate(Routes.RESULT) { popUpTo(Routes.HOME) }
+        nav.navigate(Routes.RESULT) { popUpTo(homeRoute) }
     }
 
     /** Back to the edit-answers screen ("For the shop"). */
@@ -265,11 +282,73 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     val m = com.drishtisaathi.ui.designsystem.Motion
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     NavHost(
-        nav, startDestination = Routes.HOME,
+        nav, startDestination = start,
         enterTransition = if (still) m.none else m.enter, exitTransition = if (still) m.noneOut else m.exit,
         popEnterTransition = if (still) m.none else m.popEnter, popExitTransition = if (still) m.noneOut else m.popExit,
     ) {
+        // ---- first run and accounts ----
+        composable(Routes.WELCOME) {
+            com.drishtisaathi.firstrun.WelcomeScreen(state.lang, vm::setLang, onStart = { nav.navigate(Routes.ROLE) })
+        }
+        composable(Routes.ROLE) {
+            val ctx = LocalContext.current
+            com.drishtisaathi.firstrun.RoleScreen(
+                state.lang, vm::setLang,
+                onPatient = {
+                    roles.set(com.drishtisaathi.firstrun.AppRole.PATIENT)
+                    root(if (vm.tele.user.value != null) Routes.PATIENT else Routes.PATIENT_START)
+                },
+                onShop = { roles.set(com.drishtisaathi.firstrun.AppRole.SHOP); root(Routes.HOME) },
+                onOptometrist = { com.drishtisaathi.firstrun.openPortal(ctx, state.lang) },
+                onBack = if (nav.previousBackStackEntry != null) ({ nav.popBackStack() }) else null,
+            )
+        }
+        composable(Routes.PATIENT_START) {
+            com.drishtisaathi.firstrun.PatientStartScreen(
+                state.lang, vm::setLang, onCreate = { nav.navigate(Routes.SIGNUP) }, onLogin = { nav.navigate(Routes.LOGIN) },
+                onBack = if (nav.previousBackStackEntry != null) ({ nav.popBackStack() }) else ({ roles.set(null); root(Routes.ROLE) }),
+            )
+        }
+        composable(Routes.LOGIN) {
+            com.drishtisaathi.firstrun.LoginScreen(
+                state.lang, vm::setLang, vm.tele,
+                onSignedIn = {
+                    if (consultAfterLogin) { consultAfterLogin = false; nav.navigate(Routes.TELE_CHOOSE) { popUpTo(Routes.LOGIN) { inclusive = true } } }
+                    else root(homeRoute)
+                },
+                onCreate = { nav.navigate(Routes.SIGNUP) { popUpTo(Routes.LOGIN) { inclusive = true } } },
+                onServer = { nav.navigate(Routes.BRIDGE_SETTINGS) },
+                onBack = { consultAfterLogin = false; nav.popBackStack() },
+            )
+        }
+        composable(Routes.SIGNUP) {
+            com.drishtisaathi.firstrun.SignUpScreen(
+                state.lang, vm::setLang, vm.tele,
+                onCreated = {
+                    if (consultAfterLogin) { consultAfterLogin = false; nav.navigate(Routes.TELE_CHOOSE) { popUpTo(Routes.SIGNUP) { inclusive = true } } }
+                    else nav.navigate(Routes.READY) { popUpTo(Routes.SIGNUP) { inclusive = true } }
+                },
+                onBack = { consultAfterLogin = false; nav.popBackStack() },
+            )
+        }
+        composable(Routes.READY) {
+            com.drishtisaathi.firstrun.ProfileReadyScreen(
+                state.lang, vm.tele.user.collectAsStateWithLifecycle().value?.name,
+                onStartTest = {
+                    root(homeRoute)
+                    precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT)
+                },
+                onLater = { root(homeRoute) },
+            )
+        }
         composable(Routes.HOME) {
+            // First time on the shop home: the one-time phone setup opens by itself ("Skip for now" leaves a reminder).
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                if (!vm.phoneSetup.done.value && !vm.phoneSetup.offered) {
+                    vm.phoneSetup.markOffered()
+                    nav.navigate(Routes.PHONE_SETUP)
+                }
+            }
             HomeScreen(
                 state, vm::setLang,
                 onStart = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
@@ -289,13 +368,19 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         }
         // ---- Teleconsult, patient side ----
         composable(Routes.PATIENT) {
+            val patientUser by vm.tele.user.collectAsStateWithLifecycle()
+            // Patient phone: logged out (or account deleted) → back to "Create account / Log in".
+            androidx.compose.runtime.LaunchedEffect(patientUser, role) {
+                if (patientUser == null && role == com.drishtisaathi.firstrun.AppRole.PATIENT) root(Routes.PATIENT_START)
+            }
             com.drishtisaathi.teleconsult.PatientScreen(
                 state.lang, vm::setLang, vm.tele,
                 // the same check as "Start new customer": consent first, then the test
                 onStartTest = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onConsultations = { nav.navigate(Routes.TELE_LIST) },
                 onServer = { nav.navigate(Routes.BRIDGE_SETTINGS) },
-                onBack = { consultAfterLogin = false; nav.popBackStack() },
+                onBack = { consultAfterLogin = false; if (!nav.popBackStack()) activity?.finish() },
+                onSwitchRole = if (role == com.drishtisaathi.firstrun.AppRole.PATIENT) ({ roles.set(null); root(Routes.ROLE) }) else null,
                 onSignedIn = {
                     if (consultAfterLogin) {
                         consultAfterLogin = false
@@ -329,6 +414,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 onDiagnostics = { nav.navigate(Routes.DIAGNOSTICS) },
                 onBack = { nav.popBackStack() },
                 onCatalogue = { vm.loadCatalog3D(); nav.navigate(Routes.FRAME_CATALOGUE) },
+                onSwitchRole = { roles.set(null); root(Routes.ROLE) },
             )
         }
         composable(Routes.FRAME_CATALOGUE) {
@@ -374,9 +460,9 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                         // Precision mode: the same reading test as the customer flow, then the same results.
                         precisionRun = false
                         vm.startPrecision()
-                        nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
+                        goHome()
                         startQuick(primary = true)
-                    } else nav.navigate(Routes.LANGUAGE) { popUpTo(Routes.HOME) }
+                    } else nav.navigate(Routes.LANGUAGE) { popUpTo(homeRoute) }
                 },
                 onCancel = { goHome() },
             )
@@ -571,7 +657,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
         composable(Routes.REFERRAL) {
             ReferralScreen(
                 state, vm.rules, vm::setLang,
-                onContinue = { nav.navigate(Routes.RESULT) { popUpTo(Routes.HOME) } },
+                onContinue = { nav.navigate(Routes.RESULT) { popUpTo(homeRoute) } },
                 onBack = { nav.popBackStack() },
             )
         }
@@ -634,7 +720,7 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 teleCard = {
                     com.drishtisaathi.teleconsult.ConsultCard(state.lang, gate.urgent) {
                         if (vm.tele.user.value != null) nav.navigate(Routes.TELE_CHOOSE)
-                        else { consultAfterLogin = true; nav.navigate(Routes.PATIENT) }
+                        else { consultAfterLogin = true; nav.navigate(Routes.LOGIN) }
                     }
                 },
             )

@@ -136,5 +136,5 @@ private fun DrawScope.chat(c: DrishtiColors, u: Float) {
 private fun DrawScope.success(c: DrishtiColors, u: Float) {
     drawCircle(c.success, 26 * u, o(50f, 50f, u))
     val p = Path().apply { moveTo(38 * u, 51 * u); lineTo(46.5f * u, 59 * u); lineTo(63 * u, 42 * u) }
-    drawPath(p, DS.on(c.success), style = Stroke(6 * u, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+    drawPath(p, if (c.isDark) c.background else Color.White, style = Stroke(6 * u, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
 }

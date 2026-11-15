@@ -746,7 +746,8 @@ fun SuccessCheck(modifier: Modifier = Modifier, size: Dp = 96.dp, haptic: Boolea
         if (haptic) haptics.success()
         if (!reduced) t.animateTo(1f, tween(DS.successMs, easing = FastOutSlowInEasing))
     }
-    val tickColour = DS.on(c.success)
+    // a graphic, not text: white on the light theme's green is 3.3:1 (AA for graphics), dark ink on the dark theme's
+    val tickColour = if (c.isDark) c.background else Color.White
     Canvas(modifier.size(size).clearAndSetSemantics { }) {
         val r = this.size.minDimension / 2
         drawCircle(c.success, r * (0.85f + 0.15f * t.value))
