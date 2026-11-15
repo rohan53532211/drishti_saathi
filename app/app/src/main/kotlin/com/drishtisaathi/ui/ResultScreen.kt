@@ -68,6 +68,8 @@ fun ResultScreen(
     qr: Pair<String, Boolean>? = null,
     /** Phase G: shares the summary picture (called after the consent checkbox). */
     onShareImage: (() -> Unit)? = null,
+    /** Teleconsult: the "Consult an optometrist" card. */
+    teleCard: @Composable () -> Unit = {},
 ) {
     val l = state.lang
     val r = state.result ?: return
@@ -142,6 +144,7 @@ fun ResultScreen(
             // QR card, then the optometrist card ("Send to optometrist" is always on) and the share action
             qr?.let { com.drishtisaathi.profile.QrCard(l, it.first, it.second) }
             remoteCard()
+            teleCard()
             if (onShareImage != null) {
                 var askShare by remember { mutableStateOf(false) }
                 BigButton(com.drishtisaathi.i18n.SProfile.shareWhatsApp[l], { askShare = true })

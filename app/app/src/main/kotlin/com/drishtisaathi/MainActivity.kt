@@ -112,6 +112,12 @@ private object Routes {
     // Vision profile: survey, the red banner, screening tests
     const val SURVEY = "survey"
     const val SCREENING = "screening"
+    // Teleconsult, patient side
+    const val PATIENT = "patient"
+    const val TELE_CHOOSE = "teleChoose"
+    const val TELE_LIST = "teleList"
+    const val TELE_CASE = "teleCase/{id}"
+    fun teleCase(id: String) = "teleCase/$id"
 
     fun tryOn(frameId: String?) = "tryOn" + (frameId?.let { "?frame=$it" } ?: "")
 
@@ -185,6 +191,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     // ---- Phase A: the red banner comes first, the check continues behind it ----
     /** Red flags the banner has already been shown for in this session. */
     var bannerFor by remember { mutableStateOf(emptyList<com.drishtisaathi.engine.profile.RedFlag>()) }
+    /** Teleconsult: "Consult an optometrist" was tapped without a login; after the login the choice screen opens. */
+    var consultAfterLogin by remember { mutableStateOf(false) }
     /** The banner is up (over whatever screen is open); the value is what runs after "Continue the check". */
     var afterBanner by remember { mutableStateOf<(() -> Unit)?>(null) }
     /** Shows the red banner when a red flag was found that it has not been shown for yet, then [next]. */
@@ -266,9 +274,44 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                 bridgeOnline = vm.bridgeOnline.collectAsStateWithLifecycle().value,
                 queued = vm.reportQueue.pending.collectAsStateWithLifecycle().value,
                 onBridgeChip = { vm.flushReports() },
+                onPatient = { consultAfterLogin = false; nav.navigate(Routes.PATIENT) },
+                patientName = vm.tele.user.collectAsStateWithLifecycle().value?.name,
             )
             // while Home is open: check the backend and send queued reports every 20 s
             androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { vm.flushReports(); kotlinx.coroutines.delay(20_000) } }
+        }
+        // ---- Teleconsult, patient side ----
+        composable(Routes.PATIENT) {
+            com.drishtisaathi.teleconsult.PatientScreen(
+                state.lang, vm::setLang, vm.tele,
+                // the same check as "Start new customer": consent first, then the test
+                onStartTest = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
+                onConsultations = { nav.navigate(Routes.TELE_LIST) },
+                onServer = { nav.navigate(Routes.BRIDGE_SETTINGS) },
+                onBack = { consultAfterLogin = false; nav.popBackStack() },
+                onSignedIn = {
+                    if (consultAfterLogin) {
+                        consultAfterLogin = false
+                        nav.navigate(Routes.TELE_CHOOSE) { popUpTo(Routes.PATIENT) { inclusive = true } }
+                    }
+                },
+            )
+        }
+        composable(Routes.TELE_CHOOSE) {
+            val gate = androidx.compose.runtime.remember { vm.safety(state) }
+            com.drishtisaathi.teleconsult.ChooseOptometristScreen(
+                state.lang, vm::setLang, vm.tele, gate.urgent, com.drishtisaathi.i18n.SProfile.redFlagLines(gate).map { it[state.lang] },
+                report = { vm.teleReport() },
+                onSent = { id -> nav.navigate(Routes.teleCase(id)) { popUpTo(Routes.TELE_CHOOSE) { inclusive = true } } },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.TELE_LIST) {
+            com.drishtisaathi.teleconsult.ConsultationsScreen(state.lang, vm::setLang, vm.tele, onOpen = { nav.navigate(Routes.teleCase(it)) }, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.TELE_CASE) { entry ->
+            val id = entry.arguments?.getString("id").orEmpty()
+            com.drishtisaathi.teleconsult.ConsultationScreen(state.lang, vm::setLang, vm.tele, id, onBack = { nav.popBackStack() })
         }
         composable(Routes.SHOP_TOOLS) {
             ShopToolsScreen(
@@ -580,6 +623,12 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                         onCheck = { vm.checkReview() },
                         onPoll = { vm.checkReview(silent = true) },
                     )
+                },
+                teleCard = {
+                    com.drishtisaathi.teleconsult.ConsultCard(state.lang, gate.urgent) {
+                        if (vm.tele.user.value != null) nav.navigate(Routes.TELE_CHOOSE)
+                        else { consultAfterLogin = true; nav.navigate(Routes.PATIENT) }
+                    }
                 },
             )
         }

@@ -41,6 +41,55 @@ The optometrist page is `http://<laptop IP>:8000/`. For the AI voice interview, 
 
 ---
 
+### Teleconsult (patient portal + optometrist portal)
+A patient registers in the app, takes the test and taps **Consult an optometrist**. A verified optometrist accepts the case in a web portal, talks by chat, WhatsApp or a video call, and sends advice or an e-prescription that the patient sees in the app. Branch `feature/teleconsult`.
+
+**Run it (laptop and phone on the same Wi-Fi):**
+```sh
+cd backend
+python -m venv .venv
+.venv\Scriptsctivate                 # Windows   (macOS/Linux: source .venv/bin/activate)
+pip install -r requirements.txt
+copy .env.example .env                 # then set ADMIN_EMAIL, ADMIN_PASSWORD and DEMO_PASSWORD in .env (never commit .env)
+python -m app.seed_demo                # demo accounts and 3 waiting cases (add --reset to start again)
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+| What | Where |
+|---|---|
+| Optometrist portal | `http://<laptop-ip>:8000/portal` |
+| Admin page (approve / reject optometrists) | `http://<laptop-ip>:8000/portal/admin` |
+| App | Shop tools → Optometrist bridge settings → `http://<laptop-ip>:8000`, then Home → **Patient mode** |
+
+**Demo logins** (values come from your own `backend/.env`; the placeholders are in `.env.example`):
+
+| Role | Login | Password |
+|---|---|---|
+| Admin | `ADMIN_EMAIL` | `ADMIN_PASSWORD` |
+| Optometrists (approved) | `9000000101` (DEMO Dr. Meera Sharma), `9000000102` (DEMO Dr. Arjun Verma) | `DEMO_PASSWORD` |
+| Optometrist (pending) | `9000000103` (DEMO Dr. Kavita Singh) | `DEMO_PASSWORD` |
+| Patients | `9000000201` (urgent case), `9000000202` (child myopia), `9000000203` (routine) | `DEMO_PASSWORD` |
+
+Every demo account is named DEMO and its phone number is a placeholder. To try the WhatsApp buttons with real phones, set `DEMO_PATIENT_PHONE` / `DEMO_OPTOMETRIST_PHONE` in `.env` before seeding, or register your own accounts.
+
+**Demo steps:**
+1. Phone: Home → Patient mode → Register (tick the consent box) → Take the eye test.
+2. Phone: on the result, **Consult an optometrist** → choose one or "Any available" → Send the request.
+3. Laptop: `/portal` → log in as an approved optometrist → the case is in the queue (urgent ones first, in red) → open it → **Accept this case**.
+4. Laptop: chat, **WhatsApp**, or **Start video call** (a `meet.jit.si` room; the link appears in the patient's chat as "Join video call").
+5. Laptop: **Write advice / e-prescription** → Send. The case becomes COMPLETED.
+6. Phone: Patient mode → My consultations → the advice in words and as a PDF.
+7. Admin: `/portal/admin` → approve the pending optometrist; they can then log in and see cases.
+
+**What it does and does not do:**
+- Passwords are hashed with bcrypt; every API call needs the account's login token and is checked against the role. An optometrist sees cases only after an admin approves them. A patient's phone number is shown only to the optometrist who accepted the case.
+- The patient ticks "I agree my report and name are shared with the optometrist I choose"; the time is stored. **Delete my account and data** removes the account, reports, chats and advice from the server.
+- An urgent (red-flag) report still shows "Please see an eye doctor today" first, with "A teleconsult never replaces an urgent visit."
+- Video calls use the public Jitsi Meet service and WhatsApp opens through `wa.me` links; neither is part of this backend.
+- **Demo only.** It runs over plain http on a LAN, login is a mobile number and a password, and payments are a placeholder ("not required (demo)"). **Production needs HTTPS hosting, real OTP login and payment integration**, plus per-optometrist verification of registration numbers, rate limiting, an audit log and a DPDP Act review.
+
+---
+
 ## About
 
 An Android app for small optical shops. It does a voice-guided, bilingual (Hindi/English) pre-consultation on one phone before the shop's own trial-lens test.
