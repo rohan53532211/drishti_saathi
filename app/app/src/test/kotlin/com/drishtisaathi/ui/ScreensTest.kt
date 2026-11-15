@@ -121,6 +121,23 @@ class ScreensTest {
     @Test fun shopCustomers() = shoot("p3_shop_customers") { l, on -> shop(1, l, on, listOf(session(12, 0, "URGENT"), session(11, 1), session(10, 3, "ROUTINE")))() }
     @Test fun shopTools() = shoot("p3_shop_tools") { l, on -> shop(2, l, on, emptyList())() }
 
+    // ---- phase 7: the largest font (1.5) in Hindi, the longest language, for clipping ----
+    private val big = listOf(Variant(false, Lang.HI, 1.5f))
+    @Test fun bigWelcome() = shoot("p7_welcome", big) { l, on -> WelcomeScreen(l, on) {} }
+    @Test fun bigPatientHome() = shoot("p7_patient_home", big) { l, on -> patient(0, l, on)() }
+    @Test fun bigShopHome() = shoot("p7_shop_home", big) { l, on -> shop(0, l, on, emptyList())() }
+    @Test fun bigChecklist() = shoot("p7_checklist", big) { l, on -> com.drishtisaathi.guide.ChecklistScreen(l, on, {}, {}) }
+    @Test fun bigRedFlag() = shoot("p7_red_flag", big) { l, _ -> com.drishtisaathi.profile.RedFlagBannerScreen(l, gate, {}, {}) }
+    @Test fun bigChoose() = shoot("p7_choose_optometrist", big) { l, on ->
+        com.drishtisaathi.teleconsult.ChooseOptometristContent(l, on, false, emptyList(), optometrists, null, null, null, false, {}, {}, {}, {})
+    }
+    @Test fun bigChat() = shoot("p7_chat", big) { l, on ->
+        com.drishtisaathi.teleconsult.ConsultationContent(l, on, chatCase, null, chat, null, "", {}, {}, {}, {}, {}, {}, {}, now = now)
+    }
+    @Test fun bigConsultations() = shoot("p7_consultations", big) { l, _ ->
+        Bg { com.drishtisaathi.teleconsult.ConsultationListContent(l, consults, null, {}, {}) }
+    }
+
     // ---- phase 5: results, consult, chat ----
     private val optometrists = listOf(
         optometrist,

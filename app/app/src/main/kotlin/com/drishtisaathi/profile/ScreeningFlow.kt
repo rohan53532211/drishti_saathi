@@ -145,7 +145,7 @@ fun DistancePill(lang: Lang, reading: DistanceReading?, minMm: Double?, maxMm: D
     Surface(shape = DS.pill, color = if (ok) c.successSoft else c.warningSoft, modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.size(10.dp).background(if (ok) c.success else c.warning, CircleShape))
-            Text(text, color = if (ok) c.successInk else c.warningInk, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(text, color = if (ok) c.successInk else c.warningInk, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 2)
         }
     }
 }

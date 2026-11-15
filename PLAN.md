@@ -487,7 +487,16 @@ Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, me
 - Queue: one table of waiting requests, urgent pinned on top ("Urgent · see first"), then by waiting time; columns patient, priority pill (icon + word), age, language, waiting, red flags; becomes cards on narrow screens. Skeleton while loading, illustrated empty states.
 - Case page: two columns — report (urgent banner first, rings, measurements with the range big and the method below, screening lines with status icons and the Amsler grids, lens suggestions, folded answers) and a sticky actions panel (Accept, Chat with day separators and bubbles, Video, WhatsApp, Write advice, Close).
 - Advice form: SPH / CYL / AXIS steppers per eye (±0.25 D, ±5°), ADD and PD steppers, lens picker chips from the catalogue, then a preview of exactly what the patient sees before "Send to patient".
-- Login, register and pending pages as one centred card with the eye mark. Same API calls and security rules (text nodes only, no inline handlers, `noopener` on every new tab). Screenshots `docs/screens/p6_portal_*` (desktop light/dark, phone width).
+- Login, register and pending pages as one centred card with the eye mark.
+
+### UI phase 7: brand and quality (done)
+- Icon: the adaptive eye-mark icon with a monochrome layer was done in phase 2; the portal uses the same mark.
+- `AccessibilityTest`: welcome, role, login, patient home, shop home, checklist, red flag, choose optometrist, chat — Hindi and English at font scale 1.0 / 1.3 / 1.5 — every tappable element has a TalkBack label and a ≥ 48 dp target. Status is icon + word everywhere (pills, screening lines, portal).
+- Font scale 1.5 in Hindi rendered for the key screens (`p7_*_150`): nothing clipped; the screening distance pill may now wrap to two lines; top-bar titles ellipsise (TalkBack reads the full title).
+- Hindi: every new string reviewed for natural phrasing; the 20% battery line reworded so the placeholder check passes in both languages.
+- Performance: every lazy list has stable keys (chat items, optometrists, sessions, catalogue, tips). App start under 2 s was **not measured**: no phone over adb in this environment.
+- `docs/DESIGN.md` §6 lists every screenshot (170 files).
+- Tests now: app 440, engine 397, backend 118, all passing. Same API calls and security rules (text nodes only, no inline handlers, `noopener` on every new tab). Screenshots `docs/screens/p6_portal_*` (desktop light/dark, phone width).
 
 ## Test pass before submission (15 Nov)
 

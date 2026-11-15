@@ -376,4 +376,47 @@ The `*-ink` tones exist because the brand success, warning and urgent colours ar
 
 ## 6. Screenshots
 
-Filled in by Phase 7 (`docs/screens/`).
+All files are in `docs/screens/`. App screens come from `ScreensTest` (Robolectric + Roborazzi, 360 × 780 dp) and are named `<screen>_<light|dark>_<hi|en>_<100|130|150>.png`. "Full matrix" means 8 files: light/dark × Hindi/English × font scale 1.0/1.3. Run `gradlew :app:testDebugUnitTest --tests com.drishtisaathi.ui.ScreensTest` to redraw them.
+
+| Screen | File prefix | Variants |
+|---|---|---|
+| Welcome | `p2_welcome` | full matrix |
+| Who uses this phone | `p2_role` | full matrix |
+| Patient: create account / log in | `p2_patient_start` | full matrix |
+| Sign-up, step 1 | `p2_signup_step1` | full matrix |
+| Profile ready | `p2_profile_ready` | full matrix |
+| Log in | `p2_login` | full matrix |
+| Patient home | `p3_patient_home` | full matrix |
+| Patient profile | `p3_patient_profile` | full matrix |
+| Consultations list | `p3_consultations` | full matrix |
+| Consultations, empty | `p3_consultations_empty` | light Hindi, 1.0 and 1.3 |
+| Shop home | `p3_shop_home` | full matrix |
+| Shop customers | `p3_shop_customers` | full matrix |
+| Shop tools | `p3_shop_tools` | full matrix |
+| Before-the-test checklist | `p4_checklist` | full matrix |
+| Red-flag screen | `p4_red_flag` | full matrix |
+| Test done state | `p4_test_done` | light, Hindi/English, 1.0 and 1.3 |
+| Screening success tick | `p4_screening_done` | light Hindi, 1.0 and 1.3 |
+| Result (top) | `p5_result` | light/dark × Hindi/English, 1.0 |
+| Choose optometrist | `p5_choose_optometrist` | full matrix |
+| Choose optometrist, loading + urgent | `p5_choose_loading` | light Hindi 1.0 |
+| Consultation chat | `p5_chat` | full matrix |
+| Consultation, waiting | `p5_chat_waiting` | light Hindi, 1.0 and 1.3 |
+| Advice (prescription-style card) | `p5_advice` | full matrix |
+| Largest font, Hindi: welcome, patient home, shop home, checklist, red flag, choose optometrist, chat, consultations | `p7_*_light_hi_150` | light Hindi 1.5 |
+
+Optometrist portal, from headless Edge against a local server with demo data (1440 × 900 desktop, 390 × 844 phone):
+
+| Page | File |
+|---|---|
+| Login | `p6_portal_login_light`, `p6_portal_login_dark` |
+| Pending approval | `p6_portal_pending_light` |
+| Queue (urgent pinned) | `p6_portal_queue_light`, `p6_portal_queue_dark` |
+| Case page (report + actions) | `p6_portal_case_light`, `p6_portal_case_dark` |
+| Advice form with steppers | `p6_portal_advice_light` |
+| Preview before sending | `p6_portal_preview_light` |
+| Phone width: queue, my active | `p6_portal_mobile_queue_light`, `p6_portal_mobile_active_light` |
+
+There are no "before" screenshots. The app had no screenshot tests before this branch, so the comparison is against the v1.2 APK on `feature/teleconsult`.
+
+`AccessibilityTest` checks the welcome, role, login, patient home, shop home, checklist, red-flag, choose-optometrist and chat screens in Hindi and English at font scale 1.0, 1.3 and 1.5. On each one, every tappable element must have a TalkBack label and a touch target of at least 48 dp.
