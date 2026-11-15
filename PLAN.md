@@ -440,6 +440,12 @@ Patient registers in the app, takes the test, asks for a consultation; a verifie
 3. Fix whatever the phone test finds; re-tune thresholds; native-speaker Hindi pass.
 4. Then: APK size, pilot data for the priors.
 
+## UI polish (`feature/ui-polish`, from `feature/teleconsult`, 15 Nov 2026)
+Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, measurements and backend logic are unchanged.
+
+### UI phase 0: design spec (done)
+- `docs/DESIGN.md`: screen inventory (app + portal, purpose, primary action, role), navigation map per role, principles, the design-system tokens and components, and the per-screen specs for phases 2–7.
+
 ## Test pass before submission (15 Nov)
 
 Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.
