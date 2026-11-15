@@ -31,8 +31,14 @@ data class BridgeConfig(val url: String = "", val token: String = "") {
 /** Stored per phone. The token is a shared demo secret; backups are off for the whole app (allowBackup=false). */
 class BridgeSettings(context: Context) {
     private val prefs = context.getSharedPreferences("bridge_settings", Context.MODE_PRIVATE)
-    private val _config = MutableStateFlow(BridgeConfig(prefs.getString("url", "") ?: "", prefs.getString("token", "") ?: ""))
+    // A saved address wins; a phone that has none yet starts with the hosted server (still editable in settings).
+    private val _config = MutableStateFlow(BridgeConfig(
+        prefs.getString("url", null)?.takeIf { it.isNotBlank() } ?: DEFAULT_URL, prefs.getString("token", "") ?: ""))
     val config: StateFlow<BridgeConfig> = _config.asStateFlow()
+
+    companion object {
+        const val DEFAULT_URL = "https://drishti-saathi-backend.onrender.com"
+    }
 
     fun save(c: BridgeConfig) {
         prefs.edit().putString("url", c.url.trim()).putString("token", c.token.trim()).apply()
