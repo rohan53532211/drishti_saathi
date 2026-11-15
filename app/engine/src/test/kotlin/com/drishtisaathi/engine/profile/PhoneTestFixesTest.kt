@@ -48,12 +48,13 @@ class PhoneTestFixesTest {
         }
     }
 
-    @Test fun `2 - a residual still at minus 3_75 or beyond asks for a stronger lens, once`() {
-        assertEquals(-3.75, lens.repeatIfResidualFromSeD, 0.0); assertEquals(1, lens.maxStrongerRepeats)
-        assertTrue(LensAssisted.needsStrongerLens(-3.75, 0, lens))
+    @Test fun `2 - a residual still at minus 3_00 or beyond asks for a stronger lens, once`() {
+        assertEquals(-3.0, lens.repeatIfResidualFromSeD, 0.0); assertEquals(1, lens.maxStrongerRepeats)
+        assertTrue(LensAssisted.needsStrongerLens(-3.0, 0, lens))
+        assertTrue("report S2: -1.50 lens, residual -3.25", LensAssisted.needsStrongerLens(-3.25, 0, lens))
         assertTrue(LensAssisted.needsStrongerLens(-4.5, 0, lens))
         assertFalse("a residual around 50 cm is what the mode is for", LensAssisted.needsStrongerLens(-2.0, 0, lens))
-        assertFalse(LensAssisted.needsStrongerLens(-3.5, 0, lens))
+        assertFalse(LensAssisted.needsStrongerLens(-2.75, 0, lens))
         assertFalse("only one repeat", LensAssisted.needsStrongerLens(-4.5, 1, lens))
         assertFalse(LensAssisted.needsStrongerLens(null, 0, lens))
         // -1.50 lens, residual -4.00: the eye is about -5.50, so the next lens is -3.50 (about 2 D weaker again)
@@ -95,6 +96,9 @@ class PhoneTestFixesTest {
         val vp = rules.visionProfile
         val oneHour = VisionProfile.from(ProfileInputs(outdoorHours = 1.0), vp).leisure
         assertEquals(17, oneHour.score); assertEquals("LOW", oneHour.label)
+        val twoHours = VisionProfile.from(ProfileInputs(outdoorHours = 2.0), vp).leisure
+        assertEquals(33, twoHours.score); assertEquals("2 hours outdoors is Medium", "MEDIUM", twoHours.label)
+        assertEquals("LOW", VisionProfile.from(ProfileInputs(outdoorHours = 1.5), vp).leisure.label)
         // for every answer the label is the one the score's thresholds give, and it never goes down as the score goes up
         val rings = buildList {
             for (half in 0..20) for (acts in listOf(emptySet(), setOf("OUTDOOR_SPORT"), setOf("WATER", "FARMING_FIELD")))
