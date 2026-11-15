@@ -97,6 +97,8 @@ private object Routes {
     // Customer flow: consent → language → questions (AI voice or scripted) → power / eye check → face → more
     // questions → results
     const val CONSENT = "consent"
+    /** Before the test: good light, phone charged, card and glasses nearby (UI only). */
+    const val CHECKLIST = "checklist"
     const val LANGUAGE = "language"
     const val INTERVIEW = "interview"
     const val AI_CONSENT = "aiConsent"
@@ -468,10 +470,13 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                         vm.startPrecision()
                         goHome()
                         startQuick(primary = true)
-                    } else nav.navigate(Routes.LANGUAGE) { popUpTo(homeRoute) }
+                    } else nav.navigate(Routes.CHECKLIST) { popUpTo(homeRoute) }
                 },
                 onCancel = { goHome() },
             )
+        }
+        composable(Routes.CHECKLIST) {
+            com.drishtisaathi.guide.ChecklistScreen(state.lang, vm::setLang, onReady = { nav.navigate(Routes.LANGUAGE) }, onBack = { goHome() })
         }
         composable(Routes.LANGUAGE) {
             var checking by remember { mutableStateOf(false) }

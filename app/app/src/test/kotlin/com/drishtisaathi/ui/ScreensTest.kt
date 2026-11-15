@@ -120,6 +120,20 @@ class ScreensTest {
     @Test fun shopCustomers() = shoot("p3_shop_customers") { l, on -> shop(1, l, on, listOf(session(12, 0, "URGENT"), session(11, 1), session(10, 3, "ROUTINE")))() }
     @Test fun shopTools() = shoot("p3_shop_tools") { l, on -> shop(2, l, on, emptyList())() }
 
+    // ---- phase 4: guided test flow ----
+    private val gate = com.drishtisaathi.engine.profile.SafetyGate(
+        redFlags = listOf(com.drishtisaathi.engine.profile.RedFlag.SUDDEN_VISION_LOSS, com.drishtisaathi.engine.profile.RedFlag.EYE_PAIN_REDNESS),
+        emergency = true,
+    )
+    @Test fun checklist() = shoot("p4_checklist") { l, on -> com.drishtisaathi.guide.ChecklistScreen(l, on, {}, {}) }
+    @Test fun redFlag() = shoot("p4_red_flag") { l, _ -> com.drishtisaathi.profile.RedFlagBannerScreen(l, gate, {}, {}) }
+    @Test fun testDone() = shoot("p4_test_done", matrix.take(4)) { l, _ ->
+        Bg { com.drishtisaathi.guide.TestDoneState(l, com.drishtisaathi.i18n.SProfile.amslerTitle, {}) }
+    }
+    @Test fun screeningTick() = shoot("p4_screening_done", matrix.take(2)) { l, _ ->
+        Bg { com.drishtisaathi.profile.SuccessTick({}, label = com.drishtisaathi.i18n.SProfile.colourTitle, lang = l) }
+    }
+
     /** A plain page: the theme background and the 24 dp screen padding. */
     @Composable private fun Bg(content: @Composable () -> Unit) =
         Box(Modifier.fillMaxSize().background(DS.colors.background).padding(DS.screen)) { content() }

@@ -81,6 +81,9 @@ import com.drishtisaathi.i18n.SProfile
 import com.drishtisaathi.i18n.SShop
 import com.drishtisaathi.i18n.Txt
 import com.drishtisaathi.ui.DS
+import com.drishtisaathi.ui.designsystem.Illustration
+import com.drishtisaathi.ui.designsystem.Spot
+import androidx.compose.ui.semantics.heading
 import com.drishtisaathi.vision.DistanceDebugPanel
 import com.drishtisaathi.vision.DistanceProvider
 import com.drishtisaathi.vision.DistanceReading
@@ -104,7 +107,14 @@ private fun coverLine(e: Eye): Txt {
     return Txt(SProfile.coverEye.en.format(other.en), SProfile.coverEye.hi.format(other.hi))
 }
 private fun join(a: Txt, b: Txt) = Txt("${a.en} ${b.en}", "${a.hi} ${b.hi}")
-private fun head(e: Eye?, t: Txt): Txt = if (e == null) t else Txt("${eyeWord(e).en}: ${t.en}", "${eyeWord(e).hi}: ${t.hi}")
+/** The finished test's name for the success state. */
+private fun stepName(s: ScreenStep): Txt? = when (s) {
+    is ScreenStep.Amsler -> head(s.eye, SProfile.amslerTitle)
+    is ScreenStep.Contrast -> head(s.eye, SProfile.contrastTitle)
+    ScreenStep.Colour -> SProfile.colourTitle
+    else -> null
+}
+private fun head(e: Eye?, t: Txt): Txt =if (e == null) t else Txt("${eyeWord(e).en}: ${t.en}", "${eyeWord(e).hi}: ${t.hi}")
 
 /** Hides the status and navigation bars while a test screen is shown (they come back on a swipe and when it leaves). */
 @Composable
@@ -160,12 +170,13 @@ fun Countdown(onDone: () -> Unit) {
 
 /** A gentle tick drawn in, then [onDone] (after each test). */
 @Composable
-fun SuccessTick(onDone: () -> Unit) {
+fun SuccessTick(onDone: () -> Unit, label: Txt? = null, lang: Lang = Lang.HI) {
     val c = DS.colors
     val p = remember { Animatable(0f) }
     val done by rememberUpdatedState(onDone)
-    LaunchedEffect(Unit) { p.animateTo(1f, tween(500)); delay(350); done() }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    LaunchedEffect(Unit) { p.animateTo(1f, tween(500)); delay(if (label != null) 650 else 350); done() }
+    Column(Modifier.fillMaxSize().semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Canvas(Modifier.size(120.dp)) {
             drawCircle(c.successSoft)
             val a = Offset(size.width * 0.28f, size.height * 0.52f); val b = Offset(size.width * 0.45f, size.height * 0.68f)
@@ -174,6 +185,11 @@ fun SuccessTick(onDone: () -> Unit) {
             val w = size.width * 0.08f
             if (t > 0f) drawLine(c.success, a, Offset(a.x + (b.x - a.x) * minOf(1f, t * 2), a.y + (b.y - a.y) * minOf(1f, t * 2)), w, StrokeCap.Round)
             if (t > 0.5f) drawLine(c.success, b, Offset(b.x + (e.x - b.x) * (t - 0.5f) * 2, b.y + (e.y - b.y) * (t - 0.5f) * 2), w, StrokeCap.Round)
+        }
+        if (label != null) {
+            Text(label[lang], style = MaterialTheme.typography.titleLarge, color = c.ink, modifier = Modifier.padding(top = 16.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(com.drishtisaathi.i18n.SGuide.testDone[lang], style = MaterialTheme.typography.bodyLarge, color = c.inkSecondary)
         }
     }
 }
@@ -185,23 +201,29 @@ fun SuccessTick(onDone: () -> Unit) {
 @Composable
 private fun TestChrome(
     lang: Lang, title: Txt, instruction: Txt, reading: DistanceReading?, minMm: Double?, maxMm: Double?,
-    speak: (Txt) -> Unit, onSkip: () -> Unit, background: Color = DS.colors.background,
+    speak: (Txt) -> Unit, onSkip: () -> Unit, background: Color = Color.White,
+    spot: Spot = Spot.PHONE_DISTANCE,
     controls: @Composable ColumnScope.() -> Unit = {},
     target: @Composable () -> Unit,
 ) {
-    val c = DS.colors
     LaunchedEffect(instruction) { speak(instruction) }
-    Column(Modifier.fillMaxSize().background(background).padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title[lang], Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = c.ink, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            TextButton(onClick = onSkip) { Text(SProfile.skipTest[lang], color = c.inkSecondary) }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    // the test canvas is always white: the light tokens keep the text readable on it in dark mode too
+    com.drishtisaathi.ui.DrishtiTheme(dark = false) {
+        val c = DS.colors
+        Column(Modifier.fillMaxSize().background(background).padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title[lang], Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = c.ink,
+                    fontWeight = FontWeight.SemiBold, maxLines = 2)
+                TextButton(onClick = onSkip, modifier = Modifier.heightIn(min = 48.dp)) { Text(SProfile.skipTest[lang], color = c.inkSecondary) }
+            }
             DistancePill(lang, reading, minMm, maxMm)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Illustration(spot, size = 52.dp)
+                Text(instruction[lang], Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, color = c.ink)
+            }
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { target() }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp), content = controls)
         }
-        Text(instruction[lang], style = MaterialTheme.typography.titleLarge, color = c.ink)
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { target() }
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp), content = controls)
     }
 }
 
@@ -220,7 +242,7 @@ private fun AmslerScreen(
     speak: (Txt) -> Unit, onSkip: () -> Unit, onResult: (AmslerEyeResult) -> Unit,
 ) {
     val cfg = rules.screening.amsler
-    val c = DS.colors
+    val c = com.drishtisaathi.ui.LightColors // drawn on the always-white test canvas
     var phase by remember { mutableStateOf(GridPhase.WAIT) }
     var cells by remember { mutableStateOf(emptyList<AmslerCell>()) }
     var layout by remember { mutableStateOf<AmslerLayout?>(null) }
@@ -419,7 +441,7 @@ private fun ColourScreen(
 
     TestChrome(
         lang, Txt("${SProfile.colourTitle.en} · ${SProfile.plateOf.format(index + 1, series.size).en}", "${SProfile.colourTitle.hi} · ${SProfile.plateOf.format(index + 1, series.size).hi}"),
-        SProfile.colourInstruction, reading, gate.minMm, gate.maxMm, speak, onSkip, background = Color.White,
+        SProfile.colourInstruction, reading, gate.minMm, gate.maxMm, speak, onSkip, background = Color.White, spot = Spot.EYE,
         controls = {
             listOf(listOf(1, 2, 3, 4, 5), listOf(6, 7, 8, 9, 0)).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -483,13 +505,14 @@ fun ScreeningFlow(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val step = steps[index.coerceAtMost(steps.lastIndex)]
             when {
-                tick -> SuccessTick { tick = false; advance() }
+                tick -> SuccessTick({ tick = false; advance() }, label = stepName(step), lang = lang)
                 step == ScreenStep.Setup -> {
                     LaunchedEffect(Unit) { speak(SProfile.setupBody) }
                     Column(
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(DS.screen), verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Text(SProfile.setupTitle[lang], style = MaterialTheme.typography.headlineMedium, color = c.ink)
+                        Box(Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) { Illustration(Spot.PHONE_DISTANCE, size = 160.dp) }
+                        Text(SProfile.setupTitle[lang], style = MaterialTheme.typography.headlineMedium, color = c.ink, modifier = Modifier.semantics { heading() })
                         Text(SProfile.setupBody[lang], style = MaterialTheme.typography.bodyLarge, color = c.ink)
                         Text(SProfile.screeningLabel[lang], style = MaterialTheme.typography.labelMedium, color = c.inkSecondary)
                         PrimaryButton(SProfile.setupStart[lang]) { advance() }

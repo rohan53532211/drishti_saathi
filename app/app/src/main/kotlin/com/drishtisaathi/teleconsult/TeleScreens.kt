@@ -7,6 +7,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -92,14 +93,18 @@ private fun ErrorLine(lang: Lang, error: Txt?) {
 /** "See an eye doctor today" first, then: a teleconsult never replaces an urgent visit. */
 @Composable
 fun UrgentTeleNote(lang: Lang, reasons: List<String> = emptyList()) {
+    val fg = DS.on(DS.colors.urgent)          // white on the light theme's red, dark ink on the dark theme's
     Column(
         Modifier.fillMaxWidth().background(DS.colors.urgent, DS.card).padding(20.dp).semantics(mergeDescendants = true) {},
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val lines = TeleText.urgentLines(reasons)
-        Text(lines.first()[lang], color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        lines.drop(1).dropLast(1).forEach { Text("•  ${it[lang]}", color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyMedium) }
-        Text(lines.last()[lang], color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Warning, contentDescription = null, tint = fg)
+            Text(lines.first()[lang], color = fg, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        }
+        lines.drop(1).dropLast(1).forEach { Text("•  ${it[lang]}", color = fg, style = MaterialTheme.typography.bodyMedium) }
+        Text(lines.last()[lang], color = fg, style = MaterialTheme.typography.bodyLarge)
     }
 }
 

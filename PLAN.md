@@ -467,6 +467,13 @@ Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, me
 - Consultations list shared by the tab and the old route: avatar, name, case no., time, message count, status pill (icon + word), urgent pill; skeleton, error with retry, illustrated empty state.
 - `SessionViewModel.lastResult` (read-only: newest session + its Vision Profile from the existing builder). Old HomeScreen / PatientScreen removed.
 
+### UI phase 4: guided test flow (done)
+- New "Before you start" checklist after consent (`guide/GuideScreens.kt`): good light, phone charged, bank card + glasses, each with an illustration; one "I'm ready".
+- Eye tests (`QuickEstimateFlow` panel): always-white immersive canvas in light tokens, R ●○ L eye progress, one instruction line + illustration ("How to" opens a bottom sheet with the full text), live distance pill (icon + words, polite live region), a 3-2-1 countdown before the letters (taps and voice are only taken after it), the "Tap when letters blur" button at thumb height. Procedures, distances and timings unchanged.
+- Screening (Amsler, contrast, colour): one template — illustration + instruction line → test (light tokens on the white canvas, 48 dp Skip) → success tick with the test's name and "Done". The setup page has a large illustration.
+- Red flag: full-width urgent block (icon in a circle, contrast-picked text in both themes, assertive live region), warning haptic, spoken on show + "Read aloud" button, numbered "What to do now" card, nothing else on the page.
+- The survey already matched the spec from phase 1 (one question per screen, ChoiceCards, sliders, mic FAB with pulse + transcript, "Why we ask?" sheet, section intros in section colour).
+
 ## Test pass before submission (15 Nov)
 
 Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.

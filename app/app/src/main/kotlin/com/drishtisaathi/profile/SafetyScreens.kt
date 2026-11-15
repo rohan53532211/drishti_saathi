@@ -1,12 +1,15 @@
 package com.drishtisaathi.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -50,37 +53,80 @@ fun bannerSpeech(gate: SafetyGate): Txt {
 @Composable
 fun RedFlagBannerScreen(lang: Lang, gate: SafetyGate, speak: (Txt) -> Unit, onContinue: () -> Unit) {
     val c = DS.colors
-    LaunchedEffect(gate.redFlags, lang) { speak(bannerSpeech(gate)) }
+    val haptics = com.drishtisaathi.ui.designsystem.rememberHaptics()
+    LaunchedEffect(gate.redFlags, lang) { haptics.warning(); speak(bannerSpeech(gate)) }
     Column(
-        Modifier.fillMaxSize().background(c.urgent).systemBarsPadding().verticalScroll(rememberScrollState()).padding(DS.screen),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        Modifier.fillMaxSize().background(c.background).systemBarsPadding().verticalScroll(rememberScrollState()).padding(DS.screen),
+        verticalArrangement = Arrangement.spacedBy(DS.s4),
     ) {
-        Spacer(Modifier.height(24.dp))
-        Text("!", color = Color.White, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
-        Text(SProfile.seeDoctorToday[lang], color = Color.White, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Assertive })
-        Text(SProfile.seeDoctorWhy[lang], color = Color.White, style = MaterialTheme.typography.titleMedium)
-        SProfile.redFlagLines(gate).forEach { Text("•  " + it[lang], color = Color.White, style = MaterialTheme.typography.titleLarge) }
-        Spacer(Modifier.height(8.dp))
-        Text(SProfile.bannerNote[lang], color = Color.White, style = MaterialTheme.typography.bodyLarge)
-        if (gate.emergency) Text(SProfile.shortPathNote[lang], color = Color.White, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(16.dp))
-        PrimaryButton(SProfile.bannerContinue[lang], colour = Color.White, onClick = onContinue)
+        UrgentBlock(lang, gate, headline = true)
+        com.drishtisaathi.ui.designsystem.SecondaryButton(com.drishtisaathi.i18n.SGuide.readAloud[lang], { speak(bannerSpeech(gate)) },
+            icon = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.VolumeUp)
+        WhatToDo(lang, gate)
+        Spacer(Modifier.height(DS.s2))
+        com.drishtisaathi.ui.designsystem.PrimaryButton(SProfile.bannerContinue[lang], onContinue)
+    }
+}
+
+/**
+ * The urgent block: full width, solid urgent colour, a warning icon in a circle, "Please see an eye doctor today" and
+ * the reasons. Text colour is picked for contrast on the urgent colour (white in light, dark ink in dark).
+ */
+@Composable
+fun UrgentBlock(lang: Lang, gate: SafetyGate, modifier: Modifier = Modifier, headline: Boolean = false) {
+    val c = DS.colors
+    val fg = DS.on(c.urgent)
+    Column(
+        modifier.fillMaxWidth().background(c.urgent, DS.card).padding(20.dp)
+            .semantics(mergeDescendants = true) { liveRegion = if (headline) LiveRegionMode.Assertive else LiveRegionMode.Polite },
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            androidx.compose.foundation.layout.Box(Modifier.padding(top = 2.dp).background(fg, androidx.compose.foundation.shape.CircleShape).padding(10.dp)) {
+                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Warning, contentDescription = null, tint = c.urgent,
+                    modifier = Modifier.size(28.dp))
+            }
+            Text(SProfile.seeDoctorToday[lang], color = fg, fontWeight = FontWeight.SemiBold,
+                style = if (headline) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f).semantics { heading() })
+        }
+        if (gate.emergency) Text(SProfile.shortPathHeader[lang], color = fg, style = MaterialTheme.typography.labelLarge)
+        val reasons = SProfile.redFlagLines(gate)
+        if (reasons.isNotEmpty()) Text(SProfile.seeDoctorWhy[lang], color = fg, style = MaterialTheme.typography.bodyMedium)
+        reasons.forEach { r ->
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.foundation.layout.Box(Modifier.padding(top = 10.dp).size(7.dp).background(fg, androidx.compose.foundation.shape.CircleShape))
+                Text(r[lang], color = fg, style = if (headline) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
+}
+
+/** "What to do now": numbered, plain steps (the same wording the banner always used). */
+@Composable
+private fun WhatToDo(lang: Lang, gate: SafetyGate) {
+    val c = DS.colors
+    val steps = listOfNotNull(SProfile.noLensToday, SProfile.bannerNote, SProfile.shortPathNote.takeIf { gate.emergency })
+    com.drishtisaathi.ui.designsystem.DsCard {
+        Text(com.drishtisaathi.i18n.SGuide.whatToDo[lang], style = MaterialTheme.typography.titleLarge, color = c.ink, modifier = Modifier.semantics { heading() })
+        steps.forEachIndexed { i, s ->
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier.background(c.urgentSoft, androidx.compose.foundation.shape.CircleShape).padding(horizontal = 11.dp, vertical = 4.dp),
+                ) { Text("${i + 1}", style = MaterialTheme.typography.labelLarge, color = c.urgentInk, fontWeight = FontWeight.Bold) }
+                Text(s[lang], Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = c.ink)
+            }
+        }
     }
 }
 
 /** The urgent banner at the very top of the results. */
 @Composable
 fun UrgentBanner(lang: Lang, gate: SafetyGate, modifier: Modifier = Modifier) {
-    val c = DS.colors
-    Column(
-        modifier.fillMaxWidth().background(c.urgent, DS.card).padding(20.dp).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(SProfile.seeDoctorToday[lang], color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-        if (gate.emergency) Text(SProfile.shortPathHeader[lang], color = Color.White, style = MaterialTheme.typography.labelLarge)
-        SProfile.redFlagLines(gate).forEach { Text("•  " + it[lang], color = Color.White, style = MaterialTheme.typography.bodyLarge) }
-        Text(SProfile.noLensToday[lang], color = Color.White, style = MaterialTheme.typography.bodyMedium)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        UrgentBlock(lang, gate)
+        Text(SProfile.noLensToday[lang], color = DS.colors.urgentInk, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 
