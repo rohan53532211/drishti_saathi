@@ -481,6 +481,14 @@ Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, me
 - Advice: optician-slip card — R/L table SPH / CYL / AXIS, ADD, PD, lens advice, referral, follow-up, notes, optometrist name + qualification + reg. no., trial-lens caveat, Download PDF.
 - `ChooseOptometristContent` / `ConsultationContent` are stateless so the screenshot tests draw them without a server.
 
+### UI phase 6: optometrist web portal (done)
+- `backend/app/static/portal.html` restyled in the app's language: Plus Jakarta Sans + Noto Devanagari (the app's merged fonts, OFL, served from `/portal/assets/`), the app palette light + dark, 20 px cards, 16 px buttons, Material Symbols Rounded icons (a 7 KB subset of the Apache-2.0 font, self-hosted in `static/portal/`, no third-party request).
+- Layout: left sidebar (Queue, My active, Completed, Profile with live counts, red when an urgent case waits) and a top bar with the availability switch, new-case sound, theme, avatar and log out; bottom navigation below 860 px.
+- Queue: one table of waiting requests, urgent pinned on top ("Urgent · see first"), then by waiting time; columns patient, priority pill (icon + word), age, language, waiting, red flags; becomes cards on narrow screens. Skeleton while loading, illustrated empty states.
+- Case page: two columns — report (urgent banner first, rings, measurements with the range big and the method below, screening lines with status icons and the Amsler grids, lens suggestions, folded answers) and a sticky actions panel (Accept, Chat with day separators and bubbles, Video, WhatsApp, Write advice, Close).
+- Advice form: SPH / CYL / AXIS steppers per eye (±0.25 D, ±5°), ADD and PD steppers, lens picker chips from the catalogue, then a preview of exactly what the patient sees before "Send to patient".
+- Login, register and pending pages as one centred card with the eye mark. Same API calls and security rules (text nodes only, no inline handlers, `noopener` on every new tab). Screenshots `docs/screens/p6_portal_*` (desktop light/dark, phone width).
+
 ## Test pass before submission (15 Nov)
 
 Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.

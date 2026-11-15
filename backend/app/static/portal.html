@@ -5,125 +5,235 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Drishti Saathi · Optometrist portal</title>
 <style>
-@font-face { font-family: "Inter Deva"; src: url("/portal/assets/inter_deva_regular.ttf"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Inter Deva"; src: url("/portal/assets/inter_deva_semibold.ttf"); font-weight: 600; font-display: swap; }
-@font-face { font-family: "Inter Deva"; src: url("/portal/assets/inter_deva_bold.ttf"); font-weight: 700; font-display: swap; }
+/* Same design language as the app (docs/DESIGN.md): Plus Jakarta Sans + Noto Sans Devanagari, the app palette,
+   20 px cards, 16 px buttons, Material Symbols Rounded icons (Apache-2.0, a subset served from /portal/assets). */
+@font-face { font-family: "Jakarta Deva"; src: url("/portal/assets/jakarta_deva_regular.ttf"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Jakarta Deva"; src: url("/portal/assets/jakarta_deva_semibold.ttf"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Jakarta Deva"; src: url("/portal/assets/jakarta_deva_bold.ttf"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Material Symbols Rounded"; src: url("/portal/assets/material_symbols_rounded.woff2") format("woff2"); font-weight: 400; font-display: block; }
 :root {
-  --bg:#F7F9FC; --surface:#FFFFFF; --hairline:#E3E8EF; --ink:#0B1B2B; --ink2:#5A6B7D;
-  --primary:#1A5CFF; --primary-pressed:#0B3FCC; --on-primary:#FFFFFF; --primary-soft:#E8EFFF;
-  --success:#1E9E6A; --success-ink:#136B47; --success-soft:#E5F6EE;
-  --warning:#E8A317; --warning-ink:#8A5A00; --warning-soft:#FFF4DC;
-  --urgent:#D93838; --urgent-ink:#B32424; --urgent-soft:#FDEAEA;
-  --work:#2F80ED; --digital:#A3D33A; --mobility:#6B7785; --leisure:#F2A93B;
-  --shadow:0 12px 32px rgba(11,27,43,.08);
+  --bg:#F6F8FB; --surface:#FFFFFF; --surface-alt:#F0F3F8; --hairline:#E4E9F0; --ink:#0E1A2B; --ink2:#5B6B7F;
+  --primary:#1F5EFF; --primary-pressed:#1546D1; --on-primary:#FFFFFF; --primary-soft:#E8EEFF; --primary-ink:#1D4ED8;
+  --success:#16A34A; --success-ink:#166534; --success-soft:#E7F6EC; --on-success:#FFFFFF;
+  --warning:#D97706; --warning-ink:#92400E; --warning-soft:#FEF3E2;
+  --urgent:#DC2626; --urgent-ink:#B91C1C; --urgent-soft:#FDECEC; --on-urgent:#FFFFFF;
+  --work:#2F80ED; --digital:#84CC16; --mobility:#64748B; --leisure:#F59E0B;
+  --shadow:0 8px 24px rgba(14,26,43,.10);
+  --r-card:20px; --r-btn:16px; --r-field:12px;
 }
 :root[data-theme="dark"] {
-  --bg:#0A121C; --surface:#131E2B; --hairline:#243243; --ink:#EEF3F9; --ink2:#9FB0C2;
-  --primary:#6C96FF; --primary-pressed:#4C7BF2; --on-primary:#05122B; --primary-soft:#16284A;
-  --success:#45C48E; --success-ink:#6FDBA9; --success-soft:#11301F;
-  --warning:#F2B93B; --warning-ink:#F2B93B; --warning-soft:#33290F;
-  --urgent:#FF6B6B; --urgent-ink:#FF8A8A; --urgent-soft:#3A1717;
-  --work:#5B9BF3; --digital:#B5E04F; --mobility:#94A0AE; --leisure:#F5B95A;
-  --shadow:0 12px 32px rgba(0,0,0,.35);
+  --bg:#0B121C; --surface:#131D2A; --surface-alt:#1A2636; --hairline:#243243; --ink:#EEF3F9; --ink2:#9FB0C2;
+  --primary:#7FA2FF; --primary-pressed:#5C86F5; --on-primary:#05122B; --primary-soft:#16284A; --primary-ink:#9DB8FF;
+  --success:#4ADE80; --success-ink:#6EE7A0; --success-soft:#0F2E1C; --on-success:#05122B;
+  --warning:#FBBF24; --warning-ink:#FCD34D; --warning-soft:#33270C;
+  --urgent:#F87171; --urgent-ink:#FCA5A5; --urgent-soft:#3A1616; --on-urgent:#05122B;
+  --work:#5B9BF3; --digital:#A3E635; --mobility:#94A3B8; --leisure:#FBBF24;
+  --shadow:0 8px 24px rgba(0,0,0,.35);
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 "Inter Deva", Inter, system-ui, -apple-system, "Segoe UI", "Noto Sans Devanagari", sans-serif; }
-h1,h2,h3 { margin:0; font-weight:600; letter-spacing:-.01em; text-wrap:balance; }
-h1 { font-size:28px; } h2 { font-size:20px; } h3 { font-size:16px; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 "Jakarta Deva", system-ui, -apple-system, "Segoe UI", "Noto Sans Devanagari", sans-serif; }
+h1,h2,h3 { margin:0; font-weight:700; letter-spacing:-.01em; text-wrap:balance; }
+h1 { font-size:24px; line-height:32px; } h2 { font-size:20px; line-height:28px; } h3 { font-size:17px; line-height:24px; font-weight:600; }
 p { margin:0; }
-a { color:var(--primary); }
+a { color:var(--primary-ink); }
 .muted { color:var(--ink2); }
-.small { font-size:13px; }
+.small { font-size:14px; line-height:20px; }
+.caption { font-size:13px; line-height:18px; color:var(--ink2); }
 .num { font-variant-numeric: tabular-nums; }
-.wrap { max-width:1120px; margin:0 auto; padding:16px; }
-.narrow { max-width:520px; }
-header.top { position:sticky; top:0; z-index:5; background:var(--surface); border-bottom:1px solid var(--hairline); }
-header.top .wrap { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding-top:10px; padding-bottom:10px; }
-.brand { font-weight:700; font-size:18px; color:var(--primary); margin-right:auto; cursor:pointer; }
-.brand span { color:var(--ink2); font-weight:400; font-size:14px; margin-left:6px; }
-.card { background:var(--surface); border:1px solid var(--hairline); border-radius:24px; padding:20px; }
-.card.hero { box-shadow:var(--shadow); }
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.ms { font-family:"Material Symbols Rounded"; font-weight:normal; font-style:normal; font-size:22px; line-height:1; display:inline-block; white-space:nowrap;
+  direction:ltr; -webkit-font-feature-settings:"liga"; font-feature-settings:"liga"; -webkit-font-smoothing:antialiased; flex:none;
+  font-variation-settings:"FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24; }
+.ms.fill { font-variation-settings:"FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24; }
+
+/* ---- layout: sidebar + top bar (signed in), centred card (sign-in pages) ---- */
+.layout { display:grid; grid-template-columns:240px minmax(0,1fr); min-height:100vh; }
+.side { background:var(--surface); border-right:1px solid var(--hairline); padding:20px 12px; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:4px; }
+.side .brandrow { padding:4px 12px 20px; }
+.nav { display:flex; align-items:center; gap:12px; width:100%; min-height:48px; padding:10px 12px; border-radius:14px; border:none; background:none;
+  color:var(--ink2); font:inherit; font-weight:600; cursor:pointer; text-align:left; justify-content:flex-start; }
+.nav:hover { background:var(--surface-alt); color:var(--ink); }
+.nav[aria-current="page"] { background:var(--primary-soft); color:var(--primary-ink); }
+.nav .count { margin-left:auto; background:var(--surface-alt); color:var(--ink2); border-radius:999px; padding:0 9px; font-size:13px; min-width:26px; text-align:center; }
+.nav .count.hot { background:var(--urgent); color:var(--on-urgent); }
+.side .foot { margin-top:auto; padding:12px; }
+.maincol { min-width:0; display:flex; flex-direction:column; }
+.topbar { position:sticky; top:0; z-index:5; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--hairline); display:flex; align-items:center; gap:12px; padding:12px 24px; min-height:68px; flex-wrap:wrap; }
+.topbar .title { margin-right:auto; display:flex; align-items:center; gap:10px; min-width:0; }
+.content { padding:24px; max-width:1240px; width:100%; display:flex; flex-direction:column; gap:16px; }
+.center { min-height:100vh; display:grid; place-items:center; padding:24px 16px; }
+.center .card { width:100%; max-width:480px; }
+.center .card.wide { max-width:760px; }
+.brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:18px; color:var(--ink); }
+.brand small { display:block; font-weight:500; font-size:12px; color:var(--ink2); line-height:1.2; }
+.mark { width:36px; height:36px; border-radius:11px; background:var(--primary); display:grid; place-items:center; flex:none; }
+.mark svg { width:24px; height:24px; }
+.mark.lg { width:56px; height:56px; border-radius:16px; } .mark.lg svg { width:36px; height:36px; }
+.bottomnav { display:none; }
+
+/* ---- surfaces ---- */
+.card { background:var(--surface); border:1px solid var(--hairline); border-radius:var(--r-card); padding:20px; }
+.card.hero { box-shadow:var(--shadow); border-color:transparent; }
+.panel { background:var(--surface-alt); border-radius:14px; padding:14px; }
 .stack { display:flex; flex-direction:column; gap:12px; }
 .stack.lg { gap:16px; }
 .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 .row > .grow { flex:1 1 0; min-width:0; }
 .grid2 { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
-.cols { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; align-items:start; }
-@media (max-width: 860px) { .cols { grid-template-columns:1fr; } }
-@media (max-width: 520px) { .grid2 { grid-template-columns:1fr; } h1 { font-size:24px; } .card { padding:16px; border-radius:20px; } }
-button, .btn { font:inherit; font-weight:600; border:1px solid transparent; border-radius:16px; min-height:48px; padding:10px 18px; cursor:pointer;
-  background:var(--primary); color:var(--on-primary); text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.cols { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(340px,1fr); gap:16px; align-items:start; }
+.cols > .actions { position:sticky; top:84px; }
+.sectionhead { display:flex; align-items:center; gap:10px; }
+.sectionhead h3 { flex:1; }
+
+/* ---- controls ---- */
+button, .btn { font:inherit; font-weight:600; border:1px solid transparent; border-radius:var(--r-btn); min-height:48px; padding:10px 18px; cursor:pointer;
+  background:var(--primary); color:var(--on-primary); text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  transition:transform .12s, background .12s; }
 button:hover, .btn:hover { background:var(--primary-pressed); }
+button:active, .btn:active { transform:scale(.98); }
 button:disabled { opacity:.5; cursor:not-allowed; }
+button.block, .btn.block { width:100%; min-height:56px; }
 button.ghost, .btn.ghost { background:var(--surface); color:var(--ink); border-color:var(--hairline); }
-button.ghost:hover, .btn.ghost:hover { background:var(--primary-soft); }
-button.soft { background:var(--primary-soft); color:var(--primary); }
-button.danger { background:var(--urgent); color:#fff; }
-button.ok, .btn.ok { background:var(--success); color:#fff; }
-button.ok:hover, .btn.ok:hover { background:var(--success-ink); }
-button.link { background:none; color:var(--primary); border:none; min-height:0; padding:4px; }
-button.sm, .btn.sm { min-height:40px; padding:6px 14px; border-radius:12px; font-size:14px; }
+button.ghost:hover, .btn.ghost:hover { background:var(--surface-alt); }
+button.soft, .btn.soft { background:var(--primary-soft); color:var(--primary-ink); }
+button.ok, .btn.ok { background:var(--success); color:var(--on-success); }
+button.ok:hover, .btn.ok:hover { filter:brightness(.92); background:var(--success); }
+button.link { background:none; color:var(--primary-ink); border:none; min-height:44px; padding:4px 8px; }
+button.link:hover { text-decoration:underline; background:none; }
+button.sm, .btn.sm { min-height:44px; padding:6px 14px; border-radius:12px; font-size:14px; }
+button.icon { width:44px; min-height:44px; padding:0; border-radius:50%; background:transparent; color:var(--ink2); border-color:transparent; }
+button.icon:hover { background:var(--surface-alt); color:var(--ink); }
 :focus-visible { outline:3px solid var(--primary); outline-offset:2px; }
-label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--ink2); font-weight:600; }
+label { display:flex; flex-direction:column; gap:6px; font-size:14px; color:var(--ink2); font-weight:600; }
 label.check { flex-direction:row; align-items:center; gap:10px; font-size:15px; color:var(--ink); font-weight:400; }
-input, select, textarea { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:11px 12px; width:100%; min-height:46px; }
+input, select, textarea { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--hairline); border-radius:var(--r-field); padding:11px 12px; width:100%; min-height:48px; }
+input:focus, textarea:focus, select:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px var(--primary-soft); }
 input[type=checkbox] { width:20px; height:20px; min-height:0; accent-color:var(--primary); flex:none; }
 textarea { min-height:84px; resize:vertical; }
-.pill { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 12px; font-size:13px; font-weight:600; white-space:nowrap; }
+.pill { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 12px 4px 10px; font-size:13px; font-weight:600; white-space:nowrap; line-height:20px; }
+.pill .ms { font-size:16px; }
 .pill.urgent { background:var(--urgent-soft); color:var(--urgent-ink); }
 .pill.child { background:var(--warning-soft); color:var(--warning-ink); }
-.pill.routine { background:var(--primary-soft); color:var(--primary); }
+.pill.routine { background:var(--primary-soft); color:var(--primary-ink); }
 .pill.ok { background:var(--success-soft); color:var(--success-ink); }
-.pill.grey { background:var(--bg); color:var(--ink2); border:1px solid var(--hairline); }
-.tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
-.tab { background:var(--surface); color:var(--ink2); border:1px solid var(--hairline); border-radius:999px; min-height:44px; white-space:nowrap; }
-.tab:hover { background:var(--primary-soft); }
-.tab[aria-selected=true] { background:var(--primary); color:var(--on-primary); border-color:var(--primary); }
-.tab.urgent[aria-selected=true] { background:var(--urgent); border-color:var(--urgent); color:#fff; }
-.tab .count { background:rgba(127,127,127,.18); border-radius:999px; padding:0 8px; font-size:13px; }
-.tab .dot { width:8px; height:8px; border-radius:50%; background:var(--urgent); }
-.case { cursor:pointer; text-align:left; width:100%; background:var(--surface); color:var(--ink); border:1px solid var(--hairline); border-radius:20px; padding:16px; display:block; font-weight:400; min-height:0; }
-.case:hover { background:var(--surface); border-color:var(--primary); }
-.case.urgent { border-left:6px solid var(--urgent); }
-.case.new { box-shadow:0 0 0 2px var(--primary-soft); }
-.banner { background:var(--urgent); color:#fff; border-radius:20px; padding:16px 20px; }
-.banner ul { margin:6px 0 0; padding-left:20px; }
-.note { background:var(--warning-soft); color:var(--warning-ink); border-radius:16px; padding:12px 16px; font-size:14px; }
-.error { background:var(--urgent-soft); color:var(--urgent-ink); border-radius:12px; padding:10px 14px; font-size:14px; }
-.kv { display:grid; grid-template-columns:minmax(120px, 38%) 1fr; gap:4px 12px; font-size:14px; }
-.kv dt { color:var(--ink2); } .kv dd { margin:0; overflow-wrap:anywhere; }
-.line { display:flex; gap:10px; align-items:flex-start; padding:4px 0; }
-.dot { width:10px; height:10px; border-radius:50%; margin-top:7px; flex:none; background:var(--hairline); }
-.dot.OK { background:var(--success); } .dot.WATCH { background:var(--warning); } .dot.URGENT { background:var(--urgent); }
-.rings { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; text-align:center; }
-@media (max-width: 520px) { .rings { grid-template-columns:repeat(2, minmax(0,1fr)); } }
-.ring svg { width:76px; height:76px; }
-.eye { background:var(--bg); border-radius:16px; padding:14px; }
-.eye b { font-size:15px; }
-.chat { display:flex; flex-direction:column; gap:8px; max-height:420px; overflow-y:auto; padding:4px; }
-.msg { max-width:82%; padding:10px 14px; border-radius:16px; background:var(--bg); align-self:flex-start; overflow-wrap:anywhere; white-space:pre-wrap; }
-.msg.me { background:var(--primary); color:var(--on-primary); align-self:flex-end; }
-.msg.me a { color:var(--on-primary); }
-.msg.sys { align-self:center; background:none; color:var(--ink2); font-size:13px; padding:2px 8px; text-align:center; }
-.msg img { max-width:100%; border-radius:10px; display:block; }
-.msg time { display:block; font-size:11px; opacity:.7; margin-top:2px; }
-.chips { display:flex; flex-wrap:wrap; gap:8px; }
-.chip { border:1px solid var(--hairline); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 12px; font-size:13px; min-height:36px; font-weight:400; }
-.chip[aria-pressed=true] { background:var(--primary-soft); border-color:var(--primary); color:var(--primary); font-weight:600; }
-.chip:hover { background:var(--primary-soft); }
-table.rx { width:100%; border-collapse:collapse; }
-table.rx th { font-size:13px; color:var(--ink2); text-align:left; padding:4px; font-weight:600; }
-table.rx td { padding:4px; }
-details summary { cursor:pointer; color:var(--primary); font-weight:600; padding:6px 0; }
-.avatar { width:48px; height:48px; border-radius:50%; background:var(--primary-soft); color:var(--primary); display:grid; place-items:center; font-weight:700; flex:none; object-fit:cover; }
-.switch { display:inline-flex; flex-direction:row; align-items:center; gap:10px; font-weight:600; font-size:14px; color:var(--ink); }
-.switch input { appearance:none; width:46px; height:28px; min-height:0; border-radius:999px; background:var(--hairline); position:relative; cursor:pointer; border:none; padding:0; }
-.switch input::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:transform .15s; }
+.pill.grey { background:var(--surface-alt); color:var(--ink2); }
+.switch { display:inline-flex; flex-direction:row; align-items:center; gap:10px; font-weight:600; font-size:14px; color:var(--ink); min-height:44px; cursor:pointer; }
+.switch input { appearance:none; width:48px; height:28px; min-height:0; border-radius:999px; background:var(--hairline); position:relative; cursor:pointer; border:none; padding:0; }
+.switch input::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 2px rgba(0,0,0,.2); }
 .switch input:checked { background:var(--success); }
-.switch input:checked::after { transform:translateX(18px); }
-.toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:999px; font-size:14px; z-index:20; max-width:90vw; }
-@media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+.switch input:checked::after { transform:translateX(20px); }
+.avatar { width:44px; height:44px; border-radius:50%; background:var(--primary-soft); color:var(--primary-ink); display:grid; place-items:center; font-weight:700; flex:none; }
+.avatar.lg { width:56px; height:56px; font-size:20px; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; }
+.chip { border:1px solid var(--hairline); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 14px; font-size:14px; min-height:40px; font-weight:500; }
+.chip[aria-pressed=true] { background:var(--primary-soft); border-color:var(--primary); color:var(--primary-ink); font-weight:600; }
+.chip[aria-pressed=true]::before { content:"check"; font-family:"Material Symbols Rounded"; font-size:18px; -webkit-font-feature-settings:"liga"; font-feature-settings:"liga"; }
+.chip:hover { background:var(--surface-alt); }
+.banner { background:var(--urgent); color:var(--on-urgent); border-radius:var(--r-card); padding:18px 20px; display:flex; gap:14px; }
+.banner ul { margin:6px 0 0; padding-left:20px; }
+.banner .ms { font-size:28px; }
+.note { background:var(--warning-soft); color:var(--ink); border-radius:16px; padding:12px 16px; font-size:14px; display:flex; gap:10px; align-items:flex-start; }
+.note .ms { color:var(--warning-ink); }
+.error { background:var(--urgent-soft); color:var(--ink); border-radius:12px; padding:12px 14px; font-size:14px; display:flex; gap:10px; align-items:flex-start; }
+.error .ms { color:var(--urgent-ink); }
+.empty { text-align:center; padding:40px 20px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.empty .ms { font-size:48px; color:var(--primary); background:var(--primary-soft); border-radius:50%; padding:20px; margin-bottom:8px; }
+.toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:12px 20px; border-radius:999px; font-size:14px; z-index:20; max-width:90vw; box-shadow:var(--shadow); }
+.skel { background:var(--surface-alt); border-radius:var(--r-card); height:76px; animation:pulse 1.2s ease-in-out infinite alternate; }
+@keyframes pulse { from { opacity:.5; } to { opacity:1; } }
+
+/* ---- queue ---- */
+.qhead, .qrow { display:grid; grid-template-columns:minmax(180px,2fr) 150px 70px 90px 120px minmax(160px,2fr); gap:12px; align-items:center; }
+.qhead { padding:0 20px; font-size:13px; font-weight:600; color:var(--ink2); }
+.qrow { cursor:pointer; text-align:left; width:100%; background:var(--surface); color:var(--ink); border:1px solid var(--hairline); border-radius:var(--r-card);
+  padding:14px 20px; font-weight:400; min-height:72px; }
+.qrow:hover { background:var(--surface); border-color:var(--primary); }
+.qrow.urgent { border-left:6px solid var(--urgent); padding-left:15px; }
+.qrow.new { box-shadow:0 0 0 3px var(--primary-soft); }
+.qrow .who { display:flex; align-items:center; gap:12px; min-width:0; }
+.qrow .who b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.qrow .reasons { color:var(--urgent-ink); font-weight:600; font-size:14px; }
+.qrow .lbl { display:none; }
+.group { font-size:13px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink2); margin-top:8px; }
+.group.urgent { color:var(--urgent-ink); }
+
+/* ---- case ---- */
+.rings { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; text-align:center; }
+.ring svg { width:80px; height:80px; }
+.eyes { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+.eye { background:var(--surface-alt); border-radius:16px; padding:14px 16px; }
+.eye .big { font-size:24px; line-height:32px; font-weight:700; font-variant-numeric:tabular-nums; }
+.line { display:flex; gap:10px; align-items:flex-start; padding:4px 0; }
+.line .ms { font-size:20px; margin-top:1px; }
+.line.OK .ms { color:var(--success); } .line.WATCH .ms { color:var(--warning); } .line.URGENT .ms { color:var(--urgent); }
+.kv { display:grid; grid-template-columns:minmax(120px, 38%) 1fr; gap:6px 12px; font-size:14px; margin:8px 0 0; }
+.kv dt { color:var(--ink2); } .kv dd { margin:0; overflow-wrap:anywhere; }
+details summary { cursor:pointer; color:var(--primary-ink); font-weight:600; padding:8px 0; min-height:44px; display:flex; align-items:center; gap:6px; list-style:none; }
+details summary::-webkit-details-marker { display:none; }
+details summary::before { content:"expand_more"; font-family:"Material Symbols Rounded"; font-size:22px; -webkit-font-feature-settings:"liga"; font-feature-settings:"liga"; transition:transform .15s; }
+details[open] summary::before { transform:rotate(180deg); }
+.lensitem { display:flex; gap:12px; padding:10px 0; border-top:1px solid var(--hairline); }
+.lensitem:first-of-type { border-top:none; }
+.chat { display:flex; flex-direction:column; gap:8px; height:360px; overflow-y:auto; padding:8px; background:var(--surface-alt); border-radius:16px; }
+.msg { max-width:82%; padding:10px 14px; border-radius:20px 20px 20px 6px; background:var(--surface); border:1px solid var(--hairline); align-self:flex-start; overflow-wrap:anywhere; white-space:pre-wrap; }
+.msg.me { background:var(--primary); color:var(--on-primary); border-color:transparent; border-radius:20px 20px 6px 20px; align-self:flex-end; }
+.msg.me a { color:var(--on-primary); }
+.msg.sys { align-self:center; background:none; border:none; color:var(--ink2); font-size:13px; padding:2px 8px; text-align:center; }
+.msg img { max-width:100%; border-radius:12px; display:block; margin-top:4px; }
+.msg time { display:block; font-size:12px; opacity:.75; margin-top:2px; text-align:right; }
+.day { align-self:center; background:var(--surface); color:var(--ink2); font-size:12px; font-weight:600; border-radius:999px; padding:2px 12px; }
+.composer { display:flex; gap:8px; align-items:center; }
+.composer input { border-radius:999px; padding-left:18px; }
+.composer button.send { width:48px; padding:0; border-radius:50%; flex:none; }
+
+/* advice form: steppers per eye, preview */
+table.rx { width:100%; border-collapse:separate; border-spacing:0 8px; }
+table.rx th { font-size:13px; color:var(--ink2); text-align:left; padding:0 4px; font-weight:600; }
+table.rx td { padding:0 4px; }
+.stepper { display:flex; align-items:center; border:1px solid var(--hairline); border-radius:var(--r-field); background:var(--surface); overflow:hidden; }
+.stepper:focus-within { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-soft); }
+.stepper input { border:none; border-radius:0; text-align:center; padding:8px 2px; min-width:0; box-shadow:none !important; font-variant-numeric:tabular-nums; font-weight:600; -moz-appearance:textfield; }
+.stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.stepper button { background:none; color:var(--ink2); min-height:48px; width:36px; padding:0; border-radius:0; flex:none; }
+.stepper button:hover { background:var(--surface-alt); color:var(--ink); }
+.stepper button .ms { font-size:20px; }
+.slip { border:1px solid var(--hairline); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+.slip table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+.slip th { font-size:13px; color:var(--ink2); font-weight:600; text-align:right; padding:4px 6px; }
+.slip th:first-child, .slip td:first-child { text-align:left; }
+.slip td { text-align:right; font-weight:700; font-size:17px; padding:6px; border-top:1px solid var(--hairline); }
+.slip td:first-child { font-weight:500; color:var(--ink2); font-size:15px; }
+
+/* ---- responsive: down to phone width ---- */
+@media (max-width: 1080px) {
+  .qhead { display:none; }
+  .qrow { grid-template-columns:1fr auto; grid-template-areas:"who prio" "meta meta" "reasons reasons"; row-gap:6px; }
+  .qrow .who { grid-area:who; } .qrow .prio { grid-area:prio; } .qrow .reasons { grid-area:reasons; }
+  .qrow .meta { display:inline; } .qrow .metas { grid-area:meta; display:flex; gap:12px; flex-wrap:wrap; color:var(--ink2); font-size:14px; }
+  .qrow .lbl { display:inline; }
+  .cols { grid-template-columns:1fr; } .cols > .actions { position:static; }
+}
+@media (min-width: 1081px) { .qrow .metas { display:contents; } }
+@media (max-width: 860px) {
+  .layout { grid-template-columns:1fr; }
+  .side { display:none; }
+  .bottomnav { display:flex; position:fixed; left:0; right:0; bottom:0; z-index:6; background:var(--surface); border-top:1px solid var(--hairline); padding:6px 6px calc(6px + env(safe-area-inset-bottom)); }
+  .bottomnav .nav { flex-direction:column; gap:2px; font-size:12px; padding:6px 4px; min-height:56px; justify-content:center; text-align:center; }
+  .bottomnav .nav .count { position:absolute; margin:0 0 0 26px; transform:translateY(-14px); font-size:11px; padding:0 6px; min-width:0; }
+  .bottomnav .nav { position:relative; }
+  .content { padding:16px 16px 96px; }
+  .topbar { padding:10px 16px; }
+  .topbar .hide-sm { display:none; }
+  .topbar { flex-wrap:nowrap; gap:4px; } .topbar .title h1 { font-size:20px; line-height:28px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+}
+@media (max-width: 520px) {
+  .grid2, .eyes { grid-template-columns:1fr; } .rings { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .card { padding:16px; }
+  h1 { font-size:22px; line-height:30px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
 </style>
 </head>
 <body>
@@ -151,13 +261,20 @@ function s(tag, attrs, ...kids) {
   for (const kid of kids.flat()) if (kid != null) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
   return e;
 }
+/** A Material Symbols Rounded icon (decorative: the text next to it says the same). */
+function ic(name, fill) { return h("span", { class: "ms" + (fill ? " fill" : ""), "aria-hidden": "true" }, name); }
+/** The app's eye mark on brand blue. */
+function mark(lg) {
+  return h("span", { class: "mark" + (lg ? " lg" : ""), "aria-hidden": "true" }, s("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "#fff", "stroke-width": 1.8, "stroke-linecap": "round", "stroke-linejoin": "round" },
+    s("path", { d: "M2.5 12c2.4-4.2 5.6-6.3 9.5-6.3s7.1 2.1 9.5 6.3c-2.4 4.2-5.6 6.3-9.5 6.3S4.9 16.2 2.5 12z" }), s("circle", { cx: 12, cy: 12, r: 3.2 }), s("circle", { cx: 13.2, cy: 10.8, r: .6, fill: "#fff" })));
+}
 const $app = document.getElementById("app");
 const ADMIN_PAGE = location.pathname.replace(/\/$/, "").endsWith("/admin");
 const KEY = ADMIN_PAGE ? "ds_admin_token" : "ds_portal_token";
 
 // ---------- state ----------
-const st = { token: localStorage.getItem(KEY), me: null, view: "queue", tab: "URGENT", cases: [], seen: null, caseId: null, c: null,
-             msgs: [], lastMsg: 0, lens: null, timers: [], authMode: "login", error: null, rxOpen: false, soundOn: false };
+const st = { token: localStorage.getItem(KEY), me: null, view: "queue", cases: [], loaded: false, seen: null, caseId: null, c: null,
+             msgs: [], lastMsg: 0, lens: null, timers: [], authMode: "login", error: null, rxOpen: false, rxPreview: null, soundOn: false };
 const theme = localStorage.getItem("ds_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 document.documentElement.dataset.theme = theme;
 
@@ -182,7 +299,12 @@ function logout() { localStorage.removeItem(KEY); st.token = null; st.me = null;
 function stopTimers() { st.timers.forEach(clearInterval); st.timers = []; }
 function toast(text) { const t = h("div", { class: "toast", role: "status" }, text); document.body.append(t); setTimeout(() => t.remove(), 3500); }
 function fmtTime(ms) { return new Date(ms).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); }
-function ago(ms) { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; }
+function clock(ms) { return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+function dayKey(ms) { const d = new Date(ms); return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate(); }
+function dayLabel(ms) { const k = dayKey(ms); return k === dayKey(Date.now()) ? "Today" : k === dayKey(Date.now() - 864e5) ? "Yesterday" : new Date(ms).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" }); }
+function ago(ms) { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min" : m < 1440 ? Math.round(m / 60) + " h" : Math.round(m / 1440) + " d"; }
+function initials(name) { const w = String(name || "").replace(/^(dr\.?|demo)\s+/i, "").split(/\s+/).filter(Boolean); return w.length ? (w[0][0] + (w.length > 1 ? w[w.length - 1][0] : "")).toUpperCase() : "?"; }
+function langName(l) { return l === "HI" ? "Hindi" : l === "EN" ? "English" : l || "–"; }
 function beep() {
   if (!st.soundOn) return;
   try {
@@ -192,32 +314,62 @@ function beep() {
       o.start(ctx.currentTime + i * .18); o.stop(ctx.currentTime + i * .18 + .17); });
   } catch (e) { /* no sound on this browser */ }
 }
+function errBox(text) { return h("div", { class: "error", role: "alert" }, ic("error"), h("span", {}, text)); }
 
 // ---------- shell ----------
-function shell(...content) {
-  const me = st.me;
-  const themeBtn = h("button", { class: "ghost sm", "aria-label": "Switch light and dark theme", onclick: () => {
-    const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; localStorage.setItem("ds_theme", t); } }, "Light / dark");
-  const bar = h("header", { class: "top" }, h("div", { class: "wrap" },
-    h("div", { class: "brand", onclick: () => { if (me) go("queue"); } }, "Drishti Saathi", h("span", {}, ADMIN_PAGE ? "Admin" : "Optometrist portal")),
-    me && me.role === "optometrist" && me.status === "APPROVED" ? [
-      h("label", { class: "switch" }, h("input", { type: "checkbox", checked: me.available, "aria-label": "Available for new cases", onchange: async ev => {
-        try { st.me = await api("/me", { method: "PATCH", body: { available: ev.target.checked } }); toast(st.me.available ? "You are available: patients can choose you." : "You are not available for new requests."); }
-        catch (e) { toast(e.message); } render(); } }), me.available ? "Available" : "Not available"),
-      h("button", { class: "ghost sm", onclick: () => { st.soundOn = !st.soundOn; if (st.soundOn) beep(); render(); } }, st.soundOn ? "Sound: on" : "Sound: off"),
-      h("button", { class: "ghost sm", onclick: () => go("profile") }, "Profile"),
-    ] : null,
-    themeBtn,
-    me ? h("button", { class: "ghost sm", onclick: logout }, "Log out") : null));
-  $app.replaceChildren(bar, h("main", { class: "wrap stack lg" }, content));
+const NAV = [["queue", "Queue", "inbox"], ["active", "My active", "stethoscope"], ["done", "Completed", "task_alt"], ["profile", "Profile", "person"]];
+function themeButton() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  return h("button", { class: "icon", "aria-label": dark ? "Switch to light theme" : "Switch to dark theme", title: dark ? "Light theme" : "Dark theme", onclick: () => {
+    const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; localStorage.setItem("ds_theme", t); render(); } },
+    ic(dark ? "light_mode" : "dark_mode"));
 }
-function go(view, extra = {}) { stopTimers(); Object.assign(st, { view, error: null, rxOpen: false }, extra); start(); }
+function navCount(view) {
+  if (!st.me || st.me.role !== "optometrist") return null;
+  const n = view === "profile" ? 0 : st.cases.filter(c => inView(c, view)).length;
+  if (!n) return null;
+  const hot = view === "queue" && st.cases.some(c => inView(c, "queue") && c.priority === "URGENT");
+  return h("span", { class: "count num" + (hot ? " hot" : ""), "aria-label": n + (hot ? " cases, urgent waiting" : " cases") }, n);
+}
+function navItems() {
+  const current = st.view === "case" ? (st.c && mine(st.c) ? (st.c.status === "COMPLETED" || st.c.status === "CLOSED" ? "done" : "active") : "queue") : st.view;
+  return NAV.map(([id, label, icon]) => h("button", { class: "nav", "aria-current": current === id ? "page" : null, onclick: () => go(id) }, ic(icon, current === id), h("span", {}, label), navCount(id)));
+}
+/** Signed in: sidebar (Queue, My active, Completed, Profile) and a top bar with the availability switch and the avatar. */
+function shell(title, ...content) {
+  const me = st.me;
+  const approved = me && me.role === "optometrist" && me.status === "APPROVED";
+  const top = h("header", { class: "topbar" },
+    h("div", { class: "title" }, approved ? null : h("span", { class: "brand" }, mark(), "Drishti Saathi"), typeof title === "string" ? h("h1", {}, title) : title),
+    approved ? [
+      h("label", { class: "switch" }, h("input", { type: "checkbox", role: "switch", checked: me.available, "aria-label": "Available for new cases", onchange: async ev => {
+        try { st.me = await api("/me", { method: "PATCH", body: { available: ev.target.checked } }); toast(st.me.available ? "You are available: patients can choose you." : "You are not available for new requests."); }
+        catch (e) { toast(e.message); } render(); } }), h("span", { class: "hide-sm" }, me.available ? "Available" : "Not available")),
+      h("button", { class: "icon", "aria-label": st.soundOn ? "Turn new-case sound off" : "Turn new-case sound on", title: st.soundOn ? "Sound on" : "Sound off",
+        "aria-pressed": String(st.soundOn), onclick: () => { st.soundOn = !st.soundOn; if (st.soundOn) beep(); render(); } }, ic(st.soundOn ? "notifications" : "notifications_off")),
+    ] : null,
+    themeButton(),
+    me ? h("div", { class: "row", style: "gap:8px" }, h("span", { class: "avatar hide-sm", title: me.name, "aria-hidden": "true" }, initials(me.name)),
+      h("button", { class: "icon", "aria-label": "Log out", title: "Log out", onclick: logout }, ic("logout"))) : null);
+  const main = h("div", { class: "maincol" }, top, h("main", { class: "content" }, content));
+  if (!approved || ADMIN_PAGE) { $app.replaceChildren(h("div", {}, main)); return; }
+  const side = h("nav", { class: "side", "aria-label": "Main" }, h("div", { class: "brandrow brand" }, mark(), h("div", {}, "Drishti Saathi", h("small", {}, "Optometrist portal"))),
+    navItems(), h("div", { class: "foot caption" }, me.name, h("br"), "Reg. no. " + me.registrationNo));
+  $app.replaceChildren(h("div", { class: "layout" }, side, main), h("nav", { class: "bottomnav", "aria-label": "Main" }, navItems()));
+}
+/** Signed out / pending: one centred card with the eye mark. */
+function centred(wide, ...content) {
+  $app.replaceChildren(h("div", { class: "center" }, h("div", { class: "card hero stack lg" + (wide ? " wide" : "") },
+    h("div", { class: "row" }, h("div", { class: "brand grow" }, mark(true), h("div", {}, "Drishti Saathi", h("small", {}, ADMIN_PAGE ? "Admin" : "Optometrist portal"))), themeButton()),
+    content)));
+}
+function go(view, extra = {}) { stopTimers(); Object.assign(st, { view, error: null, rxOpen: false, rxPreview: null }, extra); start(); }
 
 // ---------- auth ----------
 function field(label, attrs) { return h("label", {}, label, h("input", attrs)); }
 function authView() {
   const role = ADMIN_PAGE ? "admin" : "optometrist";
-  const err = st.error ? h("div", { class: "error", role: "alert" }, st.error) : null;
+  const err = st.error ? errBox(st.error) : null;
   if (st.authMode === "register" && !ADMIN_PAGE) {
     const f = h("form", { class: "stack", onsubmit: async ev => {
       ev.preventDefault(); const d = Object.fromEntries(new FormData(f));
@@ -231,10 +383,10 @@ function authView() {
       h("div", { class: "grid2" }, field("Clinic name", { name: "clinicName", required: true }), field("City", { name: "city", required: true })),
       h("div", { class: "grid2" }, field("Languages (comma separated)", { name: "languages", required: true, value: "Hindi, English" }), field("Consultation fee (₹, shown to patients only)", { name: "fee", type: "number", min: 0, max: 100000, value: 0 })),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "allowWhatsapp" }), "Patients whose case I accept may message me on WhatsApp"),
-      err, h("button", { type: "submit" }, "Create account"),
-      h("p", { class: "muted small" }, "An admin checks your registration number before you can see cases."),
+      err, h("button", { type: "submit", class: "block" }, "Create account"),
+      h("p", { class: "caption" }, "An admin checks your registration number before you can see cases."),
       h("button", { type: "button", class: "link", onclick: () => { st.authMode = "login"; st.error = null; render(); } }, "I already have an account"));
-    return shell(h("div", { class: "card hero narrow stack", style: "margin:24px auto; max-width:760px" }, h("h1", {}, "Register as an optometrist"), f));
+    return centred(true, h("h1", {}, "Register as an optometrist"), f);
   }
   const f = h("form", { class: "stack", onsubmit: async ev => {
     ev.preventDefault(); const d = Object.fromEntries(new FormData(f));
@@ -242,37 +394,43 @@ function authView() {
   } },
     field(ADMIN_PAGE ? "Admin email" : "Mobile number or email", { name: "identifier", required: true, autocomplete: "username" }),
     field("Password", { name: "password", type: "password", required: true, autocomplete: "current-password" }),
-    err, h("button", { type: "submit" }, "Log in"),
+    err, h("button", { type: "submit", class: "block" }, "Log in"),
     ADMIN_PAGE ? h("a", { href: "/portal", class: "small" }, "Optometrist portal") :
       h("button", { type: "button", class: "link", onclick: () => { st.authMode = "register"; st.error = null; render(); } }, "New here? Register as an optometrist"));
-  shell(h("div", { class: "card hero narrow stack", style: "margin:48px auto" },
-    h("h1", {}, ADMIN_PAGE ? "Admin login" : "Optometrist login"),
-    h("p", { class: "muted" }, ADMIN_PAGE ? "Approve or reject optometrist registrations." : "Review eye-screening reports from Drishti Saathi patients and consult by chat, WhatsApp or video."), f));
+  centred(false, h("div", { class: "stack", style: "gap:4px" }, h("h1", {}, ADMIN_PAGE ? "Admin login" : "Optometrist login"),
+    h("p", { class: "muted" }, ADMIN_PAGE ? "Approve or reject optometrist registrations." : "Review eye-screening reports from Drishti Saathi patients and consult by chat, WhatsApp or video.")), f);
 }
 function signedIn(r) { st.token = r.token; localStorage.setItem(KEY, r.token); st.me = r.user; st.error = null; st.view = "queue"; start(); }
 
 function pendingView() {
   const rejected = st.me.status === "REJECTED";
-  shell(h("div", { class: "card hero narrow stack", style: "margin:48px auto" },
-    h("span", { class: "pill " + (rejected ? "urgent" : "child") }, rejected ? "Not approved" : "Pending approval"),
+  centred(false,
+    h("span", { class: "pill " + (rejected ? "urgent" : "child"), style: "align-self:flex-start" }, ic(rejected ? "error" : "hourglass_top"), rejected ? "Not approved" : "Pending approval"),
     h("h1", {}, rejected ? "Your registration was not approved" : "Thank you, " + st.me.name),
     h("p", { class: "muted" }, rejected ? "Please contact the Drishti Saathi admin if you think this is a mistake."
       : "An admin is checking your registration number (" + st.me.registrationNo + "). You will see patient cases here as soon as you are approved."),
-    h("button", { class: "ghost", onclick: start }, "Check again")));
+    h("div", { class: "row" }, h("button", { class: "ghost", onclick: start }, "Check again"), h("button", { class: "link", onclick: logout }, "Log out")));
   st.timers.push(setInterval(async () => { try { const me = await api("/me"); if (me.status !== st.me.status) { st.me = me; start(); } } catch (e) {} }, 10000));
 }
 
 // ---------- queue ----------
-const TABS = [["URGENT", "Urgent"], ["CHILD_MYOPIA", "Child myopia"], ["ROUTINE", "Routine"], ["ACTIVE", "My active"], ["DONE", "Completed"]];
-function inTab(c, tab) {
-  const mine = c.optometrist && c.optometrist.id === st.me.id;
-  if (tab === "ACTIVE") return mine && (c.status === "ACCEPTED" || c.status === "IN_PROGRESS");
-  if (tab === "DONE") return mine && (c.status === "COMPLETED" || c.status === "CLOSED");
-  return c.status === "REQUESTED" && c.priority === tab;
+const PRIO = { URGENT: 0, CHILD_MYOPIA: 1, ROUTINE: 2 };
+function inView(c, view) {
+  const mineC = c.optometrist && c.optometrist.id === st.me.id;
+  if (view === "active") return mineC && (c.status === "ACCEPTED" || c.status === "IN_PROGRESS");
+  if (view === "done") return mineC && (c.status === "COMPLETED" || c.status === "CLOSED");
+  return c.status === "REQUESTED";
 }
-function prioPill(p) { return h("span", { class: "pill " + (p === "URGENT" ? "urgent" : p === "CHILD_MYOPIA" ? "child" : "routine") }, p === "CHILD_MYOPIA" ? "CHILD MYOPIA" : p); }
-function statusPill(x) { return h("span", { class: "pill " + (x === "COMPLETED" ? "ok" : "grey") }, x.replace("_", " ")); }
-async function loadQueue(first) {
+function prioPill(p) {
+  const [cls, icon, text] = p === "URGENT" ? ["urgent", "warning", "Urgent"] : p === "CHILD_MYOPIA" ? ["child", "child_care", "Child myopia"] : ["routine", "schedule", "Routine"];
+  return h("span", { class: "pill " + cls }, ic(icon), text);
+}
+function statusPill(x) {
+  const [cls, icon, text] = x === "COMPLETED" ? ["ok", "check_circle", "Completed"] : x === "REQUESTED" ? ["child", "hourglass_top", "Waiting"]
+    : x === "CLOSED" ? ["grey", "close", "Closed"] : ["routine", "forum", "In progress"];
+  return h("span", { class: "pill " + cls }, ic(icon), text);
+}
+async function loadQueue() {
   try {
     const cases = await api("/consultations");
     const open = cases.filter(c => c.status === "REQUESTED").map(c => c.id);
@@ -280,27 +438,47 @@ async function loadQueue(first) {
     st.seen = new Set([...(st.seen || []), ...open]);
     st.cases = cases; st.error = null;
   } catch (e) { st.error = e.message; }
-  if (st.view === "queue") queueView();
+  st.loaded = true;
+  if (["queue", "active", "done"].includes(st.view)) queueView();
+}
+function caseRow(c) {
+  const p = c.patient || {}, fresh = st.fresh && st.fresh.has(c.id);
+  const waitFrom = c.status === "REQUESTED" ? c.createdAt : (c.updatedAt || c.createdAt);
+  return h("button", { class: "qrow" + (c.priority === "URGENT" ? " urgent" : "") + (fresh ? " new" : ""), onclick: () => go("case", { caseId: c.id }),
+      "aria-label": (p.name || "Patient") + ", " + (c.priority === "URGENT" ? "urgent, " : "") + "case " + c.caseId },
+    h("div", { class: "who" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(p.name)),
+      h("div", { style: "min-width:0" }, h("b", {}, p.name || "Patient", fresh ? h("span", { class: "pill routine", style: "margin-left:8px" }, "New") : null),
+        h("div", { class: "caption" }, "Case #" + c.caseId + (c.requestedOptometristId === st.me.id && c.status === "REQUESTED" ? " · asked for you" : "")))),
+    h("div", { class: "prio" }, c.status === "REQUESTED" ? prioPill(c.priority) : statusPill(c.status)),
+    h("div", { class: "metas" },
+      h("span", { class: "meta num" }, h("span", { class: "lbl" }, "Age "), p.age ? p.age + " y" : "–"),
+      h("span", { class: "meta" }, h("span", { class: "lbl" }, ""), langName(p.language)),
+      h("span", { class: "meta num" }, h("span", { class: "lbl" }, c.status === "REQUESTED" ? "Waiting " : "Updated "), ago(waitFrom), c.messageCount ? " · " + c.messageCount + " msg" : "")),
+    h("div", { class: "reasons" }, (c.redFlagReasons || []).join(" · ")));
 }
 function queueView() {
-  const count = t => st.cases.filter(c => inTab(c, t)).length;
-  const list = st.cases.filter(c => inTab(c, st.tab));
-  const tabs = h("div", { class: "tabs", role: "tablist" }, TABS.map(([id, label]) =>
-    h("button", { class: "tab" + (id === "URGENT" ? " urgent" : ""), role: "tab", "aria-selected": String(st.tab === id), onclick: () => { st.tab = id; st.fresh = null; document.title = "Drishti Saathi · Optometrist portal"; queueView(); } },
-      id === "URGENT" && count(id) > 0 && st.tab !== id ? h("span", { class: "dot" }) : null, label, h("span", { class: "count num" }, count(id)))));
-  const cards = list.map(c => h("button", { class: "case" + (c.priority === "URGENT" ? " urgent" : "") + (st.fresh && st.fresh.has(c.id) ? " new" : ""), onclick: () => go("case", { caseId: c.id }) },
-    h("div", { class: "row" }, h("b", { class: "grow" }, c.patient ? c.patient.name : "Patient", h("span", { class: "muted" }, c.patient && c.patient.age ? " · " + c.patient.age + " y" : "")),
-      st.fresh && st.fresh.has(c.id) ? h("span", { class: "pill routine" }, "NEW") : null, prioPill(c.priority), statusPill(c.status)),
-    h("div", { class: "muted small" }, "Case #" + c.caseId + " · " + ago(c.createdAt) + (c.patient && c.patient.language ? " · " + (c.patient.language === "HI" ? "Hindi" : "English") : "") +
-      (c.requestedOptometristId === st.me.id && c.status === "REQUESTED" ? " · asked for you" : "") + (c.messageCount ? " · " + c.messageCount + " messages" : "")),
-    c.redFlagReasons.length ? h("div", { style: "color:var(--urgent-ink); margin-top:6px; font-weight:600" }, c.redFlagReasons.join(" · ")) : null));
-  shell(
-    h("div", { class: "row" }, h("h1", { class: "grow" }, "Cases"), h("span", { class: "muted small" }, "Refreshes every 10 s")),
-    st.error ? h("div", { class: "error", role: "alert" }, st.error) : null,
-    !st.me.available ? h("div", { class: "note" }, "You are marked not available: patients cannot choose you. Open requests for any optometrist are still listed.") : null,
-    tabs,
-    list.length ? h("div", { class: "stack" }, cards) : h("div", { class: "card", style: "text-align:center" }, h("p", { class: "muted" },
-      st.tab === "ACTIVE" ? "No active consultations. Accept a case from the queue." : st.tab === "DONE" ? "Completed consultations appear here." : "No waiting cases in this queue.")));
+  const view = st.view;
+  const list = st.cases.filter(c => inView(c, view)).sort((a, b) => view === "queue" ? (PRIO[a.priority] - PRIO[b.priority]) || (a.createdAt - b.createdAt) : (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+  const title = view === "active" ? "My active consultations" : view === "done" ? "Completed" : "Queue";
+  const head = h("div", { class: "qhead", "aria-hidden": "true" }, h("span", {}, "Patient"), h("span", {}, view === "queue" ? "Priority" : "Status"), h("span", {}, "Age"), h("span", {}, "Language"),
+    h("span", {}, view === "queue" ? "Waiting" : "Updated"), h("span", {}, "Red flags"));
+  let body;
+  if (!st.loaded) body = h("div", { class: "stack", "aria-label": "Loading", role: "status" }, [1, 2, 3].map(() => h("div", { class: "skel" })));
+  else if (!list.length) body = h("div", { class: "card empty" }, ic(view === "done" ? "task_alt" : view === "active" ? "stethoscope" : "inbox"),
+    h("h3", {}, view === "active" ? "No active consultations" : view === "done" ? "Nothing completed yet" : "The queue is empty"),
+    h("p", { class: "muted" }, view === "active" ? "Accept a case from the queue to start." : view === "done" ? "Consultations you complete appear here." : "New requests from patients appear here. Urgent cases are pinned on top."),
+    view === "active" ? h("button", { class: "soft", onclick: () => go("queue") }, "Open the queue") : null);
+  else if (view === "queue") {
+    const urgent = list.filter(c => c.priority === "URGENT"), rest = list.filter(c => c.priority !== "URGENT");
+    body = h("div", { class: "stack" }, head,
+      urgent.length ? [h("div", { class: "group urgent" }, "Urgent · see first"), urgent.map(caseRow)] : null,
+      rest.length ? [urgent.length ? h("div", { class: "group" }, "Other requests") : null, rest.map(caseRow)] : null);
+  } else body = h("div", { class: "stack" }, head, list.map(caseRow));
+  shell(title,
+    st.error ? errBox(st.error) : null,
+    view === "queue" && !st.me.available ? h("div", { class: "note" }, ic("schedule"), h("span", {}, "You are marked not available: patients cannot choose you. Open requests for any optometrist are still listed.")) : null,
+    h("div", { class: "row" }, h("p", { class: "muted small grow" }, view === "queue" ? "Waiting requests, urgent first, then the longest waiting. Refreshes every 10 s." : "Refreshes every 10 s.")),
+    body);
 }
 
 // ---------- case ----------
@@ -310,53 +488,56 @@ function ring(title, r, colour) {
     s("svg", { viewBox: "0 0 76 76", role: "img", "aria-label": title + (score == null ? " not answered" : " " + score) },
       s("circle", { cx: 38, cy: 38, r: 30, fill: "none", stroke: colour, "stroke-opacity": .18, "stroke-width": 8 }),
       score == null ? null : s("circle", { cx: 38, cy: 38, r: 30, fill: "none", stroke: colour, "stroke-width": 8, "stroke-linecap": "round", "stroke-dasharray": (C * score / 100) + " " + C, transform: "rotate(-90 38 38)" }),
-      s("text", { x: 38, y: 43, "text-anchor": "middle", "font-size": 16, "font-weight": 600, fill: "currentColor" }, score == null ? "–" : score)),
-    h("div", { class: "small muted" }, title), h("div", { class: "small", style: "font-weight:600" }, r ? (r.answered ? r.label : "not answered") : "–"));
+      s("text", { x: 38, y: 44, "text-anchor": "middle", "font-size": 18, "font-weight": 700, fill: "currentColor" }, score == null ? "–" : score)),
+    h("div", { class: "caption" }, title), h("div", { class: "small", style: "font-weight:600" }, r ? (r.answered ? r.label : "not answered") : "–"));
 }
 function amslerGrid(a) {
   const cols = a.columns || 12, rows = a.rows || 20, q = 8;
-  const g = s("svg", { viewBox: `0 0 ${cols * q} ${rows * q}`, style: "width:120px; background:#fff; border:1px solid var(--hairline)", role: "img",
+  const g = s("svg", { viewBox: `0 0 ${cols * q} ${rows * q}`, style: "width:120px; background:#fff; border:1px solid var(--hairline); border-radius:8px", role: "img",
     "aria-label": "Grid, " + (a.eye === "RIGHT" ? "right" : "left") + " eye, " + (a.cells || []).length + " squares marked" });
-  (a.cells || []).forEach(c => g.append(s("rect", { x: c.col * q, y: c.row * q, width: q, height: q, fill: "#D93838", "fill-opacity": .55 })));
+  (a.cells || []).forEach(c => g.append(s("rect", { x: c.col * q, y: c.row * q, width: q, height: q, fill: "#DC2626", "fill-opacity": .55 })));
   for (let i = 0; i <= cols; i++) g.append(s("line", { x1: i * q, y1: 0, x2: i * q, y2: rows * q, stroke: "#9AA5B1", "stroke-width": .5 }));
   for (let j = 0; j <= rows; j++) g.append(s("line", { x1: 0, y1: j * q, x2: cols * q, y2: j * q, stroke: "#9AA5B1", "stroke-width": .5 }));
   g.append(s("circle", { cx: cols * q / 2, cy: rows * q / 2, r: 2, fill: "#000" }));
-  return h("div", {}, h("div", { class: "small muted" }, (a.eye === "RIGHT" ? "Right eye" : "Left eye") + (a.distortion ? ": marked" : ": straight")), g);
+  return h("div", { class: "stack", style: "gap:4px" }, h("div", { class: "caption" }, (a.eye === "RIGHT" ? "Right eye" : "Left eye") + (a.distortion ? ": marked" : ": straight")), g);
 }
 function nice(k) { return String(k).replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase(); }
 function show(v) { return v == null ? "–" : typeof v === "boolean" ? (v ? "yes" : "no") : typeof v === "object" ? JSON.stringify(v) : String(v); }
+function section(icon, title, ...rest) { return h("section", { class: "card stack" }, h("div", { class: "sectionhead" }, ic(icon), h("h3", {}, title), rest.shift()), rest); }
 function reportView(c) {
   const p = c.report || {}, tri = p.triage || {}, vp = p.visionProfile, pr = (p.power || {}).phoneRange || {}, known = (p.power || {}).knownPower;
   const pd = (p.measurements || {}).pdMm, scr = p.screening, lens = p.lens, est = p.estimates || {};
   const out = [];
-  if (c.priority === "URGENT") out.push(h("div", { class: "banner", role: "alert" }, h("b", {}, "URGENT: red-flag signs reported"),
+  if (c.priority === "URGENT") out.push(h("div", { class: "banner", role: "alert" }, ic("warning", true), h("div", {}, h("b", {}, "URGENT: red-flag signs reported"),
     c.redFlagReasons.length ? h("ul", {}, c.redFlagReasons.map(r => h("li", {}, r))) : null,
-    h("div", { class: "small", style: "margin-top:6px" }, "The patient has been told to see an eye doctor today. A teleconsult never replaces an urgent visit." + (tri.path ? " " + tri.path + "." : ""))));
-  if (c.priority === "CHILD_MYOPIA") out.push(h("div", { class: "note" }, "Child with a minus power: no lens was suggested in the app; referral for myopia control."));
-  if (vp) out.push(h("div", { class: "card stack" }, h("h3", {}, "Vision profile"),
+    h("div", { class: "small", style: "margin-top:6px" }, "The patient has been told to see an eye doctor today. A teleconsult never replaces an urgent visit." + (tri.path ? " " + tri.path + "." : "")))));
+  if (c.priority === "CHILD_MYOPIA") out.push(h("div", { class: "note" }, ic("child_care"), h("span", {}, "Child with a minus power: no lens was suggested in the app; referral for myopia control.")));
+  if (vp) out.push(section("visibility", "Vision profile", null,
     h("div", { class: "rings" }, ring("Work", vp.work, "var(--work)"), ring("Digital", vp.digital, "var(--digital)"), ring("Mobility", vp.mobility, "var(--mobility)"), ring("Leisure", vp.leisure, "var(--leisure)")),
-    vp.nightGlareSensitive ? h("div", { class: "small", style: "color:var(--warning-ink)" }, "Night-glare sensitive") : null));
+    vp.nightGlareSensitive ? h("div", { class: "pill child", style: "align-self:flex-start" }, ic("warning"), "Night-glare sensitive") : null));
   const power = [];
-  if (pr.right || pr.left) power.push(h("div", { class: "grid2" },
-    h("div", { class: "eye" }, h("div", { class: "small muted" }, "Right eye"), h("b", {}, pr.right || "–")),
-    h("div", { class: "eye" }, h("div", { class: "small muted" }, "Left eye"), h("b", {}, pr.left || "–"))));
+  // "-1.00 to -1.50 D (read up to 80 cm; phone estimate, …)": the range big, the method in the caption
+  const eyeBox = (label, v) => { const m = String(v || "–").match(/^(.*?)\s*\((.*)\)\s*$/);
+    return h("div", { class: "eye" }, h("div", { class: "caption" }, label), h("div", { class: "big" }, m ? m[1] : (v || "–")), m ? h("div", { class: "caption" }, m[2]) : null); };
+  if (pr.right || pr.left) power.push(h("div", { class: "eyes" }, eyeBox("Right eye (R)", pr.right), eyeBox("Left eye (L)", pr.left)));
   if (pr.near) power.push(h("p", { class: "small" }, pr.near));
   if (known) power.push(h("p", { class: "small" }, "Known power from the patient: " + ["right", "left"].map(k => known[k] ? k[0].toUpperCase() + " " + show(known[k].sph) + (known[k].cyl ? " / " + known[k].cyl + " × " + (known[k].axis ?? "?") : "") : null).filter(Boolean).join(" · ")));
   if (pd && pd.value != null) power.push(h("p", { class: "small" }, "PD: about " + (Math.round(pd.value * 10) / 10) + " mm (" + nice(pd.source || "") + ")"));
-  out.push(h("div", { class: "card stack" }, h("div", { class: "row" }, h("h3", { class: "grow" }, "Power (phone measurement, with the method)"), tri.powerLabel ? h("span", { class: "pill urgent" }, tri.powerLabel) : null),
+  out.push(section("straighten", "Measurements", tri.powerLabel ? h("span", { class: "pill urgent" }, ic("warning"), tri.powerLabel) : null,
     power.length ? power : h("p", { class: "muted small" }, "No power was measured."),
-    h("p", { class: "muted small" }, "Phone estimates as ranges. They must be confirmed with a trial lens.")));
+    h("p", { class: "caption" }, "Phone estimates as ranges, with the method. They must be confirmed with a trial lens.")));
   if (scr) {
     const grids = ((scr.results || {}).amsler || []);
-    out.push(h("div", { class: "card stack" }, h("div", { class: "row" }, h("h3", { class: "grow" }, "Screening tests"), h("span", { class: "pill grey" }, scr.label || "Screening")),
-      (scr.lines || []).map(l => h("div", { class: "line" }, h("span", { class: "dot " + l.status }), h("span", {}, l.text))),
+    const icon = { OK: "check_circle", WATCH: "warning", URGENT: "error" };
+    out.push(section("grid_on", "Screening tests", h("span", { class: "pill grey" }, scr.label || "Screening"),
+      (scr.lines || []).map(l => h("div", { class: "line " + l.status }, h("span", { class: "ms fill", "aria-hidden": "true" }, icon[l.status] || "schedule"),
+        h("span", {}, h("span", { class: "sr" }, (l.status === "OK" ? "Normal" : l.status === "WATCH" ? "Watch" : l.status === "URGENT" ? "Urgent" : "") + ": "), l.text))),
       grids.length ? h("div", { class: "row", style: "align-items:flex-start" }, grids.map(amslerGrid)) : null));
   }
-  if (lens) out.push(h("div", { class: "card stack" }, h("h3", {}, "Lens suggestion from the app"),
+  if (lens) out.push(section("eyeglasses", "Lens suggestion from the app", lens.optometristConfirms ? h("span", { class: "pill child" }, ic("stethoscope"), "Optometrist confirms") : null,
     lens.suggested === false || !(lens.items || []).length ? h("p", { class: "muted small" }, est.suggestionsNote || "No lens was suggested.")
-      : (lens.items || []).map(i => h("div", {}, h("b", {}, i.product), h("span", { class: "muted small" }, " · " + nice(i.kind || "")),
-          (i.why || []).length ? h("ul", { class: "small", style: "margin:2px 0 6px; padding-left:20px" }, i.why.map(w => h("li", {}, w))) : null)),
-    lens.optometristConfirms ? h("span", { class: "pill child" }, "Optometrist confirms") : null));
+      : h("div", {}, (lens.items || []).map(i => h("div", { class: "lensitem" }, h("div", { class: "grow" }, h("b", {}, i.product), h("span", { class: "caption" }, " · " + nice(i.kind || "")),
+          (i.why || []).length ? h("ul", { class: "small", style: "margin:4px 0 0; padding-left:20px" }, i.why.slice(0, 3).map(w => h("li", {}, w))) : null))))));
   const a = p.answers || {};
   const rows = Object.entries(a).filter(([, v]) => v != null && typeof v !== "object");
   out.push(h("div", { class: "card" }, h("details", {}, h("summary", {}, "Interview answers and referral notes"),
@@ -395,16 +576,19 @@ function linkify(text) {
 function drawChat() {
   const box = document.getElementById("chat"); if (!box) return;
   const atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-  box.replaceChildren(...(st.msgs.length ? st.msgs.map(m => {
+  const items = []; let last = null;
+  for (const m of st.msgs) {
+    const k = dayKey(m.createdAt); if (k !== last) { items.push(h("div", { class: "day" }, dayLabel(m.createdAt))); last = k; }
     const sys = m.senderRole === "system";
     const el = h("div", { class: "msg" + (sys ? " sys" : m.senderRole === "optometrist" ? " me" : "") });
-    if (m.kind === "VIDEO") el.append("Video call: ", h("a", { href: m.text, target: "_blank", rel: "noopener" }, m.text));
+    if (m.kind === "VIDEO") el.append(ic("videocam"), " Video call: ", h("a", { href: m.text, target: "_blank", rel: "noopener" }, m.text));
     else if (m.text) el.append(...linkify(m.text));
     if (m.hasImage) { const img = h("img", { alt: "Picture sent in the chat" }); el.append(img);
       api("/consultations/" + st.caseId + "/messages/" + m.id + "/image", { blob: true }).then(b => { img.src = URL.createObjectURL(b); }).catch(() => { img.alt = "Picture could not be loaded"; }); }
-    if (!sys) el.append(h("time", {}, fmtTime(m.createdAt)));
-    return el;
-  }) : [h("div", { class: "msg sys" }, "No messages yet. Say hello to the patient.")]));
+    if (!sys) el.append(h("time", {}, clock(m.createdAt)));
+    items.push(el);
+  }
+  box.replaceChildren(...(items.length ? items : [h("div", { class: "msg sys" }, "No messages yet. Say hello to the patient.")]));
   if (atEnd) box.scrollTop = box.scrollHeight;
 }
 function shrinkImage(file) {
@@ -421,43 +605,47 @@ async function act(fn) { try { await fn(); } catch (e) { toast(e.message); } }
 
 function caseView() {
   const c = st.c;
-  const back = h("button", { class: "ghost sm", style: "align-self:flex-start", onclick: () => go("queue") }, "← All cases");
-  if (!c) return shell(back, h("div", { class: "error", role: "alert" }, st.error || "This case is not available any more (another optometrist may have accepted it)."));
+  const back = h("button", { class: "icon", "aria-label": "Back to the list", title: "Back", onclick: () => go(c && mine(c) ? (c.status === "COMPLETED" || c.status === "CLOSED" ? "done" : "active") : "queue") }, ic("arrow_back"));
+  if (!c) return shell(h("div", { class: "row", style: "gap:8px" }, back, h("h1", {}, "Case")), errBox(st.error || "This case is not available any more (another optometrist may have accepted it)."));
   const p = c.patient || {}, isMine = mine(c), open = c.status !== "CLOSED";
-  const head = h("div", { class: "card hero stack" },
-    h("div", { class: "row" }, h("div", { class: "avatar", "aria-hidden": "true" }, (p.name || "?").trim().charAt(0).toUpperCase()),
-      h("div", { class: "grow" }, h("h1", {}, p.name || "Patient"),
-        h("div", { class: "muted" }, [p.age ? p.age + " years" : null, p.gender, p.language === "HI" ? "Hindi" : p.language === "EN" ? "English" : p.language, "Case #" + c.caseId].filter(Boolean).join(" · "))),
-      prioPill(c.priority), statusPill(c.status)),
-    h("div", { class: "muted small" }, "Requested " + fmtTime(c.createdAt) + (c.acceptedAt ? " · accepted " + fmtTime(c.acceptedAt) : "") + (c.completedAt ? " · completed " + fmtTime(c.completedAt) : "") +
-      " · Fee: ₹" + (c.fee ?? 0) + " · Payment: " + c.paymentStatus),
-    c.status === "REQUESTED" ? h("div", { class: "row" },
-      h("button", { class: "ok", onclick: () => act(async () => { st.c = await api("/consultations/" + c.id + "/accept", { method: "POST" }); toast("Case accepted. You can now chat with the patient."); stopTimers(); openCase(); }) }, "Accept this case"),
-      h("span", { class: "muted small" }, "Chat, WhatsApp, video and the prescription open after you accept.")) : null);
+  const head = h("div", { class: "card hero row", style: "align-items:flex-start" },
+    h("span", { class: "avatar lg", "aria-hidden": "true" }, initials(p.name)),
+    h("div", { class: "grow stack", style: "gap:4px" },
+      h("div", { class: "row", style: "gap:8px" }, prioPill(c.priority), statusPill(c.status)),
+      h("div", { class: "muted" }, [p.age ? p.age + " years" : null, p.gender, langName(p.language)].filter(Boolean).join(" · ")),
+      h("div", { class: "caption" }, "Requested " + fmtTime(c.createdAt) + (c.acceptedAt ? " · accepted " + fmtTime(c.acceptedAt) : "") + (c.completedAt ? " · completed " + fmtTime(c.completedAt) : "") +
+        " · Fee ₹" + (c.fee ?? 0) + " · Payment: " + c.paymentStatus)));
 
+  // right: the actions panel (Accept, Chat, Video, WhatsApp, Write advice)
   const side = [];
+  if (c.status === "REQUESTED") side.push(h("div", { class: "card stack" }, h("h3", {}, "Take this case"),
+    h("p", { class: "muted small" }, "Chat, WhatsApp, video and the advice open after you accept."),
+    h("button", { class: "ok block", onclick: () => act(async () => { st.c = await api("/consultations/" + c.id + "/accept", { method: "POST" }); toast("Case accepted. You can now chat with the patient."); stopTimers(); openCase(); }) }, ic("check_circle"), "Accept case")));
   if (isMine) {
-    side.push(h("div", { class: "card stack" }, h("h3", {}, "Talk to the patient"),
-      h("div", { class: "row" },
-        c.whatsappUrl ? h("a", { class: "btn ok sm", href: c.whatsappUrl, target: "_blank", rel: "noopener" }, "WhatsApp") : null,
-        open ? h("button", { class: "sm", onclick: () => { const w = window.open("about:blank", "_blank"); act(async () => {
+    side.push(h("div", { class: "card stack" },
+      h("div", { class: "sectionhead" }, ic("forum"), h("h3", {}, "Chat")),
+      open ? h("div", { class: "row", style: "gap:8px" },
+        h("button", { class: "sm", onclick: () => { const w = window.open("about:blank", "_blank"); act(async () => {
           try { const r = await api("/consultations/" + c.id + "/video", { method: "POST" }); if (w) w.location = r.url; else toast("Video link posted in the chat."); st.c.videoUrl = r.url; pollMsgs(); }
-          catch (e) { if (w) w.close(); throw e; } }); } }, c.videoUrl ? "Join video call" : "Start video call") : null,
-        p.phone ? h("span", { class: "muted small num" }, "Phone: " + p.phone) : null),
-      h("div", { class: "chat", id: "chat", "aria-live": "polite" }),
+          catch (e) { if (w) w.close(); throw e; } }); } }, ic("videocam"), c.videoUrl ? "Join video" : "Start video"),
+        c.whatsappUrl ? h("a", { class: "btn ok sm", href: c.whatsappUrl, target: "_blank", rel: "noopener" }, ic("forum"), "WhatsApp") : null,
+        p.phone ? h("span", { class: "caption num" }, "Phone " + p.phone) : null) : null,
+      h("div", { class: "chat", id: "chat", "aria-live": "polite", "aria-label": "Messages" }),
       open ? (() => {
         const input = h("input", { placeholder: "Write a message", "aria-label": "Message", maxlength: 2000 });
         const file = h("input", { type: "file", accept: "image/*", style: "display:none", onchange: () => act(async () => {
           if (!file.files[0]) return; const b64 = await shrinkImage(file.files[0]); file.value = "";
           await api("/consultations/" + c.id + "/messages", { method: "POST", body: { imageBase64: b64, imageMime: "image/jpeg" } }); pollMsgs(); }) });
-        return h("form", { class: "row", onsubmit: ev => { ev.preventDefault(); const text = input.value.trim(); if (!text) return; input.value = "";
+        return h("form", { class: "composer", onsubmit: ev => { ev.preventDefault(); const text = input.value.trim(); if (!text) return; input.value = "";
           act(async () => { await api("/consultations/" + c.id + "/messages", { method: "POST", body: { text } }); pollMsgs(); }); } },
-          h("div", { class: "grow" }, input), file, h("button", { type: "button", class: "ghost sm", onclick: () => file.click() }, "Picture"), h("button", { type: "submit", class: "sm" }, "Send"));
+          h("button", { type: "button", class: "icon", "aria-label": "Send a picture", title: "Picture", onclick: () => file.click() }, ic("image")), file,
+          input, h("button", { type: "submit", class: "send", "aria-label": "Send" }, ic("send")));
       })() : h("p", { class: "muted small" }, "This consultation is closed.")));
     side.push(rxCard(c));
-    if (open) side.push(h("button", { class: "ghost", onclick: () => { if (confirm("Close this consultation? Chat stops for both sides.")) act(async () => { st.c = await api("/consultations/" + c.id + "/close", { method: "POST" }); caseView(); pollMsgs(); }); } }, "Close consultation"));
+    if (open) side.push(h("button", { class: "ghost", onclick: () => { if (confirm("Close this consultation? Chat stops for both sides.")) act(async () => { st.c = await api("/consultations/" + c.id + "/close", { method: "POST" }); caseView(); pollMsgs(); }); } }, ic("close"), "Close consultation"));
   }
-  shell(back, head, h("div", { class: "cols" }, h("div", { class: "stack lg" }, reportView(c)), h("div", { class: "stack lg" }, side)));
+  shell(h("div", { class: "row", style: "gap:8px; min-width:0" }, back, h("div", { style: "min-width:0" }, h("h1", {}, p.name || "Patient"), h("div", { class: "caption" }, "Case #" + c.caseId))),
+    head, h("div", { class: "cols" }, h("div", { class: "stack lg" }, reportView(c)), side.length ? h("aside", { class: "stack lg actions", "aria-label": "Actions" }, side) : null));
   drawChat();
 }
 
@@ -466,47 +654,73 @@ async function openPdf(cid) {
   try { const b = await api("/consultations/" + cid + "/prescription.pdf", { blob: true }); const url = URL.createObjectURL(b); if (w) w.location = url; else location.href = url; }
   catch (e) { if (w) w.close(); toast(e.message); }
 }
+function fmtD(v) { return v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(2); }
+/** The advice as the patient will see it: the R/L table, ADD, PD, lens advice, follow-up, signature. */
+function slip(c, b) {
+  const row = (label, e) => h("tr", {}, h("td", {}, label), h("td", {}, fmtD(e.sph)), h("td", {}, e.cyl ? fmtD(e.cyl) : "–"), h("td", {}, e.cyl && e.axis != null ? e.axis + "°" : "–"));
+  const kv = [["ADD (near)", b.add != null ? fmtD(b.add) + " D" : null], ["PD", b.pdMm != null ? b.pdMm + " mm" : null], ["Lens advice", (b.lensAdvice || []).join(", ") || null],
+    ["Referral", b.referralAdvice], ["In-person exam", b.needsInPersonExam ? "Advised" : null], ["Follow-up", b.followUpDate], ["Notes", b.notes]].filter(([, v]) => v);
+  return h("div", { class: "slip" },
+    h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Eye"), h("th", {}, "SPH"), h("th", {}, "CYL"), h("th", {}, "AXIS"))), h("tbody", {}, row("Right (R)", b.right), row("Left (L)", b.left))),
+    kv.length ? h("dl", { class: "kv" }, kv.map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])) : null,
+    h("div", { class: "caption" }, "Signed " + st.me.name + " · " + (st.me.qualification || "") + " · Reg. no. " + st.me.registrationNo + " · " + new Date().toLocaleDateString()));
+}
+function stepper(name, v, { step, min, max, label }) {
+  const input = h("input", { name, type: "number", step: String(step), min, max, value: v ?? "", inputmode: "decimal", "aria-label": label });
+  const bump = d => { const cur = input.value === "" ? 0 : Number(input.value); let n = Math.round((cur + d * step) / step) * step; n = Math.min(max, Math.max(min, n));
+    input.value = step < 1 ? n.toFixed(2) : String(n); input.dispatchEvent(new Event("change")); };
+  return h("div", { class: "stepper" }, h("button", { type: "button", "aria-label": label + " down", tabindex: "-1", onclick: () => bump(-1) }, ic("remove")), input,
+    h("button", { type: "button", "aria-label": label + " up", tabindex: "-1", onclick: () => bump(1) }, ic("add")));
+}
 function rxCard(c) {
   const open = c.status !== "CLOSED";
-  if (!st.rxOpen) return h("div", { class: "card stack" }, h("h3", {}, "Advice / e-prescription"),
-    c.hasPrescription ? h("p", { class: "small", style: "color:var(--success-ink); font-weight:600" }, "Sent to the patient.") : h("p", { class: "muted small" }, "Sending it marks the consultation completed. The patient sees it in the app as a PDF."),
+  if (!st.rxOpen) return h("div", { class: "card stack" }, h("div", { class: "sectionhead" }, ic("description"), h("h3", {}, "Advice / e-prescription")),
+    c.hasPrescription ? h("span", { class: "pill ok", style: "align-self:flex-start" }, ic("check_circle"), "Sent to the patient") : h("p", { class: "muted small" }, "Sending it marks the consultation completed. The patient sees it in the app as a PDF."),
     h("div", { class: "row" },
-      open ? h("button", { class: c.hasPrescription ? "ghost sm" : "sm", onclick: () => act(async () => {
+      open ? h("button", { class: c.hasPrescription ? "ghost" : "", onclick: () => act(async () => {
         if (!st.lens) st.lens = await api("/lens-catalog").catch(() => []);
-        st.rx = c.hasPrescription ? await api("/consultations/" + c.id + "/prescription") : null; st.rxOpen = true; caseView(); }) }, c.hasPrescription ? "Edit and send again" : "Write advice / e-prescription") : null,
-      c.hasPrescription ? h("button", { class: "soft sm", onclick: () => openPdf(c.id) }, "View PDF") : null));
+        st.rx = c.hasPrescription ? await api("/consultations/" + c.id + "/prescription") : null; st.rxOpen = true; st.rxPreview = null; caseView(); }) }, ic("edit"), c.hasPrescription ? "Edit and send again" : "Write advice") : null,
+      c.hasPrescription ? h("button", { class: "soft", onclick: () => openPdf(c.id) }, ic("picture_as_pdf"), "View PDF") : null));
+  // preview before sending
+  if (st.rxPreview) {
+    const body = st.rxPreview, err = h("div", {});
+    return h("div", { class: "card stack" }, h("div", { class: "sectionhead" }, ic("visibility"), h("h3", {}, "Check before sending")),
+      h("p", { class: "muted small" }, "This is what the patient will see. Sending completes the consultation."), slip(c, body), err,
+      h("div", { class: "row" },
+        h("button", { class: "ok", onclick: () => act(async () => { try { await api("/consultations/" + c.id + "/prescription", { method: "POST", body }); } catch (e) { err.replaceChildren(errBox(e.message)); return; }
+          st.rxOpen = false; st.rxPreview = null; st.c = await api("/consultations/" + c.id); toast("Sent to the patient. Consultation completed."); caseView(); pollMsgs(); }) }, ic("send"), "Send to patient"),
+        h("button", { class: "ghost", onclick: () => { st.rx = body; st.rxPreview = null; caseView(); } }, ic("edit"), "Edit")));
+  }
   const rx = st.rx || {}, pd = ((c.report || {}).measurements || {}).pdMm;
   const picked = new Set(rx.lensAdvice || []);
-  const num = (name, v, attrs) => h("input", { name, type: "number", step: "0.25", value: v ?? "", inputmode: "decimal", "aria-label": name, ...attrs });
-  const eyeRow = (label, key) => h("tr", {}, h("th", { scope: "row" }, label),
-    h("td", {}, num(key + "_sph", (rx[key] || {}).sph, { min: -30, max: 30 })), h("td", {}, num(key + "_cyl", (rx[key] || {}).cyl, { min: -10, max: 10 })),
-    h("td", {}, num(key + "_axis", (rx[key] || {}).axis, { step: "1", min: 0, max: 180 })));
+  const eyeRow = (label, key) => h("tr", {}, h("th", { scope: "row", style: "font-size:15px; color:var(--ink)" }, label),
+    h("td", {}, stepper(key + "_sph", (rx[key] || {}).sph, { step: .25, min: -30, max: 30, label: label + " sphere" })),
+    h("td", {}, stepper(key + "_cyl", (rx[key] || {}).cyl, { step: .25, min: -10, max: 10, label: label + " cylinder" })),
+    h("td", {}, stepper(key + "_axis", (rx[key] || {}).axis, { step: 5, min: 0, max: 180, label: label + " axis" })));
   const groups = {}; (st.lens || []).forEach(l => (groups[l.group] = groups[l.group] || []).push(l));
-  const chips = Object.entries(groups).map(([g, items]) => h("div", {}, h("div", { class: "small muted" }, nice(g)), h("div", { class: "chips" }, items.map(l =>
+  const chips = Object.entries(groups).map(([g, items]) => h("div", { class: "stack", style: "gap:6px" }, h("div", { class: "caption" }, nice(g)), h("div", { class: "chips" }, items.map(l =>
     h("button", { type: "button", class: "chip", "aria-pressed": String(picked.has(l.name)), onclick: ev => { picked.has(l.name) ? picked.delete(l.name) : picked.add(l.name); ev.currentTarget.setAttribute("aria-pressed", String(picked.has(l.name))); } }, l.name)))));
   const known = new Set((st.lens || []).map(l => l.name));
-  const err = h("div", {});
   const f = h("form", { class: "stack", onsubmit: ev => { ev.preventDefault(); const d = Object.fromEntries(new FormData(f));
     const n = k => d[k] === "" || d[k] == null ? null : Number(d[k]);
     const extra = (d.lensOther || "").split(",").map(x => x.trim()).filter(Boolean);
-    const body = { right: { sph: n("right_sph"), cyl: n("right_cyl"), axis: n("right_axis") }, left: { sph: n("left_sph"), cyl: n("left_cyl"), axis: n("left_axis") },
+    st.rxPreview = { right: { sph: n("right_sph"), cyl: n("right_cyl"), axis: n("right_axis") }, left: { sph: n("left_sph"), cyl: n("left_cyl"), axis: n("left_axis") },
       add: n("add"), pdMm: n("pdMm"), lensAdvice: [...[...picked].filter(x => known.has(x)), ...extra], referralAdvice: d.referralAdvice || null,
       needsInPersonExam: !!d.needsInPersonExam, followUpDate: d.followUpDate || null, notes: d.notes || null };
-    act(async () => { try { await api("/consultations/" + c.id + "/prescription", { method: "POST", body }); } catch (e) { err.replaceChildren(h("div", { class: "error", role: "alert" }, e.message)); return; }
-      st.rxOpen = false; st.c = await api("/consultations/" + c.id); toast("Sent to the patient. Consultation completed."); caseView(); pollMsgs(); }); } },
-    h("table", { class: "rx" }, h("thead", {}, h("tr", {}, h("th", {}, "Eye"), h("th", {}, "Sphere (D)"), h("th", {}, "Cylinder (D)"), h("th", {}, "Axis (°)"))),
+    caseView(); } },
+    h("table", { class: "rx" }, h("thead", {}, h("tr", {}, h("th", {}, "Eye"), h("th", {}, "SPH (D)"), h("th", {}, "CYL (D)"), h("th", {}, "AXIS (°)"))),
       h("tbody", {}, eyeRow("Right", "right"), eyeRow("Left", "left"))),
-    h("div", { class: "grid2" }, h("label", {}, "Near addition (D)", num("add", rx.add, { min: 0, max: 4 })), h("label", {}, "PD (mm)", num("pdMm", rx.pdMm ?? (pd && pd.value != null ? Math.round(pd.value * 2) / 2 : null), { step: "0.5", min: 40, max: 80 }))),
+    h("div", { class: "grid2" }, h("label", {}, "Near addition (D)", stepper("add", rx.add, { step: .25, min: 0, max: 4, label: "Near addition" })),
+      h("label", {}, "PD (mm)", stepper("pdMm", rx.pdMm ?? (pd && pd.value != null ? Math.round(pd.value * 2) / 2 : null), { step: .5, min: 40, max: 80, label: "PD" }))),
     chips.length ? h("div", { class: "stack" }, h("div", { class: "small", style: "font-weight:600; color:var(--ink2)" }, "Lens advice (from the lens catalogue)"), chips) : null,
     h("label", {}, "Other lens advice (comma separated)", h("input", { name: "lensOther", value: (rx.lensAdvice || []).filter(x => !known.has(x)).join(", ") })),
     h("label", {}, "Referral advice", h("textarea", { name: "referralAdvice", maxlength: 1000 }, rx.referralAdvice || "")),
     h("label", { class: "check" }, h("input", { type: "checkbox", name: "needsInPersonExam", checked: rx.needsInPersonExam ?? c.priority === "URGENT" }), "An in-person eye examination is advised"),
     h("div", { class: "grid2" }, h("label", {}, "Follow-up date", h("input", { type: "date", name: "followUpDate", value: rx.followUpDate || "" })), h("div", {})),
     h("label", {}, "Notes for the patient", h("textarea", { name: "notes", maxlength: 2000 }, rx.notes || "")),
-    h("p", { class: "muted small" }, "Signed as " + st.me.name + ", registration no. " + st.me.registrationNo + ", with today's date."),
-    err,
-    h("div", { class: "row" }, h("button", { type: "submit", class: "ok" }, "Send to patient and complete"), h("button", { type: "button", class: "ghost", onclick: () => { st.rxOpen = false; caseView(); } }, "Cancel")));
-  return h("div", { class: "card stack" }, h("h3", {}, "Advice / e-prescription"), f);
+    h("p", { class: "caption" }, "Signed as " + st.me.name + ", registration no. " + st.me.registrationNo + ", with today's date."),
+    h("div", { class: "row" }, h("button", { type: "submit" }, ic("visibility"), "Preview"), h("button", { type: "button", class: "ghost", onclick: () => { st.rxOpen = false; caseView(); } }, "Cancel")));
+  return h("div", { class: "card stack" }, h("div", { class: "sectionhead" }, ic("edit"), h("h3", {}, "Write advice")), f);
 }
 
 // ---------- profile ----------
@@ -515,15 +729,16 @@ function profileView() {
   const f = h("form", { class: "stack", onsubmit: ev => { ev.preventDefault(); const d = Object.fromEntries(new FormData(f));
     act(async () => { try { st.me = await api("/me", { method: "PATCH", body: { name: d.name, qualification: d.qualification, clinicName: d.clinicName, city: d.city,
         languages: d.languages.split(",").map(x => x.trim()).filter(Boolean), fee: Number(d.fee || 0), allowWhatsapp: !!d.allowWhatsapp } }); toast("Profile saved."); profileView(); }
-      catch (e) { err.replaceChildren(h("div", { class: "error", role: "alert" }, e.message)); } }); } },
+      catch (e) { err.replaceChildren(errBox(e.message)); } }); } },
     h("div", { class: "grid2" }, field("Full name", { name: "name", required: true, value: me.name }), field("Qualification", { name: "qualification", required: true, value: me.qualification })),
     h("div", { class: "grid2" }, field("Clinic name", { name: "clinicName", required: true, value: me.clinicName }), field("City", { name: "city", required: true, value: me.city })),
     h("div", { class: "grid2" }, field("Languages (comma separated)", { name: "languages", required: true, value: (me.languages || []).join(", ") }), field("Consultation fee (₹, display only)", { name: "fee", type: "number", min: 0, max: 100000, value: me.fee })),
     h("label", { class: "check" }, h("input", { type: "checkbox", name: "allowWhatsapp", checked: me.allowWhatsapp }), "Patients whose case I accept may message me on WhatsApp"),
     h("dl", { class: "kv" }, h("dt", {}, "Registration no."), h("dd", {}, me.registrationNo), h("dt", {}, "Mobile"), h("dd", { class: "num" }, me.phone), h("dt", {}, "Email"), h("dd", {}, me.email), h("dt", {}, "Status"), h("dd", {}, me.status)),
-    h("p", { class: "muted small" }, "Payments are not collected in this demo: the fee is shown to patients only."),
-    err, h("button", { type: "submit" }, "Save profile"));
-  shell(h("button", { class: "ghost sm", style: "align-self:flex-start", onclick: () => go("queue") }, "← All cases"), h("div", { class: "card hero stack", style: "max-width:760px" }, h("h1", {}, "My profile"), f));
+    h("p", { class: "caption" }, "Payments are not collected in this demo: the fee is shown to patients only."),
+    err, h("div", {}, h("button", { type: "submit" }, "Save profile")));
+  shell("Profile", h("div", { class: "card stack lg", style: "max-width:760px" },
+    h("div", { class: "row" }, h("span", { class: "avatar lg", "aria-hidden": "true" }, initials(me.name)), h("div", { class: "grow" }, h("h2", {}, me.name), h("div", { class: "muted small" }, [me.qualification, me.city].filter(Boolean).join(" · ")))), f));
 }
 
 // ---------- admin ----------
@@ -534,21 +749,29 @@ async function adminView() {
   const order = { PENDING: 0, APPROVED: 1, REJECTED: 2 };
   list.sort((a, b) => order[a.status] - order[b.status] || b.createdAt - a.createdAt);
   const setStatus = (o, what) => act(async () => { await api("/admin/optometrists/" + o.id + "/" + what, { method: "POST" }); toast(o.name + (what === "approve" ? " approved." : " rejected.")); adminView(); });
-  shell(h("div", { class: "row" }, h("h1", { class: "grow" }, "Optometrist registrations"),
-      sum ? h("span", { class: "muted small num" }, sum.patients + " patients · " + Object.values(sum.consultations).reduce((a, b) => a + b, 0) + " consultations") : null),
-    err ? h("div", { class: "error", role: "alert" }, err) : null,
+  const pill = o => o.status === "APPROVED" ? h("span", { class: "pill ok" }, ic("check_circle"), "Approved") : o.status === "PENDING" ? h("span", { class: "pill child" }, ic("hourglass_top"), "Pending") : h("span", { class: "pill urgent" }, ic("error"), "Rejected");
+  shell("Optometrist registrations",
+    sum ? h("p", { class: "muted small num" }, sum.patients + " patients · " + Object.values(sum.consultations).reduce((a, b) => a + b, 0) + " consultations") : null,
+    err ? errBox(err) : null,
     list.length ? list.map(o => h("div", { class: "card stack" },
-      h("div", { class: "row" }, h("div", { class: "grow" }, h("h2", {}, o.name, o.demo ? h("span", { class: "muted small" }, " (demo data)") : null), h("div", { class: "muted small" }, o.qualification + " · " + o.clinicName + ", " + o.city)),
-        h("span", { class: "pill " + (o.status === "APPROVED" ? "ok" : o.status === "PENDING" ? "child" : "urgent") }, o.status)),
+      h("div", { class: "row" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(o.name)),
+        h("div", { class: "grow" }, h("h3", {}, o.name, o.demo ? h("span", { class: "caption" }, " (demo data)") : null), h("div", { class: "muted small" }, o.qualification + " · " + o.clinicName + ", " + o.city)), pill(o)),
       h("dl", { class: "kv" }, h("dt", {}, "Registration no."), h("dd", {}, o.registrationNo), h("dt", {}, "Mobile"), h("dd", { class: "num" }, o.phone), h("dt", {}, "Email"), h("dd", {}, o.email),
         h("dt", {}, "Languages"), h("dd", {}, (o.languages || []).join(", ")), h("dt", {}, "Fee"), h("dd", { class: "num" }, "₹" + o.fee), h("dt", {}, "Registered"), h("dd", {}, fmtTime(o.createdAt))),
-      h("div", { class: "row" }, o.status !== "APPROVED" ? h("button", { class: "ok sm", onclick: () => setStatus(o, "approve") }, "Approve") : null,
+      h("div", { class: "row" }, o.status !== "APPROVED" ? h("button", { class: "ok sm", onclick: () => setStatus(o, "approve") }, ic("check_circle"), "Approve") : null,
         o.status !== "REJECTED" ? h("button", { class: "ghost sm", onclick: () => setStatus(o, "reject") }, o.status === "APPROVED" ? "Remove approval" : "Reject") : null)))
-      : h("div", { class: "card" }, h("p", { class: "muted" }, "No optometrist has registered yet.")));
+      : h("div", { class: "card empty" }, ic("person"), h("h3", {}, "No registrations yet"), h("p", { class: "muted" }, "Optometrists who register appear here for approval.")));
 }
 
 // ---------- start ----------
-function render() { if (!st.token || !st.me) return authView(); start(); }
+function render() {
+  if (!st.token || !st.me) return authView();
+  // redraw in place (theme, sound, availability) only on the approved optometrist's pages; everything else starts over
+  const approved = !ADMIN_PAGE && st.me.role === "optometrist" && st.me.status === "APPROVED";
+  if (approved && ["queue", "active", "done"].includes(st.view)) return queueView();
+  if (approved && st.view === "case" && st.c) return caseView();
+  start();
+}
 async function start() {
   stopTimers();
   if (!st.token) return authView();
@@ -556,10 +779,13 @@ async function start() {
   if (ADMIN_PAGE) { if (st.me.role !== "admin") { st.error = "This page is for the admin."; return logout(); } await adminView(); st.timers.push(setInterval(adminView, 15000)); return; }
   if (st.me.role !== "optometrist") { st.error = "This portal is for optometrists."; return logout(); }
   if (st.me.status !== "APPROVED") return pendingView();
-  if (st.view === "case") return openCase();
-  if (st.view === "profile") return profileView();
-  st.view = "queue"; queueView(); await loadQueue(true);
+  // the case counts in the sidebar stay fresh on every page
   st.timers.push(setInterval(loadQueue, 10000));
+  if (st.view === "case") { if (!st.loaded) loadQueue(); return openCase(); }
+  if (st.view === "profile") { profileView(); if (!st.loaded) await loadQueue(); profileView(); return; }
+  if (!["queue", "active", "done"].includes(st.view)) st.view = "queue";
+  document.title = "Drishti Saathi · Optometrist portal"; st.fresh = null;
+  queueView(); await loadQueue();
 }
 document.addEventListener("click", () => { if (st.audio && st.audio.state === "suspended") st.audio.resume(); }, true);
 start();
