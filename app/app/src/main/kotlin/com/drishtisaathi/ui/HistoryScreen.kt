@@ -1,38 +1,35 @@
 package com.drishtisaathi.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.drishtisaathi.data.SessionEntity
-import com.drishtisaathi.engine.ReferralLevel
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.drishtisaathi.i18n.SHome
+import com.drishtisaathi.ui.designsystem.DsBottomSheet
+import com.drishtisaathi.ui.designsystem.EmptyState
+import com.drishtisaathi.ui.designsystem.PrimaryButton
+import com.drishtisaathi.ui.designsystem.SecondaryButton
+import com.drishtisaathi.ui.designsystem.Spot
 
-/** Staff-only list of stored sessions: open or delete each one. */
+/** Staff-only list of stored sessions (newest first): open or delete each one; delete asks first. */
 @Composable
 fun HistoryScreen(
     lang: Lang,
@@ -45,65 +42,29 @@ fun HistoryScreen(
     onBack: () -> Unit,
 ) {
     val l = lang
+    val c = DS.colors
     var pendingDelete by remember { mutableStateOf<Long?>(null) }
-    val fmt = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US) }
 
     AppScaffold(l, onLang, title = S.history[l], onBack = onBack) { pad ->
-        if (sessions.isEmpty()) {
-            Column(Modifier.padding(pad).padding(24.dp)) { SectionCard(com.drishtisaathi.i18n.SProfile.emptyHistoryTitle[l]) {
-                    Text(com.drishtisaathi.i18n.SProfile.emptyHistoryBody[l], style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.secondary)
-                } }
-        } else {
-            LazyColumn(
-                Modifier.padding(pad).fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(sessions, key = { it.id }) { s ->
-                    val level = runCatching { ReferralLevel.valueOf(s.referralLevel) }.getOrDefault(ReferralLevel.NONE)
-                    val color = when (level) {
-                        ReferralLevel.URGENT -> UrgentRed
-                        ReferralLevel.ROUTINE -> RoutineAmber
-                        ReferralLevel.NONE -> OkGreen
-                    }
-                    Card(Modifier.fillMaxWidth().clickable { onOpen(s.id) }) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                val demo = remember(s.id, s.measurementsJson) {
-                                    runCatching { com.drishtisaathi.data.SessionCodec.measurements(s).demo }.getOrDefault(false)
-                                }
-                                Text(
-                                    (if (demo) "DEMO · " else "") + S.sessionNo.format(s.id.toInt())[l],
-                                    style = MaterialTheme.typography.titleMedium, color = if (demo) UrgentRed else Color.Unspecified,
-                                )
-                                Text(fmt.format(Date(s.createdAt)), style = MaterialTheme.typography.bodyMedium)
-                                Text(S.referralLevel(level)[l], style = MaterialTheme.typography.bodySmall, color = color)
-                                if (s.verifiedAt != null) Text("✓ " + S.verified[l], style = MaterialTheme.typography.bodySmall, color = OkGreen)
-                                remote[s.id]?.let { r ->
-                                    val b = com.drishtisaathi.i18n.SBridge
-                                    Text(
-                                        (if (r.reviewed) b.historyReviewed else b.historyWaiting).format(r.caseId)[l],
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                                        color = if (r.reviewed) OkGreen else RoutineAmber,
-                                    )
-                                    if (r.needsInPersonExam == true) Text("! " + b.historyInPerson[l], style = MaterialTheme.typography.bodySmall, color = UrgentRed)
-                                }
-                            }
-                            TextButton(onClick = { pendingDelete = s.id }) { Text(S.delete[l], color = UrgentRed) }
-                        }
-                    }
-                }
+        if (sessions.isEmpty()) Box(Modifier.padding(pad).padding(DS.screen)) {
+            EmptyState(Spot.EYE, SHome.customersEmpty[l], SHome.customersEmptyLine[l])
+        } else LazyColumn(
+            Modifier.padding(pad).fillMaxSize(),
+            contentPadding = PaddingValues(DS.screen),
+            verticalArrangement = Arrangement.spacedBy(DS.s3),
+        ) {
+            items(sessions.sortedByDescending { it.createdAt }, key = { it.id }) { s ->
+                com.drishtisaathi.home.SessionRow(l, s, remote[s.id], { onOpen(s.id) }, { pendingDelete = s.id })
             }
         }
     }
 
     pendingDelete?.let { id ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            text = { Text(S.deleteConfirm[l], style = MaterialTheme.typography.bodyLarge) },
-            confirmButton = { TextButton({ pendingDelete = null; onDelete(id) }) { Text(S.delete[l], color = UrgentRed) } },
-            dismissButton = { TextButton({ pendingDelete = null }) { Text(S.cancel[l]) } },
-        )
+        DsBottomSheet(onDismiss = { pendingDelete = null }) {
+            Text(SHome.deleteSession[l], style = MaterialTheme.typography.titleLarge, color = c.ink, modifier = Modifier.semantics { heading() })
+            Text(S.deleteConfirm[l], style = MaterialTheme.typography.bodyLarge, color = c.ink)
+            PrimaryButton(S.delete[l], { pendingDelete = null; onDelete(id) }, container = c.urgent, icon = Icons.Rounded.DeleteOutline)
+            SecondaryButton(S.cancel[l], { pendingDelete = null })
+        }
     }
 }

@@ -10,7 +10,7 @@ object TxtRegistry {
 
     /** Forces every track object to initialise so the wording test sees all of their strings. */
     fun loadAll(): List<Txt> {
-        listOf(SCamera, SVision, SVoice, STryOn, SFlow, SAnamnesis, SBridge, SAiVoice, SShop, S3D, SProfile, STele, SAuth).forEach { it.hashCode() }
+        listOf(SCamera, SVision, SVoice, STryOn, SFlow, SAnamnesis, SBridge, SAiVoice, SShop, S3D, SProfile, STele, SAuth, SHome).forEach { it.hashCode() }
         return all
     }
 }

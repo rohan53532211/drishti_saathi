@@ -119,136 +119,6 @@ fun ConsultCard(lang: Lang, urgent: Boolean, onConsult: () -> Unit) {
     }
 }
 
-/** The "Patient mode" card on Home. */
-@Composable
-fun PatientModeCard(lang: Lang, userName: String?, onClick: () -> Unit) {
-    val c = DS.colors
-    Surface(onClick = onClick, shape = DS.card, color = c.primarySoft, modifier = Modifier.fillMaxWidth().heightIn(min = DS.answerMin)) {
-        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(40.dp).background(c.primary, CircleShape), contentAlignment = Alignment.Center) {
-                Text((userName?.trim()?.firstOrNull()?.uppercase() ?: "+"), color = c.onPrimary, style = MaterialTheme.typography.titleMedium)
-            }
-            Column(Modifier.weight(1f)) {
-                Text(if (userName != null) STele.hello.format(userName)[lang] else STele.patientMode[lang], style = MaterialTheme.typography.titleMedium, color = c.ink)
-                Text(STele.patientModeLine[lang], style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
-            }
-        }
-    }
-}
-
-// ---- account -------------------------------------------------------------------------------------
-
-/**
- * Patient mode: register or log in (mobile number + password; the consent box is required to register), then the
- * profile with "Take the eye test", "My consultations", log out and "Delete my account and data".
- */
-@Composable
-fun PatientScreen(
-    lang: Lang, onLang: (Lang) -> Unit, tele: TeleController,
-    onStartTest: () -> Unit, onConsultations: () -> Unit, onServer: () -> Unit, onBack: () -> Unit,
-    /** Called right after a login or registration (the result screen sends the patient back to its "Consult" step). */
-    onSignedIn: () -> Unit = {},
-    /** "Change who uses this phone" (patient phones only). */
-    onSwitchRole: (() -> Unit)? = null,
-) {
-    val user by tele.user.collectAsState()
-    val c = DS.colors
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    AppScaffold(lang, onLang, title = STele.patientMode[lang], onBack = onBack) { pad ->
-        Column(
-            Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(DS.screen),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            val u = user
-            if (u == null) {
-                var registering by rememberSaveable { mutableStateOf(false) }
-                var name by rememberSaveable { mutableStateOf("") }
-                var phone by rememberSaveable { mutableStateOf("") }
-                var password by remember { mutableStateOf("") }          // never saved with the screen state
-                var age by rememberSaveable { mutableStateOf("") }
-                var gender by rememberSaveable { mutableStateOf<String?>(null) }
-                var consent by rememberSaveable { mutableStateOf(false) }
-                var busy by remember { mutableStateOf(false) }
-                var error by remember { mutableStateOf<Txt?>(null) }
-
-                Text((if (registering) STele.register else STele.login)[lang], style = MaterialTheme.typography.headlineMedium, color = c.ink,
-                    modifier = Modifier.semantics { heading() })
-                if (registering) OutlinedTextField(name, { name = it.take(80) }, label = { Text(STele.name[lang]) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(phone, { phone = it.filter { ch -> ch.isDigit() || ch == '+' }.take(13) }, label = { Text(STele.phone[lang]) }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(password, { password = it.take(128) }, label = { Text(STele.password[lang]) }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth())
-                if (registering) {
-                    OutlinedTextField(age, { age = it.filter(Char::isDigit).take(3) }, label = { Text(STele.age[lang]) }, singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                    Text(STele.gender[lang], style = MaterialTheme.typography.labelMedium, color = c.inkSecondary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("F" to STele.genderF, "M" to STele.genderM, "O" to STele.genderO).forEach { (code, label) ->
-                            AnswerCard(label[lang], selected = gender == code, modifier = Modifier.weight(1f)) { gender = if (gender == code) null else code }
-                        }
-                    }
-                    Row(Modifier.fillMaxWidth().background(c.surface, DS.button).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = consent, onCheckedChange = { consent = it })
-                        Text(STele.consent[lang], style = MaterialTheme.typography.bodyLarge, color = c.ink)
-                    }
-                }
-                ErrorLine(lang, error)
-                PrimaryButton((if (registering) STele.register else STele.login)[lang], enabled = !busy) {
-                    val problem = if (registering) TeleText.registrationProblem(name, phone, password, age, consent) else TeleText.loginProblem(phone, password)
-                    if (problem != null) { error = problem; return@PrimaryButton }
-                    busy = true; error = null
-                    scope.launch {
-                        val digits = TeleText.phoneDigits(phone)!!
-                        val r = if (registering) tele.register(name, digits, password, age.trim().toInt(), gender, lang.name) else tele.login(digits, password)
-                        busy = false
-                        r.onSuccess { password = ""; onSignedIn() }.onFailure { error = TeleText.error(it, login = true) }
-                    }
-                }
-                TextButton(onClick = { registering = !registering; error = null }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                    Text((if (registering) STele.haveAccount else STele.newHere)[lang], color = c.primary)
-                }
-                Text(STele.demoNote[lang], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
-                TextButton(onClick = onServer, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(STele.serverSettings[lang], color = c.inkSecondary) }
-            } else {
-                var confirmDelete by remember { mutableStateOf(false) }
-                var error by remember { mutableStateOf<Txt?>(null) }
-                SoftCard(hero = true) {
-                    Text(STele.hello.format(u.name)[lang], style = MaterialTheme.typography.headlineSmall, color = c.ink)
-                    Text(listOfNotNull(u.phone, u.age?.toString(), u.language).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
-                    Text("✓ " + STele.consent[lang], style = MaterialTheme.typography.bodySmall, color = c.successInk)
-                }
-                PrimaryButton(STele.takeTest[lang], onClick = onStartTest)
-                BigButton(STele.myConsultations[lang], onConsultations)
-                ErrorLine(lang, error)
-                TextButton(onClick = { tele.logout() }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(STele.logout[lang], color = c.inkSecondary) }
-                TextButton(onClick = { confirmDelete = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(STele.deleteAccount[lang], color = c.urgentInk) }
-                if (onSwitchRole != null) TextButton(onClick = onSwitchRole, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                    Text(com.drishtisaathi.i18n.SAuth.switchRole[lang], color = c.inkSecondary)
-                }
-                Text(STele.demoNote[lang], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
-                if (confirmDelete) AlertDialog(
-                    onDismissRequest = { confirmDelete = false },
-                    title = { Text(STele.deleteAccount[lang]) },
-                    text = { Text(STele.deleteConfirm[lang], style = MaterialTheme.typography.bodyLarge) },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            confirmDelete = false
-                            scope.launch {
-                                tele.deleteAccount()
-                                    .onSuccess { Toast.makeText(context, STele.deleted[lang], Toast.LENGTH_LONG).show() }
-                                    .onFailure { error = TeleText.error(it) }
-                            }
-                        }) { Text(S.delete[lang], color = c.urgentInk) }
-                    },
-                    dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(S.cancel[lang]) } },
-                )
-            }
-        }
-    }
-}
-
 // ---- asking for a consultation -------------------------------------------------------------------
 
 /**
@@ -331,44 +201,89 @@ private fun StatusPill(lang: Lang, k: TeleConsultation) {
         modifier = Modifier.background(bg, DS.pill).padding(horizontal = 12.dp, vertical = 6.dp))
 }
 
-/** "My consultations": each with its status; the list is fetched again every 15 seconds while the screen is open. */
+/** Waiting / In progress / Completed: the status as a pill with an icon and a word (never colour alone). */
+fun statusTone(status: String): com.drishtisaathi.ui.designsystem.Tone = when (status) {
+    "COMPLETED" -> com.drishtisaathi.ui.designsystem.Tone.SUCCESS
+    "CLOSED" -> com.drishtisaathi.ui.designsystem.Tone.NEUTRAL
+    "REQUESTED" -> com.drishtisaathi.ui.designsystem.Tone.WARNING
+    else -> com.drishtisaathi.ui.designsystem.Tone.INFO
+}
+
+/** The patient's consultations, newest first; fetched again every 15 seconds while shown. */
 @Composable
-fun ConsultationsScreen(lang: Lang, onLang: (Lang) -> Unit, tele: TeleController, onOpen: (String) -> Unit, onBack: () -> Unit) {
-    val c = DS.colors
+fun rememberConsultations(tele: TeleController): Pair<List<TeleConsultation>?, Txt?> {
     var list by remember { mutableStateOf<List<TeleConsultation>?>(null) }
     var error by remember { mutableStateOf<Txt?>(null) }
     LaunchedEffect(Unit) {
         while (true) {
-            tele.call { it.consultations() }.onSuccess { list = it; error = null }.onFailure { error = TeleText.error(it) }
+            tele.call { it.consultations() }.onSuccess { r -> list = r.sortedByDescending { it.updatedAt.coerceAtLeast(it.createdAt) }; error = null }
+                .onFailure { error = TeleText.error(it) }
             delay(15_000)
         }
     }
-    AppScaffold(lang, onLang, title = STele.myConsultations[lang], onBack = onBack) { pad ->
-        Column(
-            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(DS.screen),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ErrorLine(lang, error)
-            val shown = list
-            if (shown == null && error == null) Text(SProfile.loading[lang], color = c.inkSecondary)
-            if (shown != null && shown.isEmpty()) SoftCard { Text(STele.none[lang], style = MaterialTheme.typography.bodyLarge, color = c.inkSecondary) }
-            shown.orEmpty().forEach { k ->
-                Surface(onClick = { onOpen(k.id) }, shape = DS.card, color = c.surface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (k.urgent) c.urgent else c.hairline), modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(STele.caseNo.format(k.caseId)[lang], Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = c.ink)
-                            if (k.urgent) Text(STele.urgentTag[lang], color = c.urgentInk, style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.background(c.urgentSoft, DS.pill).padding(horizontal = 10.dp, vertical = 4.dp))
-                        }
-                        StatusPill(lang, k)
-                        Text((k.optometrist?.let { STele.withOptometrist.format(it.name)[lang] + " · " } ?: "") + time(k.createdAt),
-                            style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
-                    }
-                }
+    return list to error
+}
+
+/**
+ * "My consultations" (UI phase 3/5): rows with the optometrist's avatar, name, case number and time, a status pill and
+ * an URGENT pill; a skeleton while loading, a friendly error with retry, an illustrated empty state with one action.
+ */
+@Composable
+fun ConsultationList(lang: Lang, tele: TeleController, onOpen: (String) -> Unit, modifier: Modifier = Modifier,
+                     onEmptyAction: (() -> Unit)? = null, emptyAction: String? = null) {
+    var attempt by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.compose.runtime.key(attempt) {
+        val (list, error) = rememberConsultations(tele)
+        ConsultationListContent(lang, list, error, { attempt++ }, onOpen, modifier, onEmptyAction, emptyAction)
+    }
+}
+
+/** The list itself: [list] null = still loading (or failed, with [error]). */
+@Composable
+fun ConsultationListContent(lang: Lang, list: List<TeleConsultation>?, error: Txt?, onRetry: () -> Unit, onOpen: (String) -> Unit,
+                            modifier: Modifier = Modifier, onEmptyAction: (() -> Unit)? = null, emptyAction: String? = null) {
+    val c = DS.colors
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        when {
+            list == null && error != null -> com.drishtisaathi.ui.designsystem.ErrorState(error[lang], com.drishtisaathi.i18n.SHome.tryAgain[lang], onRetry)
+            list == null -> com.drishtisaathi.ui.designsystem.SkeletonList(com.drishtisaathi.i18n.SHome.loading[lang])
+            list.isEmpty() -> com.drishtisaathi.ui.designsystem.EmptyState(
+                com.drishtisaathi.ui.designsystem.Spot.CHAT, com.drishtisaathi.i18n.SHome.consultsEmpty[lang],
+                com.drishtisaathi.i18n.SHome.consultsEmptyLine[lang], cta = emptyAction, onCta = onEmptyAction)
+            else -> {
+                if (error != null) com.drishtisaathi.ui.designsystem.Banner(error[lang], com.drishtisaathi.ui.designsystem.Tone.WARNING)
+                list.forEach { k -> androidx.compose.runtime.key(k.id) { ConsultationRow(lang, k) { onOpen(k.id) } } }
+                Text(STele.autoRefresh[lang], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
             }
-            Text(STele.autoRefresh[lang], style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
         }
+    }
+}
+
+@Composable
+fun ConsultationRow(lang: Lang, k: TeleConsultation, onClick: () -> Unit) {
+    val c = DS.colors
+    com.drishtisaathi.ui.designsystem.DsCard(onClick = onClick, container = if (k.urgent) c.urgentSoft else null) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            com.drishtisaathi.ui.designsystem.Avatar(k.optometrist?.name)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(k.optometrist?.name ?: com.drishtisaathi.i18n.SHome.waitingOptometrist[lang], style = MaterialTheme.typography.titleMedium, color = c.ink)
+                Text(listOfNotNull(STele.caseNo.format(k.caseId)[lang], time(maxOf(k.updatedAt, k.createdAt)),
+                    k.messageCount.takeIf { it > 0 }?.let { com.drishtisaathi.i18n.SHome.messages.format(it)[lang] }).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall, color = c.inkSecondary)
+            }
+        }
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (k.urgent) com.drishtisaathi.ui.designsystem.StatusPill(STele.urgentTag[lang], com.drishtisaathi.ui.designsystem.Tone.URGENT)
+            com.drishtisaathi.ui.designsystem.StatusPill(STele.status(k.status)[lang], statusTone(k.status))
+        }
+    }
+}
+
+/** "My consultations" as its own screen (from the result screen). */
+@Composable
+fun ConsultationsScreen(lang: Lang, onLang: (Lang) -> Unit, tele: TeleController, onOpen: (String) -> Unit, onBack: () -> Unit) {
+    AppScaffold(lang, onLang, title = STele.myConsultations[lang], onBack = onBack) { pad ->
+        ConsultationList(lang, tele, onOpen, Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(DS.screen))
     }
 }
 

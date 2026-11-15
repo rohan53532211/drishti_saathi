@@ -461,6 +461,12 @@ Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, me
 - `RoleStore` remembers the role; the app opens on the role's home (shop home, or the patient's account page / create-account). "Change who uses this phone" on the patient page and in Shop tools. The one-time phone setup now opens only on the shop home. "Consult an optometrist" without a login opens the new Login screen.
 - Screenshot tests: Robolectric 4.17 + Roborazzi 1.77 (`ScreensTest`), light/dark × Hindi/English × font 1.0/1.3, saved to `docs/screens/`.
 
+### UI phase 3: homes and navigation per role (done)
+- `home/Homes.kt`. Patient: bottom nav Home · Consultations · Profile. Home = greeting, hero "Start eye test (10 min)", Last result (mini rings, date, urgent pill), My optometrist (newest consultation with status pill, or "Consult an optometrist" after a test), tips row. Profile = avatar initials, details, app language, change role, server, log out, delete account (confirm bottom sheet), about + disclaimer.
+- Shop: bottom nav Home · Customers · Tools. Home = connection pill, setup banner, hero "Start new customer", tiles (Past sessions, Frames, Tools). Customers = saved checks with referral pills and optometrist status, delete via bottom sheet. Tools = frames, demo customers; "Advanced" folds away phone setup/calibration, server URL + token, diagnostics/staff checks, change role. Default server stays the hosted one.
+- Consultations list shared by the tab and the old route: avatar, name, case no., time, message count, status pill (icon + word), urgent pill; skeleton, error with retry, illustrated empty state.
+- `SessionViewModel.lastResult` (read-only: newest session + its Vision Profile from the existing builder). Old HomeScreen / PatientScreen removed.
+
 ## Test pass before submission (15 Nov)
 
 Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.

@@ -48,7 +48,6 @@ import com.drishtisaathi.ui.ConfirmScreen
 import com.drishtisaathi.ui.ConsentScreen
 import com.drishtisaathi.ui.DrishtiTheme
 import com.drishtisaathi.ui.HistoryScreen
-import com.drishtisaathi.ui.HomeScreen
 import com.drishtisaathi.ui.InterviewScreen
 import com.drishtisaathi.ui.OldNumbersScreen
 import com.drishtisaathi.ui.ReferralScreen
@@ -349,20 +348,28 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     nav.navigate(Routes.PHONE_SETUP)
                 }
             }
-            HomeScreen(
-                state, vm::setLang,
-                onStart = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
-                onHistory = { nav.navigate(Routes.HISTORY) },
-                onShopTools = { vm.avatarStaffDefault = true; nav.navigate(Routes.SHOP_TOOLS) },
+            val sessions by vm.sessions.collectAsState(initial = emptyList())
+            val remote by vm.remoteReviews.collectAsState(initial = emptyMap())
+            com.drishtisaathi.home.ShopShell(
+                state.lang, vm::setLang,
                 setupDone = setupDone,
-                onSetup = { nav.navigate(Routes.PHONE_SETUP) },
-                onFrames = { vm.avatarStaffDefault = true; vm.loadCatalog3D(); nav.navigate(Routes.FRAME_CATALOGUE) },
                 bridgeOnline = vm.bridgeOnline.collectAsStateWithLifecycle().value,
                 queued = vm.reportQueue.pending.collectAsStateWithLifecycle().value,
+                sessions = sessions, remote = remote,
+                onStart = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
                 onBridgeChip = { vm.flushReports() },
-                onPatient = { consultAfterLogin = false; nav.navigate(Routes.PATIENT) },
-                patientName = vm.tele.user.collectAsStateWithLifecycle().value?.name,
+                onSetup = { nav.navigate(Routes.PHONE_SETUP) },
+                onFrames = { vm.avatarStaffDefault = true; vm.loadCatalog3D(); nav.navigate(Routes.FRAME_CATALOGUE) },
+                onDemo = { nav.navigate(Routes.DEMO) },
+                onServer = { nav.navigate(Routes.BRIDGE_SETTINGS) },
+                onDiagnostics = { nav.navigate(Routes.DIAGNOSTICS) },
+                onOpenSession = { id -> vm.openSession(id) { nav.navigate(Routes.RESULT) } },
+                onDeleteSession = { id -> vm.deleteSession(id) },
+                onSwitchRole = { roles.set(null); root(Routes.ROLE) },
+                onExit = { activity?.finish() },
             )
+            // Sent sessions: check for the optometrist's reply every 15 s while the shop home is open.
+            androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { vm.checkAllWaiting(); kotlinx.coroutines.delay(15_000) } }
             // while Home is open: check the backend and send queued reports every 20 s
             androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { vm.flushReports(); kotlinx.coroutines.delay(20_000) } }
         }
@@ -373,21 +380,20 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
             androidx.compose.runtime.LaunchedEffect(patientUser, role) {
                 if (patientUser == null && role == com.drishtisaathi.firstrun.AppRole.PATIENT) root(Routes.PATIENT_START)
             }
-            com.drishtisaathi.teleconsult.PatientScreen(
-                state.lang, vm::setLang, vm.tele,
-                // the same check as "Start new customer": consent first, then the test
-                onStartTest = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
-                onConsultations = { nav.navigate(Routes.TELE_LIST) },
-                onServer = { nav.navigate(Routes.BRIDGE_SETTINGS) },
-                onBack = { consultAfterLogin = false; if (!nav.popBackStack()) activity?.finish() },
-                onSwitchRole = if (role == com.drishtisaathi.firstrun.AppRole.PATIENT) ({ roles.set(null); root(Routes.ROLE) }) else null,
-                onSignedIn = {
-                    if (consultAfterLogin) {
-                        consultAfterLogin = false
-                        nav.navigate(Routes.TELE_CHOOSE) { popUpTo(Routes.PATIENT) { inclusive = true } }
-                    }
-                },
-            )
+            val last by vm.lastResult.collectAsState(initial = null)
+            patientUser?.let { u ->
+                com.drishtisaathi.home.PatientShell(
+                    state.lang, vm::setLang, u, vm.tele, last,
+                    // the same check as "Start new customer": consent first, then the test
+                    onStartTest = { precisionRun = false; bannerFor = emptyList(); vm.avatarStaffDefault = false; vm.startNew(); nav.navigate(Routes.CONSENT) },
+                    onOpenResult = { id -> vm.openSession(id) { nav.navigate(Routes.RESULT) } },
+                    onConsult = { id -> vm.openSession(id) { nav.navigate(Routes.TELE_CHOOSE) } },
+                    onOpenConsultation = { nav.navigate(Routes.teleCase(it)) },
+                    onServer = { nav.navigate(Routes.BRIDGE_SETTINGS) },
+                    onSwitchRole = { roles.set(null); root(Routes.ROLE) },
+                    onExit = { if (!nav.popBackStack()) activity?.finish() },
+                )
+            }
         }
         composable(Routes.TELE_CHOOSE) {
             val gate = androidx.compose.runtime.remember { vm.safety(state) }
