@@ -42,6 +42,8 @@ MAX_REPORT_BYTES = 256 * 1024
 MAX_IMAGE_BYTES = 600 * 1024
 IMAGE_MIMES = ("image/jpeg", "image/png", "image/webp")
 DEFAULT_LENS_CATALOG = Path(__file__).resolve().parents[2] / "app" / "app" / "src" / "main" / "assets" / "lens_catalog.json"
+# The same file kept inside backend/: a host that deploys only backend/ (Render root directory) has no app assets.
+BUNDLED_LENS_CATALOG = Path(__file__).parent / "data" / "lens_catalog.json"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tc_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -235,7 +237,8 @@ def greeting(to_name: str, cid: str, from_name: str, lang: str, from_optometrist
 
 def lens_options(path: Optional[Path]) -> list[dict[str, str]]:
     """Lens names the prescription form can pick from: the app's own lens_catalog.json when it is there."""
-    f = Path(os.environ.get("LENS_CATALOG") or path or DEFAULT_LENS_CATALOG)
+    chosen = os.environ.get("LENS_CATALOG") or path
+    f = Path(chosen) if chosen else (DEFAULT_LENS_CATALOG if DEFAULT_LENS_CATALOG.exists() else BUNDLED_LENS_CATALOG)
     if not f.exists():
         return []
     try:

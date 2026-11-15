@@ -1,0 +1,40 @@
+# Render blueprint for the backend (FastAPI): the optometrist bridge, the teleconsult API and /portal.
+# New > Blueprint in the Render dashboard reads this file; the values marked "sync: false" are typed in there
+# and are never in git.
+#
+# Free plan: the service sleeps when idle and its disk does not last. Every restart begins with an empty
+# database: the tables and the admin are made again, and the demo accounts are seeded when DEMO_PASSWORD is set.
+services:
+  - type: web
+    name: drishti-saathi-backend
+    runtime: python
+    plan: free
+    branch: feature/teleconsult
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Render ends https at its proxy: --proxy-headers makes the app see the real client address and scheme.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      # Signs the login tokens. Without it a new key is made at every restart and everyone is logged out.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
+      # Optional: your own numbers for the first demo optometrist and the third demo patient (WhatsApp buttons).
+      - key: DEMO_OPTOMETRIST_PHONE
+        sync: false
+      - key: DEMO_PATIENT_PHONE
+        sync: false
+      # Optional but advised on a public address: the app sends it as X-Bridge-Token (same value in staff settings).
+      - key: BRIDGE_TOKEN
+        sync: false

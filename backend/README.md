@@ -114,6 +114,39 @@ Each prints an `https://…` address. Then:
 
 Stop the tunnel after the demo.
 
+## Host it on Render (free web service)
+
+`render.yaml` at the repository root is a Render blueprint: **New → Blueprint**, pick this repository and the branch `feature/teleconsult`. To make the service by hand instead (**New → Web Service**), use:
+
+| Setting | Value |
+|---|---|
+| Root directory | `backend` |
+| Runtime | Python 3 (version from `PYTHON_VERSION` = `3.11.11`; `backend/.python-version` says the same) |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"` |
+| Health check path | `/health` |
+
+Environment variables (values are typed into the Render dashboard, never into git):
+
+| Name | Needed | What it is |
+|---|---|---|
+| `PYTHON_VERSION` | yes | `3.11.11` |
+| `JWT_SECRET` | yes | Long random string that signs the logins. Without it every restart logs everyone out. The blueprint makes one. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | yes | The one admin account, made at start-up. |
+| `DEMO_PASSWORD` | yes | Password of every demo account (8 or more characters). Without it no demo data is seeded. |
+| `SARVAM_API_KEY` | for the voice interview | Without it the app uses the standard interview. |
+| `DEMO_OPTOMETRIST_PHONE`, `DEMO_PATIENT_PHONE` | optional | Your own numbers for the first demo optometrist and the third demo patient. |
+| `BRIDGE_TOKEN` | advised | The app must send the same value as `X-Bridge-Token`; without it `/profiles` is open to anyone with the address. |
+| `CORS_ORIGINS`, `AUTO_SEED_DEMO`, `SARVAM_*` | optional | See `.env.example`. |
+
+What to know about the free plan:
+- **The disk does not last.** The service sleeps after about 15 minutes without traffic, and every restart or deploy begins with an empty SQLite file. At start-up the tables and the admin are made again, and when the database has no patient or optometrist the demo accounts and the three demo cases are seeded (`DEMO_PASSWORD`). Anything registered or written since the last start is gone. Real use needs a persistent disk or a hosted database.
+- The first request after a sleep takes up to a minute.
+- Render deploys only `backend/`. The lens list and the interview topics come from the copies in `backend/app/data/` there; a test fails when they differ from the app's assets (copy the two files again).
+- The 3D frame catalogue (`generated/frames3d`, not in git) is not on Render, so `/catalog` is empty there.
+
+After the deploy: `https://<name>.onrender.com/health` answers `{"ok": true, ...}`, the portal is at `/portal` and the admin page at `/portal/admin`. Put the `https://` address in the app's bridge settings.
+
 ## AI voice interview (Sarvam)
 
 The same server also runs the optional **Voice interview (AI)**. The flow is: phone → this backend → Sarvam → this backend → phone. The Sarvam key lives only in `backend/.env` and is never in the APK.
