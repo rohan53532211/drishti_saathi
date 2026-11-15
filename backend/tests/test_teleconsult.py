@@ -363,8 +363,10 @@ def test_portal_pages_are_served(client):
 
 # ---- demo data ----
 
-def test_seed_script_makes_marked_demo_accounts_once(client, db_path):
-    from app import seed_demo
+def test_seed_script_makes_marked_demo_accounts_once(client, db_path, monkeypatch):
+    from app import seed_demo    # importing it loads backend/.env
+    for name in ("DEMO_OPTOMETRIST_PHONE", "DEMO_PATIENT_PHONE"):    # a developer's own .env must not change the demo logins here
+        monkeypatch.delenv(name, raising=False)
     made = seed_demo.seed(db_path, "demo-pass-123")
     assert made == {"optometrists": 3, "patients": 3, "consultations": 3}
     assert seed_demo.seed(db_path, "demo-pass-123") == {"optometrists": 0, "patients": 0, "consultations": 0}    # nothing twice
