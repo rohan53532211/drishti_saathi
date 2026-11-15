@@ -99,6 +99,13 @@ data class VisionProfile(
     companion object {
         private fun pct(v: Double) = v.roundToInt().coerceIn(0, 100)
 
+        /** The leisure label from the ring's score (the same number the ring shows), never from a separate scale. */
+        fun leisureLabel(score: Int, cfg: VisionProfileConfig): LeisureLabel = when {
+            score >= cfg.leisure.highFromScore -> LeisureLabel.HIGH
+            score >= cfg.leisure.mediumFromScore -> LeisureLabel.MEDIUM
+            else -> LeisureLabel.LOW
+        }
+
         fun from(i: ProfileInputs, cfg: VisionProfileConfig): VisionProfile {
             // Work: how much of the work is near work
             val weights = i.workActivities.mapNotNull { cfg.work.nearWeights[it] }
@@ -122,16 +129,13 @@ data class VisionProfile(
             // Leisure: hours in the sun plus a bonus for sunny activities
             val o = i.outdoorHours
             val bonus = i.leisure.sumOf { cfg.leisure.activityBonus[it] ?: 0 }
-            val leisureLabel = when {
-                o == null || o < cfg.leisure.mediumFromHours -> LeisureLabel.LOW
-                o >= cfg.leisure.highFromHours -> LeisureLabel.HIGH
-                else -> LeisureLabel.MEDIUM
-            }
+            val leisureScore = pct((o ?: 0.0) / cfg.leisure.fullScaleHours * 100 + bonus)
+            val leisureLabel = leisureLabel(leisureScore, cfg)
             return VisionProfile(
                 work = Ring(workScore, workLabel.name, weights.isNotEmpty()),
                 digital = Ring(pct((h ?: 0.0) / cfg.digital.fullScaleHours * 100), digitalLabel.name, h != null),
                 mobility = Ring(cfg.mobility.scores.getValue(d ?: DriveFrequency.NEVER), mobilityLabel.name, d != null),
-                leisure = Ring(pct((o ?: 0.0) / cfg.leisure.fullScaleHours * 100 + bonus), leisureLabel.name, o != null),
+                leisure = Ring(leisureScore, leisureLabel.name, o != null),
                 nightGlareSensitive = sensitive,
             )
         }

@@ -80,7 +80,8 @@ class ScreeningFlowTest {
         val r = normal.copy(contrast = listOf(ContrastEyeResult(Eye.RIGHT, 12.5, true), ContrastEyeResult(Eye.LEFT, null, true)))
         val at55 = ScreeningText.lines(r, 55, false, f.rules).filter { it.label.en.startsWith("Contrast") }
         assertEquals("Contrast R: lowest step seen 12.5% – Reduced. Suggest cataract / eye-health check", at55[0].text.en)
-        assertEquals("Contrast L: no step seen – Reduced. Suggest cataract / eye-health check", at55[1].text.en)
+        // no step seen at all (not even 100 %): the test is not valid, so no "Reduced" and no eye-health note
+        assertEquals("Contrast L: Test not valid – repeat with glasses/trial lens on", at55[1].text.en)
         assertTrue(at55.all { it.status == ScreenLine.Status.WATCH })
         assertNull(ScreeningText.lines(r, 30, false, f.rules).first { it.label.en.startsWith("Contrast") }.note)
         assertEquals(SProfile.eyeHealthNote, ScreeningText.lines(r, 30, true, f.rules).first { it.label.en.startsWith("Contrast") }.note)

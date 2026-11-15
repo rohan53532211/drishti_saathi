@@ -1,5 +1,6 @@
 package com.drishtisaathi.engine.profile
 
+import com.drishtisaathi.engine.Eye
 import com.drishtisaathi.engine.InterviewAnswers
 import com.drishtisaathi.engine.PowerKnown
 import com.drishtisaathi.engine.QuickEstimate
@@ -14,8 +15,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class RedFlag {
     SUDDEN_VISION_LOSS, EYE_PAIN_REDNESS, NEW_FLASHES, NEW_FLOATERS, CURTAIN_SHADOW, DOUBLE_VISION,
-    /** Wavy, missing, blurred or broken lines on the grid, or bent straight lines reported in the survey. */
+    /** Wavy, missing, blurred or broken lines marked on the grid test (never from an answer). */
     AMSLER_DISTORTION,
+    /** The customer said straight lines (door frames, tiles) look bent or wavy: their answer, not a grid result. */
+    BENT_LINES_REPORTED,
     /** "Flashes, floating spots or a curtain": yes, signs not picked. */
     FLASHES_FLOATERS_CURTAIN_UNSPECIFIED,
     /** "Sudden drop in vision, pain or redness, double vision": yes, signs not picked. */
@@ -48,12 +51,14 @@ data class SafetyGate(
     /** Under 18 with any minus power: the power is measured, no lens choice, referral for myopia control. */
     val childMyopia: Boolean = false,
     val tag: ReportTag = ReportTag.ROUTINE,
+    /** The eyes whose grid test showed distortion (empty when the flag comes from the older both-eyes grid test). */
+    val amslerEyes: List<Eye> = emptyList(),
 ) {
     val urgent: Boolean get() = redFlags.isNotEmpty()
     /** A red flag or child myopia: no lens is suggested or sold; the referral card is shown instead. */
     val lensAllowed: Boolean get() = !urgent && !childMyopia
-    /** With a red flag the measured power is labelled "for the optometrist only". */
-    val powerForOptometristOnly: Boolean get() = urgent
+    /** With a red flag or child myopia the power is worded "For the optometrist only", never "your power". */
+    val powerForOptometristOnly: Boolean get() = urgent || childMyopia
     /** A child without myopia may get a lens family for children, labelled "optometrist confirms". */
     val optometristConfirms: Boolean get() = child && lensAllowed
 }
@@ -66,8 +71,8 @@ object Safety {
 
     /**
      * Every red flag found so far, without duplicates, in a fixed order. A red-flag "yes" whose follow-up was not
-     * answered is kept as UNSPECIFIED (never dropped). The grid counts when the old or the new grid test found
-     * distortion, or the customer reports bent straight lines.
+     * answered is kept as UNSPECIFIED (never dropped). The grid flag needs a grid result with distortion; the
+     * customer's own "straight lines look bent" is a separate flag.
      */
     fun redFlags(a: InterviewAnswers, s: SurveyAnswers, tests: VisionTests? = null, screening: ScreeningResults? = null): List<RedFlag> {
         val out = linkedSetOf<RedFlag>()
@@ -78,9 +83,17 @@ object Safety {
         if (a.redFlagFlashes == true && picked.none { it in flashesGroup }) out += RedFlag.FLASHES_FLOATERS_CURTAIN_UNSPECIFIED
         if (a.redFlagOther == true && picked.none { it in otherGroup }) out += RedFlag.SUDDEN_LOSS_PAIN_DOUBLE_UNSPECIFIED
         if (s.yes(DOUBLE_VISION_QUESTION) == true) out += RedFlag.DOUBLE_VISION
-        if (a.straightLinesBent == true || tests?.amslerAbnormal == true || screening?.amslerAbnormal == true) out += RedFlag.AMSLER_DISTORTION
+        if (gridDistortion(tests, screening)) out += RedFlag.AMSLER_DISTORTION
+        if (a.straightLinesBent == true) out += RedFlag.BENT_LINES_REPORTED
         return RedFlag.entries.filter { it in out }
     }
+
+    /**
+     * The grid flag comes only from a grid test that was actually done: the per-eye grid of the screening stage, or
+     * (sessions without it) the older grid test. An answer never sets it.
+     */
+    fun gridDistortion(tests: VisionTests?, screening: ScreeningResults?): Boolean =
+        if (screening != null && screening.amsler.isNotEmpty()) screening.amslerAbnormal else tests?.amslerAbnormal == true
 
     fun isEmergency(flags: List<RedFlag>, cfg: SafetyConfig): Boolean =
         flags.any { it in cfg.emergencySigns || (it.unspecified && cfg.unspecifiedIsEmergency) }
@@ -107,7 +120,8 @@ object Safety {
             childMyopia -> ReportTag.CHILD_MYOPIA
             else -> ReportTag.ROUTINE
         }
-        return SafetyGate(flags, isEmergency(flags, cfg), child, childMyopia, tag)
+        val gridEyes = if (RedFlag.AMSLER_DISTORTION in flags) screening?.amslerEyes.orEmpty() else emptyList()
+        return SafetyGate(flags, isEmergency(flags, cfg), child, childMyopia, tag, gridEyes)
     }
 
     /**

@@ -47,12 +47,22 @@ object LensText {
         "WORK" -> SProfile.ringWork; "DIGITAL" -> SProfile.ringDigital; "MOBILITY" -> SProfile.ringMobility; else -> SProfile.ringLeisure
     }
 
-    /** "Work: Near-focused (88)" per ring; a ring nobody answered says so. */
-    fun ringLines(p: VisionProfile): List<Txt> = p.rings.map { (id, r) ->
+    /** What an unanswered ring says: on the emergency short path the survey was skipped on purpose. */
+    fun ringUnknown(emergency: Boolean): Txt = if (emergency) SProfile.ringSkippedEmergency else SProfile.ringNotAnswered
+
+    /** The label under a ring. */
+    fun ringLabel(r: com.drishtisaathi.engine.profile.Ring, emergency: Boolean): Txt = if (r.known) SProfile.ringLabel(r.label) else ringUnknown(emergency)
+
+    /**
+     * "Work: Near-focused (88)" per ring; a ring nobody answered says so, and on the emergency short path
+     * ([emergency]) it says "Skipped – emergency short path".
+     */
+    fun ringLines(p: VisionProfile, emergency: Boolean = false): List<Txt> = p.rings.map { (id, r) ->
         val t = ringTitle(id)
         val label = SProfile.ringLabel(r.label)
         val glare = if (id == "MOBILITY" && p.nightGlareSensitive) SProfile.nightGlare else null
-        if (!r.known) Txt("${t.en}: ${SProfile.ringNotAnswered.en}", "${t.hi}: ${SProfile.ringNotAnswered.hi}")
+        val unknown = ringUnknown(emergency)
+        if (!r.known) Txt("${t.en}: ${unknown.en}", "${t.hi}: ${unknown.hi}")
         else Txt("${t.en}: ${label.en} (${r.score})" + (glare?.let { " · ${it.en}" } ?: ""), "${t.hi}: ${label.hi} (${r.score})" + (glare?.let { " · ${it.hi}" } ?: ""))
     }
 }

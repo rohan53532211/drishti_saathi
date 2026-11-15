@@ -303,9 +303,14 @@ fun contrastChoices(correct: Char, n: Int, rnd: Random): List<Char> =
 @Composable
 private fun ContrastScreen(
     lang: Lang, rules: RulesConfig, eye: Eye, reading: DistanceReading?, scale: ScreenScale,
-    speak: (Txt) -> Unit, onSkip: () -> Unit, onResult: (ContrastEyeResult) -> Unit,
+    speak: (Txt) -> Unit, onSkip: () -> Unit,
+    /** This eye's power is 1.00 D or more: the customer is told to wear the glasses or the trial lens first. */
+    wearCorrection: Boolean = false,
+    onResult: (ContrastEyeResult) -> Unit,
 ) {
     val cfg = rules.screening.contrast
+    /** The 100 % letters were not read: the test is not valid; it is repeated with the correction on. */
+    var invalid by remember { mutableStateOf<ContrastEyeResult?>(null) }
     val vm = remember(rules) { com.drishtisaathi.engine.vision.VisionMath(rules) }
     val rnd = remember { Random(System.nanoTime()) }
     var run by remember { mutableStateOf(ContrastRun(cfg)) }
@@ -320,15 +325,30 @@ private fun ContrastScreen(
 
     fun answer(right: Boolean) {
         val next = run.answer(right)
-        if (next.done) onResult(next.result(eye)) else {
+        if (next.done) { val r = next.result(eye); if (r.invalid) invalid = r else onResult(r) } else {
             run = next
             letter = SLOAN_LETTERS.filter { it != letter }.random(rnd)
             choices = contrastChoices(letter, cfg.choices, rnd)
         }
     }
 
+    invalid?.let { bad ->
+        LaunchedEffect(bad) { speak(SProfile.contrastInvalidBody) }
+        Column(Modifier.fillMaxSize().background(DS.colors.background).padding(DS.screen), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(head(eye, SProfile.contrastTitle)[lang], style = MaterialTheme.typography.headlineSmall, color = DS.colors.ink)
+            Text(SProfile.resContrastInvalid[lang], style = MaterialTheme.typography.titleLarge, color = DS.colors.warningInk, fontWeight = FontWeight.SemiBold)
+            Text(SProfile.contrastInvalidBody[lang], style = MaterialTheme.typography.bodyLarge, color = DS.colors.ink)
+            PrimaryButton(SProfile.contrastRepeat[lang]) { run = ContrastRun(cfg); started = false; invalid = null }
+            TextButton(onClick = { onResult(bad) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(SProfile.continueWithoutEye[lang], color = DS.colors.inkSecondary)
+            }
+        }
+        return
+    }
+    // an eye with 1.00 D or more is told to wear its correction first, or even the black letters are out of focus
+    val intro = join(if (wearCorrection) join(SProfile.contrastWearCorrection, coverLine(eye)) else coverLine(eye), SProfile.contrastInstruction)
     TestChrome(
-        lang, head(eye, SProfile.contrastTitle), if (started) SProfile.contrastInstruction else join(coverLine(eye), SProfile.contrastInstruction),
+        lang, head(eye, SProfile.contrastTitle), if (started) SProfile.contrastInstruction else intro,
         reading, cfg.minMm, cfg.maxMm, speak, onSkip, background = Color.White,
         controls = {
             if (started) {
@@ -479,7 +499,10 @@ fun ScreeningFlow(
                     AmslerScreen(lang, rules, step.eye, reading, scale, voice, speak, onSkip = { skip(step) }) { r -> finished(results.copy(amsler = results.amsler + r)) }
                 }
                 step is ScreenStep.Contrast -> key(step) {
-                    ContrastScreen(lang, rules, step.eye, reading, scale, speak, onSkip = { skip(step) }) { r -> finished(results.copy(contrast = results.contrast + r)) }
+                    val wear = Contrast.needsCorrection(ScreeningPlan.eyePower(step.eye, quick, answers), rules.screening.contrast)
+                    ContrastScreen(lang, rules, step.eye, reading, scale, speak, onSkip = { skip(step) }, wearCorrection = wear) { r ->
+                        finished(results.copy(contrast = results.contrast + r))
+                    }
                 }
                 step == ScreenStep.Colour -> ColourScreen(lang, rules, reading, scale, voice, speak, onSkip = { skip(step) }) { r -> finished(results.copy(colour = r)) }
                 step == ScreenStep.Classic -> VisionTestFlow(

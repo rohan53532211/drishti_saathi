@@ -55,9 +55,14 @@ data class LensAssistedConfig(
     val highMyopiaBeyondSeD: Double,
     val maxLensAbsD: Double,
     val rangeHalfWidthD: Double,
+    /** Residual through the lens at or beyond this (D, minus): the lens was too weak, ask for a stronger one. */
+    val repeatIfResidualFromSeD: Double,
+    /** How many times the test is repeated with a stronger lens. */
+    val maxStrongerRepeats: Int,
 ) {
     init {
         require(triggerSeD < 0 && highMyopiaBeyondSeD < triggerSeD) { "lensAssisted: thresholds must be minus, high myopia beyond the trigger" }
+        require(repeatIfResidualFromSeD < 0 && maxStrongerRepeats >= 0) { "lensAssisted: bad repeat rule" }
         require(suggestOffsetD > 0 && suggestStepD > 0 && lensStepD > 0 && vertexDistanceM in 0.0..0.03 && maxReachM > 0.2) { "lensAssisted: bad values" }
     }
     companion object { operator fun invoke(): LensAssistedConfig = missingSection("lensAssisted") }
@@ -82,10 +87,14 @@ data class ContrastConfig(
     /** Lowest step passed at or below this (percent) = Normal; anything else = Reduced. */
     val normalMaxPercent: Double,
     val eyeHealthNoteFromAge: Int,
+    /** A power at or beyond this (D, absolute) in the tested eye: the correction must be worn for the test. */
+    val wearCorrectionFromAbsD: Double,
 ) {
     init {
         require(stepsPercent.isNotEmpty() && stepsPercent.zipWithNext().all { (a, b) -> a > b }) { "contrast.stepsPercent must fall" }
         require(passCorrect in 1..trialsPerStep && choices in 2..6) { "contrast: bad trial settings" }
+        require(stepsPercent.first() == 100.0) { "contrast: the first step must be 100 % (it is the validity check)" }
+        require(wearCorrectionFromAbsD > 0) { "contrast.wearCorrectionFromAbsD" }
     }
 }
 
@@ -122,7 +131,13 @@ data class ScreeningConfig(
 @Serializable data class WorkRingConfig(val nearWeights: Map<String, Double>, val defaultScore: Int, val nearFocusedFrom: Int, val distanceFocusedBelow: Int)
 @Serializable data class DigitalRingConfig(val connectedFromHours: Double, val nativeAboveHours: Double, val fullScaleHours: Double)
 @Serializable data class MobilityRingConfig(val scores: Map<DriveFrequency, Int>, val sensitiveFrom: Freq)
-@Serializable data class LeisureRingConfig(val mediumFromHours: Double, val highFromHours: Double, val fullScaleHours: Double, val activityBonus: Map<String, Int>)
+@Serializable
+data class LeisureRingConfig(
+    /** Label thresholds on the ring's own score (0-100), so the label always matches the number shown. */
+    val mediumFromScore: Int, val highFromScore: Int, val fullScaleHours: Double, val activityBonus: Map<String, Int>,
+) {
+    init { require(mediumFromScore in 1 until highFromScore && highFromScore <= 100) { "visionProfile.leisure: bad label thresholds" } }
+}
 
 /** Phase E profile rings (see engine/profile/VisionProfile.kt). */
 @Serializable

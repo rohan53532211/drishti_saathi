@@ -466,6 +466,8 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
                     onInstruction = { voice.instructionSpeaker.speak(it, l) },
                     // Without camera permission: demo and precision mode use the distance slider (no dead end).
                     allowDemoWithoutCamera = state.demo || state.precision,
+                    // a red flag is already known: the power is "For the optometrist only" and not read out
+                    optometristOnly = vm.safety().powerForOptometristOnly,
                     // Staff / device checks: the far letters' size line
                     debug = state.precision || state.demo,
                     // learning loop: in lens-assisted mode the phone-model correction applies to the residual only

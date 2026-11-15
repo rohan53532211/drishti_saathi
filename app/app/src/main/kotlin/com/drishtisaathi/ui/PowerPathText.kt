@@ -10,7 +10,6 @@ import com.drishtisaathi.i18n.S
 import com.drishtisaathi.i18n.SAnamnesis
 import com.drishtisaathi.i18n.Txt
 import com.drishtisaathi.i18n.fmtD
-import com.drishtisaathi.vision.quickEyeText
 
 /**
  * Power path lines shared by the summary screen and the shop PDF (never the customer copy: it has no power numbers).
@@ -52,18 +51,22 @@ object PowerPathText {
      * The eye check's result (compulsory for everyone, also next to a known power or a red flag): the known power if
      * any, each eye's phone range, the near result.
      */
-    fun quickLines(state: UiState): List<Txt> {
-        val q = state.quick ?: return listOfNotNull(knownLine(state))
+    fun quickLines(state: UiState, optometristOnly: Boolean = false): List<Txt> {
+        val q = state.quick ?: com.drishtisaathi.engine.QuickEstimate()
         return buildList {
             knownLine(state)?.let(::add)
-            q.eyes.forEach { (eye, e) -> val t = quickEyeText(e); add(Txt(eyeName(eye) + ": " + t.en, eyeName(eye) + ": " + t.hi)) }
+            // Both eyes, always: a reading, or "not measured" with the reason. Never a silently missing eye.
+            q.bothEyes.forEach { (eye, e, why) -> add(com.drishtisaathi.vision.quickEyeLine(eye, e, why, optometristOnly)) }
             // The reading check: the add (38+), or the near point against the age-expected one (no plus number).
-            q.nearPointCm?.let { cm ->
-                add(com.drishtisaathi.vision.nearResultText(cm, q.addD, q.expectedNearPointCm, q.possibleLongSight))
-            }
-            if (q.possibleLongSight && q.expectedNearPointCm == null) add(SAnamnesis.quickLongSight)
+            q.nearPointCm?.let { cm -> add(nearLine(q, cm)) }
+            // never next to a measured minus power
+            if (q.possibleLongSight && q.expectedNearPointCm == null && !q.anyMyopia) add(SAnamnesis.quickLongSight)
         }
     }
+
+    /** The near result in words; with measured myopia it never mentions long-sightedness. */
+    fun nearLine(q: com.drishtisaathi.engine.QuickEstimate, cm: Double): Txt =
+        com.drishtisaathi.vision.nearResultText(cm, q.addD, q.expectedNearPointCm, q.nearFartherThanExpected ?: q.possibleLongSight, q.anyMyopia, q.nearWithCorrection)
 
     /** The functional vision profile card: hours per zone, the main zone and the lens it points to. */
     fun profileLines(state: UiState, rules: RulesConfig): List<Txt> {

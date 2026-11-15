@@ -120,8 +120,9 @@ class PdfContentTest {
         assertFalse(cust.contains(" D "))                                                         // still no power numbers
     }
 
-    @Test fun `disclaimer appears at top and bottom`() {
+    @Test fun `disclaimer appears once, at the top`() {
         val blocks = PdfContent.shopCopy(state(myope), rules, ctx, Lang.HI)
-        assertEquals(2, blocks.count { it is Block.Para && it.text == S.disclaimerBoth })
+        assertEquals(1, blocks.count { it is Block.Para && it.text == S.disclaimerBoth })
+        assertTrue(blocks.indexOfFirst { it is Block.Para && it.text == S.disclaimerBoth } < blocks.indexOfFirst { it is Block.Rule })
     }
 }

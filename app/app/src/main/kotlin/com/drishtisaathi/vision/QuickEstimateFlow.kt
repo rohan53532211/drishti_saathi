@@ -150,8 +150,11 @@ internal fun eyeCheckSteps(plan: EyeCheckPlan): List<QuickStep> = buildList {
 
 private enum class QPhase { RUN, LENS_ENTRY, LENS_RUN, RESULT }
 
-/** The result line for one eye: a range, never one exact number. */
-fun quickEyeText(e: QuickEye): Txt {
+/**
+ * The result line for one eye: a range, never one exact number. [optometristOnly] (URGENT and CHILD MYOPIA
+ * reports): the plain range without "Your approximate power", because the customer is not given a number.
+ */
+fun quickEyeText(e: QuickEye, optometristOnly: Boolean = false): Txt {
     val se = e.seD
     if (se == null || e.noMyopiaAtReach) return SAnamnesis.quickNoMyopia
     val from = e.rangeFromD ?: PowerRange.around(se).fromD
@@ -161,8 +164,24 @@ fun quickEyeText(e: QuickEye): Txt {
     val base = if (e.method == com.drishtisaathi.engine.profile.PowerMethod.LENS_ASSISTED && lens != null) {
         // every report shows the method: the lens, the residual through it, the total and its range
         P.methodLens.format(fmtD(lens), fmtD(e.residualD ?: (se - lens)), fmtD(se), fmtD(from), fmtD(to))
-    } else SShop.farRange.format(fmtD(from), fmtD(to), e.blurAtCm?.roundToInt() ?: 0)
+    } else (if (optometristOnly) P.optomRange else SShop.farRange).format(fmtD(from), fmtD(to), e.blurAtCm?.roundToInt() ?: 0)
     return if (e.highMyopia) Txt("${base.en}. ${P.highMyopiaNote.en}", "${base.hi}। ${P.highMyopiaNote.hi}") else base
+}
+
+/**
+ * One eye's line on every report. Both eyes are always printed: a measured eye as "R: …", or for an URGENT /
+ * CHILD MYOPIA report "For the optometrist only: R …"; an eye without a reading as "L: not measured – reason".
+ */
+fun quickEyeLine(eye: com.drishtisaathi.engine.Eye, e: QuickEye?, why: com.drishtisaathi.engine.NotMeasured?, optometristOnly: Boolean = false): Txt {
+    val P = com.drishtisaathi.i18n.SProfile
+    val n = if (eye == com.drishtisaathi.engine.Eye.RIGHT) "R" else "L"
+    if (e == null) {
+        val r = P.notMeasuredReason(why ?: com.drishtisaathi.engine.NotMeasured.NOT_DONE)
+        return Txt("$n: " + P.notMeasured.en.format(r.en), "$n: " + P.notMeasured.hi.format(r.hi))
+    }
+    val t = quickEyeText(e, optometristOnly)
+    return if (optometristOnly) Txt("${P.forOptometristOnly.en}: $n ${t.en}", "${P.forOptometristOnly.hi}: $n ${t.hi}")
+    else Txt("$n: ${t.en}", "$n: ${t.hi}")
 }
 
 /** How the eye was measured, short (QR, optometrist page): "through −2.00 D lens" / "without a lens". */
@@ -173,10 +192,19 @@ fun quickMethodText(e: QuickEye): Txt {
     else P.methodUnaidedShort
 }
 
-/** Near reading check result: the add as a range (38+), or the near point against the age-expected one (no plus number). */
-fun nearResultText(nearPointCm: Double?, addD: Double?, expectedCm: Double?, farther: Boolean): Txt = when {
+/**
+ * Near reading check result: the add as a range (38+), or the near point against the age-expected one (no plus
+ * number). [myopic]: myopia was measured for this customer, so long-sightedness is never mentioned; without the
+ * distance correction on ([corrected] not true) the near point is not judged at all.
+ */
+fun nearResultText(
+    nearPointCm: Double?, addD: Double?, expectedCm: Double?, farther: Boolean,
+    myopic: Boolean = false, corrected: Boolean? = null,
+): Txt = when {
     nearPointCm == null -> SAnamnesis.quickNearNone
     addD != null -> PowerRange.add(addD).let { SShop.nearAddRange.format(nearPointCm.roundToInt(), fmtD(it.fromD), fmtD(it.toD)) }
+    myopic && corrected != true -> com.drishtisaathi.i18n.SProfile.nearUncorrectedMyope.format(nearPointCm.roundToInt())
+    expectedCm != null && farther && myopic -> com.drishtisaathi.i18n.SProfile.nearFartherMyope.format(nearPointCm.roundToInt(), expectedCm.roundToInt())
     expectedCm != null && farther -> SShop.nearFarther.format(nearPointCm.roundToInt(), expectedCm.roundToInt())
     expectedCm != null -> SShop.nearNormal.format(nearPointCm.roundToInt(), expectedCm.roundToInt())
     else -> SShop.nearOnly.format(nearPointCm.roundToInt())
@@ -199,15 +227,34 @@ private fun stepHeader(step: QuickStep): Txt = when (step) {
 
 private fun eyeLine(eye: TestEye, t: Txt): Txt = Txt("${eyeName(eye).en}: ${t.en}", "${eyeName(eye).hi}: ${t.hi}")
 
-/** The eye check's result. [primary] = it is the session's power source (false next to a known power). */
-internal fun eyeCheckResult(right: QuickEye?, left: QuickEye?, near: NearCheck.Result?, primary: Boolean): QuickEstimate {
+/**
+ * The eye check's result. [primary] = it is the session's power source (false next to a known power). An eye
+ * without a reading keeps its reason ([rightWhy] / [leftWhy], default "eye check not done"). Long-sightedness is
+ * never suggested next to a measured minus power.
+ */
+internal fun eyeCheckResult(
+    right: QuickEye?, left: QuickEye?, near: NearCheck.Result?, primary: Boolean,
+    rightWhy: com.drishtisaathi.engine.NotMeasured? = null, leftWhy: com.drishtisaathi.engine.NotMeasured? = null,
+): QuickEstimate {
     val add = near?.addD?.let(PowerRange::add)
+    val myopic = right?.myopic == true || left?.myopic == true
     return QuickEstimate(
         right, left, add?.centreD, near?.nearPointCm,
-        possibleLongSight = near?.fartherThanExpected == true,
+        possibleLongSight = near?.fartherThanExpected == true && !myopic,
         primary = primary, expectedNearPointCm = near?.expectedNearPointCm,
         addFromD = add?.fromD, addToD = add?.toD,
+        rightNotMeasured = if (right == null) rightWhy ?: com.drishtisaathi.engine.NotMeasured.NOT_DONE else null,
+        leftNotMeasured = if (left == null) leftWhy ?: com.drishtisaathi.engine.NotMeasured.NOT_DONE else null,
+        nearWithCorrection = near?.withCorrection,
+        nearFartherThanExpected = near?.fartherThanExpected,
     )
+}
+
+/** The first eye without a reading (right before left), so the check can go back to it; null = both measured. */
+internal fun firstUnmeasuredEye(right: QuickEye?, left: QuickEye?): TestEye? = when {
+    right == null -> TestEye.RIGHT
+    left == null -> TestEye.LEFT
+    else -> null
 }
 
 /**
@@ -234,7 +281,11 @@ fun QuickEstimateFlow(
     debug: Boolean = false,
     /** This phone model's correction from verified shop records; in lens-assisted mode it corrects the residual only. */
     deviceFit: com.drishtisaathi.engine.vision.DeviceFit? = null,
+    /** A red flag is already known: the power is worded "For the optometrist only" and never spoken to the customer. */
+    optometristOnly: Boolean = false,
 ) {
+    // under 18 a minus power is for the optometrist only (child myopia), so a child's lines are worded that way too
+    val forOptom = optometristOnly || (answers.age ?: 99) < rules.safety.childUnderAge
     DisposableEffect(distance) {
         distance.start()
         onDispose { distance.stop() }
@@ -266,37 +317,61 @@ fun QuickEstimateFlow(
     var firstPass by remember { mutableStateOf<QuickEye?>(null) }
     var lensD by remember { mutableStateOf<Double?>(null) }
     var tooStrong by remember { mutableStateOf(false) }
+    /** The reading through a lens that turned out too weak (residual still strong): a stronger lens is asked for once. */
+    var weak by remember { mutableStateOf<QuickEye?>(null) }
+    var strongerRepeats by remember { mutableIntStateOf(0) }
+    /** Eyes whose far check was skipped (the report then says "not measured – skipped"). */
+    var skippedEyes by remember { mutableStateOf(emptySet<TestEye>()) }
+    /** A short-sighted customer: is the distance correction on for the near check? null = not asked yet. */
+    var nearCorrection by remember { mutableStateOf<Boolean?>(null) }
+    val P = com.drishtisaathi.i18n.SProfile
 
-    fun next() { index = (index + 1).coerceAtMost(steps.lastIndex); phase = QPhase.RUN; attempt++; firstPass = null; lensD = null; tooStrong = false }
-    fun again() { phase = QPhase.RUN; attempt++; firstPass = null; lensD = null; tooStrong = false }
-    fun setEye(eye: TestEye, e: QuickEye) { if (eye == TestEye.RIGHT) right = e else left = e }
-    fun nearLine() = nearResultText(near?.nearPointCm, near?.addD, near?.expectedNearPointCm, near?.fartherThanExpected == true)
+    fun resetLens() { firstPass = null; lensD = null; tooStrong = false; weak = null; strongerRepeats = 0 }
+    fun next() { index = (index + 1).coerceAtMost(steps.lastIndex); phase = QPhase.RUN; attempt++; resetLens() }
+    fun again() { phase = QPhase.RUN; attempt++; resetLens(); nearCorrection = null }
+    fun goTo(eye: TestEye) { index = steps.indexOf(QuickStep.Power(eye)).coerceAtLeast(0); phase = QPhase.RUN; attempt++; resetLens() }
+    fun setEye(eye: TestEye, e: QuickEye) { if (eye == TestEye.RIGHT) right = e else left = e; skippedEyes = skippedEyes - eye }
+    fun skipEye(eye: TestEye) { skippedEyes = skippedEyes + eye; next() }
+    fun why(eye: TestEye) = if (eye in skippedEyes) com.drishtisaathi.engine.NotMeasured.SKIPPED else com.drishtisaathi.engine.NotMeasured.NOT_DONE
+    val myopic = right?.myopic == true || left?.myopic == true
+    fun nearLine() = nearResultText(near?.nearPointCm, near?.addD, near?.expectedNearPointCm, near?.fartherThanExpected == true, myopic, near?.withCorrection)
 
     Column(modifier.fillMaxSize()) {
         if (voice != null) MuteRow(voice, lang)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
-                step == QuickStep.Done -> QuickInfo(
-                    lang, SShop.checkDone,
-                    buildList {
-                        right?.let { add(eyeLine(TestEye.RIGHT, quickEyeText(it))) }
-                        left?.let { add(eyeLine(TestEye.LEFT, quickEyeText(it))) }
-                        if (nearDone) add(nearLine())
-                    },
-                    primary = SShop.next to { onDone(eyeCheckResult(right, left, near, primary)) },
-                )
+                step == QuickStep.Done -> {
+                    // Both eyes are always listed. An eye without a reading says so, and the main button goes back to it.
+                    val missing = firstUnmeasuredEye(right, left)
+                    val finish = { onDone(eyeCheckResult(right, left, near, primary, why(TestEye.RIGHT), why(TestEye.LEFT))) }
+                    QuickInfo(
+                        lang, SShop.checkDone,
+                        buildList {
+                            add(quickEyeLine(com.drishtisaathi.engine.Eye.RIGHT, right, why(TestEye.RIGHT), forOptom))
+                            add(quickEyeLine(com.drishtisaathi.engine.Eye.LEFT, left, why(TestEye.LEFT), forOptom))
+                            if (missing != null) add(P.bothEyesNeeded)
+                            if (nearDone) add(nearLine())
+                        },
+                        primary = if (missing == null) SShop.next to finish else {
+                            val w = if (missing == TestEye.RIGHT) SShop.rightWord else SShop.leftWord
+                            Txt(P.measureEyeNow.en.format(w.en), P.measureEyeNow.hi.format(w.hi)) to { goTo(missing) }
+                        },
+                        skip = if (missing == null) null else P.continueWithoutEye to finish,
+                    )
+                }
                 phase == QPhase.RESULT -> QuickInfo(
                     lang, stepHeader(step),
                     listOfNotNull(
                         when (step) {
-                            is QuickStep.Power -> (if (step.eye == TestEye.RIGHT) right else left)?.let(::quickEyeText) ?: SShop.skipped
+                            is QuickStep.Power -> (if (step.eye == TestEye.RIGHT) right else left)?.let { quickEyeText(it, forOptom) } ?: SShop.skipped
                             QuickStep.Near -> nearLine()
                             else -> null
                         },
                     ),
                     primary = SShop.next to { next() },
                     skip = SShop.doAgain to { again() },
-                    speak = env.onInstruction,
+                    // a number that is for the optometrist only is not read out to the customer
+                    speak = if (forOptom && step is QuickStep.Power) null else env.onInstruction,
                 )
                 step is QuickStep.Power && phase == QPhase.LENS_ENTRY -> {
                     val first = firstPass
@@ -304,35 +379,50 @@ fun QuickEstimateFlow(
                     else com.drishtisaathi.profile.LensEntryScreen(
                         lang, header(step.eye, com.drishtisaathi.i18n.SProfile.lensModeTitle), first.seD!!, lensCfg, tooStrong, env.onInstruction,
                         onStart = { d -> lensD = d; tooStrong = false; attempt++; phase = QPhase.LENS_RUN },
-                        // no lens at hand: the first reading stays, never a guess
-                        onNoLens = { setEye(step.eye, PowerRange.unaided(first, lensCfg)); phase = QPhase.RESULT },
+                        // no lens at hand: the first reading stays (or the reading through the weaker lens), never a guess
+                        onNoLens = { if (weak == null) setEye(step.eye, PowerRange.unaided(first, lensCfg)); phase = QPhase.RESULT },
+                        weak = weak,
                     )
                 }
                 step is QuickStep.Power && phase == QPhase.LENS_RUN -> key(step, attempt, "lens") {
                     FarLetterScreen(
                         env, step.eye, reading, voice, header(step.eye, com.drishtisaathi.i18n.SProfile.lensModeTitle), simulated, debug,
-                        onSkip = { setEye(step.eye, PowerRange.unaided(firstPass!!, lensCfg)); phase = QPhase.RESULT },
+                        onSkip = { if (weak == null) setEye(step.eye, PowerRange.unaided(firstPass!!, lensCfg)); phase = QPhase.RESULT },
                         throughLens = lensD,
                     ) { through ->
                         val e = PowerRange.lensAssistedEye(firstPass!!, through, lensD ?: 0.0, lensCfg, deviceFit)
-                        // letters sharp at every distance: the lens is too strong, ask for a weaker one
-                        if (e == null) { tooStrong = true; phase = QPhase.LENS_ENTRY } else { setEye(step.eye, e); phase = QPhase.RESULT }
+                        when {
+                            // letters sharp at every distance: the lens is too strong, ask for a weaker one
+                            e == null -> { tooStrong = true; phase = QPhase.LENS_ENTRY }
+                            // the blur point through the lens is still very close: the lens is too weak, repeat once with a stronger one
+                            com.drishtisaathi.engine.profile.LensAssisted.needsStrongerLens(e.residualD, strongerRepeats, lensCfg) -> {
+                                setEye(step.eye, e); weak = e; strongerRepeats++; tooStrong = false; phase = QPhase.LENS_ENTRY
+                            }
+                            else -> { setEye(step.eye, e); phase = QPhase.RESULT }
+                        }
                     }
                 }
                 step is QuickStep.Power -> key(step, attempt) {
-                    FarLetterScreen(env, step.eye, reading, voice, stepHeader(step), simulated, debug, onSkip = { next() }) { eye ->
+                    FarLetterScreen(env, step.eye, reading, voice, stepHeader(step), simulated, debug, onSkip = { skipEye(step.eye) }) { eye ->
                         // from −3.75 D the blur point is so close that 1 cm changes the result a lot: repeat through a lens
                         if (com.drishtisaathi.engine.profile.LensAssisted.needed(eye.seD.takeIf { !eye.noMyopiaAtReach }, lensCfg)) {
                             firstPass = eye; setEye(step.eye, PowerRange.unaided(eye, lensCfg)); phase = QPhase.LENS_ENTRY
                         } else { setEye(step.eye, eye); phase = QPhase.RESULT }
                     }
                 }
+                // A short-sighted customer reads the near text with the distance correction on; staff confirm it first.
+                step == QuickStep.Near && myopic && nearCorrection == null -> QuickInfo(
+                    lang, P.nearCorrectionTitle, listOf(P.nearCorrectionBody),
+                    primary = P.nearCorrectionOn to { nearCorrection = true },
+                    skip = P.nearCorrectionOff to { nearCorrection = false },
+                    speak = env.onInstruction,
+                )
                 step == QuickStep.Near -> key(step, attempt) {
                     val sentence = remember { sentences.pick(lang, Random(System.nanoTime()), lastSentence).also { lastSentence = it } }
                     val farSe = listOfNotNull(right?.seD, left?.seD).takeIf { it.isNotEmpty() }?.average()
                     NearSentenceScreen(env, reading, voice, stepHeader(step), simulated, sentence, onSkip = { next() }) { mm ->
                         nearDone = true
-                        near = NearCheck.analyse(mm, answers.age, farSe, answers, rules)
+                        near = NearCheck.analyse(mm, answers.age, farSe, answers, rules, myopic, withCorrection = nearCorrection == true)
                         phase = QPhase.RESULT
                     }
                 }
@@ -689,18 +779,19 @@ fun CameraQuickEstimateFlow(
     allowDemoWithoutCamera: Boolean = false,
     debug: Boolean = false,
     deviceFit: com.drishtisaathi.engine.vision.DeviceFit? = null,
+    optometristOnly: Boolean = false,
 ) {
     var demo by remember { mutableStateOf(false) }
     if (demo) {
         val fake = remember { FakeDistanceProvider() }
-        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug, deviceFit)
+        QuickEstimateFlow(lang, rules, fake, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug, deviceFit, optometristOnly)
         return
     }
     CameraPermissionGate(lang, onSkip = { if (allowDemoWithoutCamera) demo = true else onSkip() }, autoRequest = true) {
         val relaxed = remember(rules) { powerCheckCamera(rules.camera) }
         val tracker = rememberFaceTracker(relaxed)
         val provider = remember(tracker) { CameraDistanceProvider(tracker, calibration, relaxed, controlsTracker = false) }
-        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug, deviceFit)
+        QuickEstimateFlow(lang, rules, provider, calibration, plan, answers, primary, onDone, modifier, voice, onInstruction, debug, deviceFit, optometristOnly)
     }
 }
 

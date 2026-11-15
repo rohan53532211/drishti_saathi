@@ -269,7 +269,7 @@ class RulesEngine(private val rules: RulesConfig, priors: AnthroPriors) {
             eyeAdvice(Eye.RIGHT, t.right, a.knownRx?.right, a, notes, fit, primary?.right, compare?.right),
             eyeAdvice(Eye.LEFT, t.left, a.knownRx?.left, a, notes, fit, primary?.left, compare?.left),
         )
-        if (primary?.possibleLongSight == true) { notes += Note.POSSIBLE_LONG_SIGHT; notes += Note.HAND_TEST_NEEDED }
+        if (primary?.possibleLongSight == true && !primary.anyMyopia) { notes += Note.POSSIBLE_LONG_SIGHT; notes += Note.HAND_TEST_NEEDED }
         val measured = listOfNotNull(t.right, t.left)
         if (measured.any { it.astigmatismFlag }) notes += Note.CHECK_CYLINDER
 

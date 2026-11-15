@@ -82,8 +82,10 @@ object BridgeProfile {
             put("triage", buildJsonObject {
                 put("tag", gate.tag.name)
                 put("redFlags", kotlinx.serialization.json.JsonArray(gate.redFlags.map { JsonPrimitive(it.name) }))
-                put("redFlagReasons", kotlinx.serialization.json.JsonArray(gate.redFlags.map { JsonPrimitive(com.drishtisaathi.i18n.SProfile.redFlag(it).en) }))
+                put("redFlagReasons", kotlinx.serialization.json.JsonArray(com.drishtisaathi.i18n.SProfile.redFlagLines(gate).map { JsonPrimitive(it.en) }))
                 put("emergency", gate.emergency)
+                if (gate.emergency) put("path", com.drishtisaathi.i18n.SProfile.shortPathHeader.en)
+                put("ageBand", com.drishtisaathi.profile.QrPayload.ageBand(answers.age))
                 put("childMyopia", gate.childMyopia)
                 put("lensSuggested", gate.lensAllowed)
                 if (gate.powerForOptometristOnly) put("powerLabel", com.drishtisaathi.i18n.SProfile.forOptometristOnly.en)
@@ -105,11 +107,14 @@ object BridgeProfile {
                 put("phoneEstimate", enc(com.drishtisaathi.engine.QuickEstimate.serializer(), state.quick))
                 // The phone check as ranges (never one exact number), readable on the optometrist page.
                 put("phoneRange", buildJsonObject {
-                    state.quick?.right?.let { put("right", JsonPrimitive(com.drishtisaathi.vision.quickEyeText(it).en)) }
-                    state.quick?.left?.let { put("left", JsonPrimitive(com.drishtisaathi.vision.quickEyeText(it).en)) }
+                    // both eyes, always, in the optometrist's wording (a plain range, or "not measured" with the reason)
+                    state.quick?.bothEyes?.forEach { (eye, e, why) ->
+                        val text = if (e != null) com.drishtisaathi.vision.quickEyeText(e, optometristOnly = true)
+                            else com.drishtisaathi.i18n.SProfile.notMeasured.format(com.drishtisaathi.i18n.SProfile.notMeasuredReason(why ?: com.drishtisaathi.engine.NotMeasured.NOT_DONE).en)
+                        put(if (eye == com.drishtisaathi.engine.Eye.RIGHT) "right" else "left", JsonPrimitive(text.en))
+                    }
                     state.quick?.nearPointCm?.let { cm ->
-                        val q = state.quick!!
-                        put("near", JsonPrimitive(com.drishtisaathi.vision.nearResultText(cm, q.addD, q.expectedNearPointCm, q.possibleLongSight).en))
+                        put("near", JsonPrimitive(com.drishtisaathi.ui.PowerPathText.nearLine(state.quick!!, cm).en))
                     }
                 })
             })

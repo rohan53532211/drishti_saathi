@@ -96,7 +96,8 @@ class ScreeningTest {
         // stops at 6 %: reduced
         val six = (1..10).fold(ContrastRun(cfg.contrast)) { r, _ -> r.answer(true) }.answer(false).answer(false)
         assertEquals(6.0, six.result(Eye.LEFT).lowestPassedPercent!!, 0.0); assertTrue(six.result(Eye.LEFT).reduced)
-        assertTrue(run(false, false).result(Eye.LEFT).reduced)
+        // even the 100 % step failed: not valid, never "reduced"
+        assertTrue(run(false, false).result(Eye.LEFT).invalid); assertFalse(run(false, false).result(Eye.LEFT).reduced)
     }
 
     @Test fun `reduced contrast suggests an eye-health check from 50, or with low-light or glare complaints`() {

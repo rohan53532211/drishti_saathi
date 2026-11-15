@@ -53,19 +53,32 @@ fun padType(typed: String, key: String): String = when {
  * Lens-assisted mode, step 1: staff are told why, which lens to hold (about 2 D weaker than the first reading) and
  * type the power of the lens they actually hold (a trial lens or the customer's old glasses) on a number pad.
  * [tooStrong]: the last lens left the letters sharp at every distance, so a weaker one is asked for.
+ * [weak]: the reading through the last lens still had a strong residual (the lens was too weak), so a stronger lens is
+ * suggested from that reading's total and the check is repeated once.
  */
 @Composable
 fun LensEntryScreen(
     lang: Lang, title: Txt, firstPassSeD: Double, cfg: LensAssistedConfig, tooStrong: Boolean, speak: (Txt) -> Unit,
     onStart: (lensD: Double) -> Unit, onNoLens: () -> Unit,
+    weak: com.drishtisaathi.engine.QuickEye? = null,
 ) {
     val c = DS.colors
-    val suggested = remember(firstPassSeD) { LensAssisted.suggestLens(firstPassSeD, cfg) }
-    var typed by remember { mutableStateOf("%.2f".format(java.util.Locale.US, -suggested)) }
+    val weakTotal = weak?.seD; val weakLens = weak?.lensD
+    val suggested = remember(firstPassSeD, weakTotal, weakLens) {
+        if (weakTotal != null && weakLens != null) LensAssisted.strongerLens(weakTotal, weakLens, cfg) else LensAssisted.suggestLens(firstPassSeD, cfg)
+    }
+    val weakLine = weak?.residualD?.let { SProfile.lensTooWeak.format(fmtD(it)) }
+    var typed by remember(suggested) { mutableStateOf("%.2f".format(java.util.Locale.US, -suggested)) }
     val lens = padLensPower(typed)
     val valid = LensAssisted.validLens(lens, cfg) && lens != 0.0
     val suggestLine = SProfile.lensSuggest.format(fmtD(suggested))
-    LaunchedEffect(tooStrong) { speak(if (tooStrong) SProfile.lensTooStrong else Txt("${SProfile.lensModeWhy.en} ${suggestLine.en}", "${SProfile.lensModeWhy.hi} ${suggestLine.hi}")) }
+    LaunchedEffect(tooStrong, weakLine) {
+        speak(when {
+            tooStrong -> SProfile.lensTooStrong
+            weakLine != null -> Txt("${weakLine.en} ${suggestLine.en}", "${weakLine.hi} ${suggestLine.hi}")
+            else -> Txt("${SProfile.lensModeWhy.en} ${suggestLine.en}", "${SProfile.lensModeWhy.hi} ${suggestLine.hi}")
+        })
+    }
 
     Column(
         Modifier.fillMaxSize().background(c.background).verticalScroll(rememberScrollState()).padding(horizontal = DS.screen, vertical = 16.dp),
@@ -74,6 +87,8 @@ fun LensEntryScreen(
         Text(title[lang], style = MaterialTheme.typography.headlineSmall, color = c.ink, fontWeight = FontWeight.SemiBold)
         if (tooStrong) Text(SProfile.lensTooStrong[lang], color = c.urgentInk, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.fillMaxWidth().background(c.urgentSoft, DS.button).padding(16.dp))
+        else if (weakLine != null) Text(weakLine[lang], color = c.warningInk, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.fillMaxWidth().background(c.warningSoft, DS.button).padding(16.dp))
         else Text(SProfile.lensModeWhy[lang], style = MaterialTheme.typography.bodyLarge, color = c.inkSecondary)
         Text(SProfile.lensFirstPass.format(fmtD(firstPassSeD))[lang], style = MaterialTheme.typography.bodyMedium, color = c.inkSecondary)
         if (LensAssisted.highMyopia(firstPassSeD, cfg)) Text(SProfile.highMyopiaNote[lang], color = c.warningInk, style = MaterialTheme.typography.bodyMedium,
@@ -89,7 +104,7 @@ fun LensEntryScreen(
         }
         NumberPad(lang) { key -> typed = padType(typed, key) }
         PrimaryButton(SProfile.lensStart[lang], enabled = valid) { lens?.let(onStart) }
-        TextButton(onClick = onNoLens, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SProfile.lensNone[lang], color = c.inkSecondary) }
+        TextButton(onClick = onNoLens, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text((if (weak != null) SProfile.lensKeepReading else SProfile.lensNone)[lang], color = c.inkSecondary) }
     }
 }
 

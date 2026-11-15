@@ -62,7 +62,8 @@ class SafetyTest {
         assertEquals(ReportTag.URGENT, am.tag); assertFalse(am.lensAllowed); assertFalse(am.emergency)
 
         assertEquals(listOf(RedFlag.AMSLER_DISTORTION), Safety.gate(InterviewAnswers(age = 62), none, cfg, tests = VisionTests(amslerAbnormal = true)).redFlags)
-        assertEquals(listOf(RedFlag.AMSLER_DISTORTION), Safety.gate(InterviewAnswers(straightLinesBent = true), none, cfg).redFlags)
+        // the customer's own answer is its own flag: the grid flag needs a grid result
+        assertEquals(listOf(RedFlag.BENT_LINES_REPORTED), Safety.gate(InterviewAnswers(straightLinesBent = true), none, cfg).redFlags)
     }
 
     @Test fun `emergency signs take the short path - power of each eye and the grid only`() {

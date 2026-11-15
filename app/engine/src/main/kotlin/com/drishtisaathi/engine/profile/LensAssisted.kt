@@ -33,6 +33,21 @@ object LensAssisted {
         return (ceil(raw / cfg.suggestStepD - 1e-9) * cfg.suggestStepD).let { if (it == -0.0) 0.0 else it }
     }
 
+    /**
+     * The residual through the lens is still strong (at or beyond [LensAssistedConfig.repeatIfResidualFromSeD]): the
+     * blur point is still very close, so the lens was too weak. Asked at most
+     * [LensAssistedConfig.maxStrongerRepeats] times ([repeatsDone] so far); after that the reading is kept.
+     */
+    fun needsStrongerLens(residualD: Double?, repeatsDone: Int, cfg: LensAssistedConfig): Boolean =
+        residualD != null && residualD <= cfg.repeatIfResidualFromSeD && repeatsDone < cfg.maxStrongerRepeats
+
+    /**
+     * The stronger lens to hold next: about [LensAssistedConfig.suggestOffsetD] weaker than the total just measured,
+     * and always at least one step stronger than the lens that was too weak.
+     */
+    fun strongerLens(totalSeD: Double, heldLensD: Double, cfg: LensAssistedConfig): Double =
+        minOf(suggestLens(totalSeD, cfg), heldLensD - cfg.suggestStepD)
+
     /** Effective power at the eye of a lens held [LensAssistedConfig.vertexDistanceM] in front of it: Fe = F / (1 − d·F). */
     fun effectiveLens(lensD: Double, cfg: LensAssistedConfig): Double =
         if (abs(lensD) >= cfg.vertexFromAbsD) lensD / (1.0 - cfg.vertexDistanceM * lensD) else lensD

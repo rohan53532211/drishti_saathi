@@ -145,7 +145,10 @@ data class QuickEye(
     val unaidedSeD: Double? = null,
     /** Stronger than lensAssisted.highMyopiaBeyondSeD: the optometrist must confirm; eye-health check advised. */
     val highMyopia: Boolean = false,
-)
+) {
+    /** A minus power was measured for this eye. */
+    val myopic: Boolean get() = !noMyopiaAtReach && (seD ?: 0.0) < 0
+}
 
 /**
  * The power path's quick estimate, stored with the session. [primary] = it is the session's power source
@@ -166,9 +169,29 @@ data class QuickEstimate(
     /** The reading add shown as a range: [addD] ± 0.25 D. */
     val addFromD: Double? = null,
     val addToD: Double? = null,
+    /** Why an eye has no reading (set when [right] / [left] is null), so the report never drops an eye silently. */
+    val rightNotMeasured: NotMeasured? = null,
+    val leftNotMeasured: NotMeasured? = null,
+    /** The near check was done with the distance correction on (glasses or trial lens); null = not recorded. */
+    val nearWithCorrection: Boolean? = null,
+    /** Under the add age: the near point is farther than expected for the age; null = sessions stored before this field. */
+    val nearFartherThanExpected: Boolean? = null,
 ) {
     val eyes: List<Pair<Eye, QuickEye>> get() = listOfNotNull(right?.let { Eye.RIGHT to it }, left?.let { Eye.LEFT to it })
+
+    /** Minus power was measured in at least one eye. */
+    val anyMyopia: Boolean get() = eyes.any { (_, e) -> e.myopic }
+
+    /** Both eyes in a fixed order, measured or not: R then L. */
+    val bothEyes: List<Triple<Eye, QuickEye?, NotMeasured?>>
+        get() = listOf(
+            Triple(Eye.RIGHT, right, if (right == null) rightNotMeasured ?: NotMeasured.NOT_DONE else null),
+            Triple(Eye.LEFT, left, if (left == null) leftNotMeasured ?: NotMeasured.NOT_DONE else null),
+        )
 }
+
+/** Why an eye was not measured in the power check. */
+@Serializable enum class NotMeasured { SKIPPED, NOT_DONE }
 
 /** Measurements typed in by staff (PD ruler, face width) until the camera flow exists. */
 @Serializable

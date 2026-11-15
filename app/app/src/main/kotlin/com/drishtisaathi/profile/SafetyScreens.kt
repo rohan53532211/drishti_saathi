@@ -38,8 +38,8 @@ fun UiState.gate(rules: RulesConfig): SafetyGate =
 
 /** What the red banner says aloud: the headline and every reason. */
 fun bannerSpeech(gate: SafetyGate): Txt {
-    val en = gate.redFlags.joinToString(". ") { SProfile.redFlag(it).en }
-    val hi = gate.redFlags.joinToString("। ") { SProfile.redFlag(it).hi }
+    val en = SProfile.redFlagLines(gate).joinToString(". ") { it.en }
+    val hi = SProfile.redFlagLines(gate).joinToString("। ") { it.hi }
     return Txt("${SProfile.seeDoctorToday.en}. $en.", "${SProfile.seeDoctorToday.hi}। $hi।")
 }
 
@@ -60,7 +60,7 @@ fun RedFlagBannerScreen(lang: Lang, gate: SafetyGate, speak: (Txt) -> Unit, onCo
         Text(SProfile.seeDoctorToday[lang], color = Color.White, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Assertive })
         Text(SProfile.seeDoctorWhy[lang], color = Color.White, style = MaterialTheme.typography.titleMedium)
-        gate.redFlags.forEach { Text("•  " + SProfile.redFlag(it)[lang], color = Color.White, style = MaterialTheme.typography.titleLarge) }
+        SProfile.redFlagLines(gate).forEach { Text("•  " + it[lang], color = Color.White, style = MaterialTheme.typography.titleLarge) }
         Spacer(Modifier.height(8.dp))
         Text(SProfile.bannerNote[lang], color = Color.White, style = MaterialTheme.typography.bodyLarge)
         if (gate.emergency) Text(SProfile.shortPathNote[lang], color = Color.White, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
@@ -78,7 +78,8 @@ fun UrgentBanner(lang: Lang, gate: SafetyGate, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(SProfile.seeDoctorToday[lang], color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-        gate.redFlags.forEach { Text("•  " + SProfile.redFlag(it)[lang], color = Color.White, style = MaterialTheme.typography.bodyLarge) }
+        if (gate.emergency) Text(SProfile.shortPathHeader[lang], color = Color.White, style = MaterialTheme.typography.labelLarge)
+        SProfile.redFlagLines(gate).forEach { Text("•  " + it[lang], color = Color.White, style = MaterialTheme.typography.bodyLarge) }
         Text(SProfile.noLensToday[lang], color = Color.White, style = MaterialTheme.typography.bodyMedium)
     }
 }

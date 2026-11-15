@@ -65,11 +65,11 @@ fun SoftCard(modifier: Modifier = Modifier, hero: Boolean = false, content: @Com
  * small rings with their labels. The arcs draw in over 900 ms.
  */
 @Composable
-fun VisionProfileCard(lang: Lang, profile: VisionProfile, modifier: Modifier = Modifier) {
+fun VisionProfileCard(lang: Lang, profile: VisionProfile, modifier: Modifier = Modifier, emergency: Boolean = false) {
     val c = DS.colors
     val t = remember { Animatable(0f) }
     LaunchedEffect(profile) { t.snapTo(0f); t.animateTo(1f, tween(DS.ringsMs, easing = FastOutSlowInEasing)) }
-    val summary = LensText.ringLines(profile).joinToString(". ") { it[lang] }
+    val summary = LensText.ringLines(profile, emergency).joinToString(". ") { it[lang] }
     SoftCard(modifier, hero = true) {
         Text(SProfile.profileTitle[lang], style = MaterialTheme.typography.titleLarge, color = c.ink, modifier = Modifier.semantics { heading() })
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -88,7 +88,7 @@ fun VisionProfileCard(lang: Lang, profile: VisionProfile, modifier: Modifier = M
         profile.rings.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { (id, r) ->
-                    SmallRing(lang, id, r, t.value, glare = id == "MOBILITY" && profile.nightGlareSensitive, modifier = Modifier.weight(1f))
+                    SmallRing(lang, id, r, t.value, glare = id == "MOBILITY" && profile.nightGlareSensitive, modifier = Modifier.weight(1f), emergency = emergency)
                 }
             }
         }
@@ -96,7 +96,7 @@ fun VisionProfileCard(lang: Lang, profile: VisionProfile, modifier: Modifier = M
 }
 
 @Composable
-private fun SmallRing(lang: Lang, id: String, r: Ring, t: Float, glare: Boolean, modifier: Modifier = Modifier) {
+private fun SmallRing(lang: Lang, id: String, r: Ring, t: Float, glare: Boolean, modifier: Modifier = Modifier, emergency: Boolean = false) {
     val c = DS.colors
     val col = ringColour(id, c)
     Row(modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -111,7 +111,7 @@ private fun SmallRing(lang: Lang, id: String, r: Ring, t: Float, glare: Boolean,
         }
         Column {
             Text(LensText.ringTitle(id)[lang], style = MaterialTheme.typography.labelMedium, color = c.inkSecondary)
-            Text((if (r.known) SProfile.ringLabel(r.label) else SProfile.ringNotAnswered)[lang], style = MaterialTheme.typography.bodyMedium, color = c.ink, fontWeight = FontWeight.SemiBold)
+            Text(LensText.ringLabel(r, emergency)[lang], style = MaterialTheme.typography.bodyMedium, color = c.ink, fontWeight = FontWeight.SemiBold)
             if (glare) Text(SProfile.nightGlare[lang], style = MaterialTheme.typography.bodySmall, color = c.warningInk)
         }
     }

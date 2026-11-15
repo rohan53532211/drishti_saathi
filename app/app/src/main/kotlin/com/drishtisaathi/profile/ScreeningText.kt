@@ -29,6 +29,16 @@ sealed interface ScreenStep {
 }
 
 object ScreeningPlan {
+    /**
+     * The power of [eye] for "wear your correction first": the phone's reading when it found a minus power, else the
+     * customer's known power for that eye.
+     */
+    fun eyePower(eye: Eye, quick: QuickEstimate?, answers: com.drishtisaathi.engine.InterviewAnswers): Double? {
+        val q = if (eye == Eye.RIGHT) quick?.right else quick?.left
+        val known = (if (eye == Eye.RIGHT) answers.knownRx?.right else answers.knownRx?.left)?.sphericalEquivalent
+        return q?.seD?.takeIf { q.myopic } ?: known
+    }
+
     /** Everyone: grid, contrast, colour, then the E test and clock dial. Emergency short path: the grid only. */
     fun steps(emergency: Boolean): List<ScreenStep> = buildList {
         add(ScreenStep.Setup)
@@ -101,9 +111,11 @@ object ScreeningText {
             for (e in Eye.entries) {
                 val r = s.contrast.firstOrNull { it.eye == e }
                 if (r == null) { if ("CONTRAST_$e" in s.skipped) add(notDone(P.resContrast, e)); continue }
+                // even the 100 % letters were not read: the test says nothing about contrast (no "Reduced", no cataract note)
+                if (r.invalid) { add(ScreenLine(label(P.resContrast, e), P.resContrastInvalid, ScreenLine.Status.WATCH)); continue }
                 val word = if (r.reduced) P.reduced else P.normal
-                val value = r.lowestPassedPercent?.let { P.resContrastStep.format(pct(it), word.en).let { t -> Txt(t.en, P.resContrastStep.hi.format(pct(it), word.hi)) } }
-                    ?: Txt(P.resContrastNone.en.format(word.en), P.resContrastNone.hi.format(word.hi))
+                val step = pct(r.lowestPassedPercent ?: 0.0)
+                val value = Txt(P.resContrastStep.en.format(step, word.en), P.resContrastStep.hi.format(step, word.hi))
                 val note = P.eyeHealthNote.takeIf { Contrast.eyeHealthNote(r.reduced, age, lowLightOrGlare, rules.screening.contrast) }
                 add(ScreenLine(label(P.resContrast, e), value, if (r.reduced) ScreenLine.Status.WATCH else ScreenLine.Status.OK, note))
             }
