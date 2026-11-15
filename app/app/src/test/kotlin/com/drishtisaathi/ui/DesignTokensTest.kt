@@ -7,7 +7,11 @@ import org.junit.Test
 import java.io.File
 import kotlin.math.pow
 
-/** Phase F: the design tokens match the brief, text pairs reach 4.5:1 in both themes, and the survey's section colours are the tokens. */
+/**
+ * docs/DESIGN.md §4: the tokens are the ones in the spec, every text / background pair reaches WCAG AA (4.5:1) in the
+ * light and the dark theme, text on a solid colour is picked for contrast, the survey's section colours are the
+ * tokens, and the type scale, spacing and motion values follow the spec.
+ */
 class DesignTokensTest {
     private fun hex(c: Color) = "#%02X%02X%02X".format((c.red * 255).toInt(), (c.green * 255).toInt(), (c.blue * 255).toInt())
     private fun lum(c: Color): Double {
@@ -16,25 +20,34 @@ class DesignTokensTest {
     }
     private fun contrast(a: Color, b: Color): Double { val (hi, lo) = listOf(lum(a), lum(b)).sortedDescending(); return (hi + 0.05) / (lo + 0.05) }
 
-    @Test fun `light tokens are the ones from the brief`() {
+    @Test fun `light tokens are the ones from the spec`() {
         val c = LightColors
         assertEquals(
-            listOf("#F7F9FC", "#FFFFFF", "#E3E8EF", "#0B1B2B", "#5A6B7D", "#1A5CFF", "#0B3FCC", "#1E9E6A", "#E8A317", "#D93838"),
-            listOf(c.background, c.surface, c.hairline, c.ink, c.inkSecondary, c.primary, c.primaryPressed, c.success, c.warning, c.urgent).map(::hex),
+            listOf("#F6F8FB", "#FFFFFF", "#F0F3F8", "#0E1A2B", "#5B6B7F", "#E4E9F0", "#1F5EFF", "#FFFFFF", "#E8EEFF", "#16A34A", "#D97706", "#DC2626"),
+            listOf(c.background, c.surface, c.surfaceAlt, c.ink, c.inkSecondary, c.hairline, c.primary, c.onPrimary, c.primarySoft,
+                c.success, c.warning, c.urgent).map(::hex),
         )
-        assertEquals(listOf("#2F80ED", "#A3D33A", "#6B7785", "#F2A93B"), listOf(c.work, c.digital, c.mobility, c.leisure).map(::hex))
+        assertEquals(listOf("#2F80ED", "#84CC16", "#64748B", "#F59E0B"), listOf(c.work, c.digital, c.mobility, c.leisure).map(::hex))
     }
 
-    @Test fun `text reaches 4_5 to 1 on its background in the light and the dark theme`() {
+    /** Every pair a screen draws text with. */
+    private fun textPairs(c: DrishtiColors): Map<String, Pair<Color, Color>> = mapOf(
+        "ink on background" to (c.ink to c.background), "ink on surface" to (c.ink to c.surface), "ink on surface-alt" to (c.ink to c.surfaceAlt),
+        "ink-muted on surface" to (c.inkSecondary to c.surface), "ink-muted on background" to (c.inkSecondary to c.background),
+        "ink-muted on surface-alt" to (c.inkSecondary to c.surfaceAlt),
+        "primary on surface" to (c.primary to c.surface), "primary on background" to (c.primary to c.background),
+        "on-primary on primary" to (c.onPrimary to c.primary),
+        "primary ink on primary container" to (c.primaryInk to c.primarySoft), "ink on primary container" to (c.ink to c.primarySoft),
+        "success ink on its container" to (c.successInk to c.successSoft), "success ink on surface" to (c.successInk to c.surface),
+        "warning ink on its container" to (c.warningInk to c.warningSoft), "warning ink on surface" to (c.warningInk to c.surface),
+        "urgent ink on its container" to (c.urgentInk to c.urgentSoft), "urgent ink on surface" to (c.urgentInk to c.surface),
+        "ink on urgent container" to (c.ink to c.urgentSoft), "ink on warning container" to (c.ink to c.warningSoft),
+        "ink on success container" to (c.ink to c.successSoft),
+    )
+
+    @Test fun `every text pair reaches 4_5 to 1 in the light and the dark theme`() {
         for (c in listOf(LightColors, DarkColors)) {
-            val pairs = mapOf(
-                "ink on background" to (c.ink to c.background), "ink on surface" to (c.ink to c.surface),
-                "secondary ink on surface" to (c.inkSecondary to c.surface), "secondary ink on background" to (c.inkSecondary to c.background),
-                "primary on surface" to (c.primary to c.surface), "on-primary on primary" to (c.onPrimary to c.primary),
-                "primary on its soft tint" to (c.primary to c.primarySoft),
-                "success ink on its soft tint" to (c.successInk to c.successSoft), "warning ink on its soft tint" to (c.warningInk to c.warningSoft),
-                "urgent ink on its soft tint" to (c.urgentInk to c.urgentSoft), "urgent ink on surface" to (c.urgentInk to c.surface), "ink on urgent soft" to (c.ink to c.urgentSoft),
-            ) + if (c.isDark) emptyMap() else mapOf("white on urgent (red banner)" to (Color.White to c.urgent))
+            val pairs = textPairs(c) + if (c.isDark) emptyMap() else mapOf("white on urgent (red banner)" to (Color.White to c.urgent))
             for ((name, p) in pairs) {
                 val r = contrast(p.first, p.second)
                 assertTrue("${if (c.isDark) "dark" else "light"}: $name is %.2f:1".format(r), r >= 4.5)
@@ -42,28 +55,50 @@ class DesignTokensTest {
         }
     }
 
-    @Test fun `text on a section colour is picked for contrast`() {
-        for (c in listOf(LightColors.work, LightColors.digital, LightColors.mobility, LightColors.leisure, LightColors.urgent, LightColors.primary)) {
-            assertEquals(hex(c), maxOf(contrast(Color.White, c), contrast(Color(0xFF0B1B2B), c)), contrast(DS.on(c), c), 1e-6)
-            assertTrue(hex(c), contrast(DS.on(c), c) >= 4.5)
+    @Test fun `text on a solid colour is picked for contrast`() {
+        for (t in listOf(LightColors, DarkColors)) {
+            for (c in listOf(t.work, t.digital, t.mobility, t.leisure, t.urgent, t.primary, t.success, t.warning)) {
+                assertEquals(hex(c), maxOf(contrast(Color.White, c), contrast(LightColors.ink, c)), contrast(DS.on(c), c), 1e-6)
+                assertTrue(hex(c) + " " + contrast(DS.on(c), c), contrast(DS.on(c), c) >= 4.5)
+            }
         }
+        assertEquals(contrast(LightColors.ink, LightColors.surface), DS.contrast(LightColors.ink, LightColors.surface), 1e-9)
     }
 
-    @Test fun `the survey sections use the token colours and touch targets are at least 48 dp`() {
+    @Test fun `the survey sections use the token colours`() {
         val q = File("src/main/assets/anamnesis_questions.json").readText()
         for (h in listOf(LightColors.work, LightColors.digital, LightColors.mobility, LightColors.leisure, LightColors.urgent).map(::hex)) {
             assertTrue(h, q.contains("\"colour\": \"$h\""))
         }
-        assertTrue(DS.minTouch.value >= 48f && DS.answerMin.value >= 64f)
-        assertEquals(250, DS.stepMs); assertEquals(900, DS.ringsMs)
     }
 
-    @Test fun `the type scale follows the brief - display 32, title 24, body 18, label 15, tabular figures`() {
+    @Test fun `spacing, shape, touch targets and motion follow the spec`() {
+        assertEquals(listOf(4f, 8f, 12f, 16f, 24f, 32f), listOf(DS.s1, DS.s2, DS.s3, DS.s4, DS.s5, DS.s6).map { it.value })
+        assertEquals(24f, DS.screen.value)
+        assertTrue(DS.minTouch.value >= 48f && DS.answerMin.value >= 64f)
+        assertEquals(56f, DS.buttonHeight.value)
+        assertEquals(40f, DS.iconCircle.value); assertEquals(24f, DS.icon.value)
+        assertEquals(200, DS.stepMs); assertEquals(120, DS.pressMs); assertEquals(900, DS.ringsMs)
+        val tokens = File("src/main/kotlin/com/drishtisaathi/ui/Tokens.kt").readText()
+        assertTrue(tokens.contains("val card = RoundedCornerShape(20.dp)") && tokens.contains("val button = RoundedCornerShape(16.dp)"))
+    }
+
+    @Test fun `the type scale follows the spec - display 32 40, headline 24 32, title 20 28, body 17 26, label 14 20, caption 13 18`() {
         val t = File("src/main/kotlin/com/drishtisaathi/ui/Theme.kt").readText()
-        assertTrue(t.contains("displaySmall = style(32, 42, FontWeight.SemiBold)"))
-        assertTrue(t.contains("titleLarge = style(24,"))
-        assertTrue(t.contains("bodyLarge = style(18,"))
-        assertTrue(t.contains("labelMedium = style(15,"))
-        assertTrue(t.contains("fontFeatureSettings = TNUM"))
+        listOf(
+            "displaySmall = style(32, 40, FontWeight.Bold)", "headlineSmall = style(24, 32, FontWeight.SemiBold)",
+            "titleLarge = style(20, 28, FontWeight.SemiBold)", "bodyLarge = style(17, 26)",
+            "labelLarge = style(14, 20, FontWeight.Medium)", "bodySmall = style(13, 18)", "fontFeatureSettings = TNUM",
+        ).forEach { assertTrue(it, t.contains(it)) }
+    }
+
+    @Test fun `screens take colours from the tokens - no colour literals in the design system`() {
+        val ds = File("src/main/kotlin/com/drishtisaathi/ui/designsystem")
+        val literal = Regex("""Color\(0x[0-9A-Fa-f]{8}\)""")
+        ds.listFiles()!!.filter { it.extension == "kt" }.forEach { f ->
+            // the hero shadow tint is the one literal (a shadow colour, not a text or fill colour)
+            val found = literal.findAll(f.readText()).map { it.value }.filter { it != "Color(0x1A0E1A2B)" }.toList()
+            assertTrue("${f.name}: $found", found.isEmpty())
+        }
     }
 }

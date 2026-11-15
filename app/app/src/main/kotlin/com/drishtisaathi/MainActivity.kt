@@ -260,8 +260,15 @@ fun DrishtiApp(vm: SessionViewModel = viewModel()) {
     /** Precision mode: consent first, then the same eye check and the same results, saved as a session. */
     var precisionRun by remember { mutableStateOf(false) }
 
+    // 200 ms fade + short slide between screens; none at all under "Remove animations"
+    val still = com.drishtisaathi.ui.designsystem.Motion.reduced()
+    val m = com.drishtisaathi.ui.designsystem.Motion
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-    NavHost(nav, startDestination = Routes.HOME) {
+    NavHost(
+        nav, startDestination = Routes.HOME,
+        enterTransition = if (still) m.none else m.enter, exitTransition = if (still) m.noneOut else m.exit,
+        popEnterTransition = if (still) m.none else m.popEnter, popExitTransition = if (still) m.noneOut else m.popExit,
+    ) {
         composable(Routes.HOME) {
             HomeScreen(
                 state, vm::setLang,

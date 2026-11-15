@@ -320,7 +320,7 @@ private fun StatusPill(lang: Lang, k: TeleConsultation) {
         "COMPLETED" -> c.successSoft to c.successInk
         "CLOSED" -> c.background to c.inkSecondary
         "REQUESTED" -> c.warningSoft to c.warningInk
-        else -> c.primarySoft to c.primary
+        else -> c.primarySoft to c.primaryInk
     }
     Text(STele.status(k.status)[lang], color = fg, style = MaterialTheme.typography.labelMedium,
         modifier = Modifier.background(bg, DS.pill).padding(horizontal = 12.dp, vertical = 6.dp))

@@ -128,7 +128,7 @@ fun VoicePanel(voice: VoiceController, lang: Lang, modifier: Modifier = Modifier
             when (val d = st.dialogue) {
                 is DialogueState.Asking -> Text(SVoice.speaking[lang], style = MaterialTheme.typography.bodyLarge)
                 is DialogueState.Listening -> {
-                    Text(SVoice.listening[lang], style = MaterialTheme.typography.titleMedium, color = Teal, fontWeight = FontWeight.SemiBold)
+                    Text(SVoice.listening[lang], style = MaterialTheme.typography.titleMedium, color = com.drishtisaathi.ui.DS.colors.primaryInk, fontWeight = FontWeight.SemiBold)
                     if (d.partial.isNotBlank()) Text(SVoice.heard.format(d.partial)[lang], style = MaterialTheme.typography.bodyLarge)
                 }
                 is DialogueState.Confirming -> {

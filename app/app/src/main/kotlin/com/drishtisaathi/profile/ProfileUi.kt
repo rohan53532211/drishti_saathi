@@ -56,7 +56,7 @@ fun SoftCard(modifier: Modifier = Modifier, hero: Boolean = false, content: @Com
     val c = DS.colors
     Surface(
         shape = DS.card, color = c.surface, border = BorderStroke(1.dp, c.hairline),
-        modifier = modifier.fillMaxWidth().then(if (hero) Modifier.shadow(12.dp, DS.card, ambientColor = Color(0x14000000), spotColor = Color(0x14000000)) else Modifier),
+        modifier = modifier.fillMaxWidth().then(if (hero) Modifier.shadow(DS.heroShadow, DS.card, ambientColor = Color(0x1A0E1A2B), spotColor = Color(0x1A0E1A2B)) else Modifier),
     ) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() } }
 }
 
@@ -128,12 +128,12 @@ fun LensIllustration(ids: List<String>, size: Dp = 88.dp) {
         val r = this.size.minDimension / 2 * 0.92f
         val centre = Offset(this.size.width / 2, this.size.height / 2)
         val fill = when {
-            photo -> Brush.verticalGradient(listOf(Color(0xFF6B7785), Color(0xFFDDE2E8)), startY = centre.y - r, endY = centre.y + r)
+            photo -> Brush.verticalGradient(listOf(c.mobility, c.surfaceAlt), startY = centre.y - r, endY = centre.y + r)
             blue -> Brush.radialGradient(listOf(Color(0x332F80ED), Color(0x662F80ED)), centre, r)
             else -> Brush.radialGradient(listOf(Color(0x10FFFFFF), c.primarySoft), centre, r)
         }
         drawCircle(fill, r, centre)
-        drawCircle(if (drive) Color(0xFFF2A93B) else c.hairline, r, centre, style = Stroke(if (drive) r * 0.12f else r * 0.05f))
+        drawCircle(if (drive) c.leisure else c.hairline, r, centre, style = Stroke(if (drive) r * 0.12f else r * 0.05f))
         // a soft highlight
         drawArc(Color.White.copy(alpha = 0.7f), 200f, 50f, false, Offset(centre.x - r * 0.72f, centre.y - r * 0.72f), Size(r * 1.44f, r * 1.44f),
             style = Stroke(r * 0.07f, cap = StrokeCap.Round))

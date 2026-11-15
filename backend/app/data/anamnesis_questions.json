@@ -698,7 +698,7 @@
     "sections": [
       {
         "id": "SAFETY",
-        "colour": "#D93838",
+        "colour": "#DC2626",
         "title": {
           "en": "Warning signs",
           "hi": "चेतावनी के लक्षण"
@@ -734,7 +734,7 @@
       },
       {
         "id": "DIGITAL",
-        "colour": "#A3D33A",
+        "colour": "#84CC16",
         "title": {
           "en": "Screens",
           "hi": "स्क्रीन"
@@ -746,7 +746,7 @@
       },
       {
         "id": "MOBILITY",
-        "colour": "#6B7785",
+        "colour": "#64748B",
         "title": {
           "en": "Driving & travel",
           "hi": "गाड़ी चलाना और सफ़र"
@@ -758,7 +758,7 @@
       },
       {
         "id": "LEISURE",
-        "colour": "#F2A93B",
+        "colour": "#F59E0B",
         "title": {
           "en": "Free time & sun",
           "hi": "फ़ुर्सत और धूप"

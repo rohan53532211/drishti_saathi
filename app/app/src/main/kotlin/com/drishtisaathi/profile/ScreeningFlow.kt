@@ -279,7 +279,7 @@ private fun AmslerScreen(
                 ) {
                     val sq = l.squarePx.toFloat()
                     val line = if (active) Color.Black else Color(0xFFBDBDBD)
-                    cells.forEach { drawRect(Color(0x55D93838), Offset(it.col * sq, it.row * sq), Size(sq, sq)) }
+                    cells.forEach { drawRect(Color(0x55DC2626), Offset(it.col * sq, it.row * sq), Size(sq, sq)) }
                     for (i in 0..l.columns) drawLine(line, Offset(i * sq, 0f), Offset(i * sq, size.height), 1.5f)
                     for (j in 0..l.rows) drawLine(line, Offset(0f, j * sq), Offset(size.width, j * sq), 1.5f)
                     drawCircle(Color.Black, sq * 0.22f, Offset(size.width / 2, size.height / 2))

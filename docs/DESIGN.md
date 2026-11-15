@@ -182,12 +182,13 @@ Weights: Regular 400, Medium 500, SemiBold 600, Bold 700. Built by `tools/build_
 | ink-muted | `#5B6B7F` | `#9FB0C2` |
 | hairline | `#E4E9F0` | `#243243` |
 | primary / on-primary / primary-container | `#1F5EFF` / `#FFFFFF` / `#E8EEFF` | `#7FA2FF` / `#05122B` / `#16284A` |
-| success (+ ink, container) | `#16A34A` (`#15803D`, `#E7F6EC`) | `#4ADE80` (`#6EE7A0`, `#0F2E1C`) |
+| primary-ink (text on primary-container) | `#1D4ED8` | `#9DB8FF` |
+| success (+ ink, container) | `#16A34A` (`#166534`, `#E7F6EC`) | `#4ADE80` (`#6EE7A0`, `#0F2E1C`) |
 | warning (+ ink, container) | `#D97706` (`#92400E`, `#FEF3E2`) | `#FBBF24` (`#FCD34D`, `#33270C`) |
 | urgent (+ ink, container) | `#DC2626` (`#B91C1C`, `#FDECEC`) | `#F87171` (`#FCA5A5`, `#3A1616`) |
 | Work / Digital / Mobility / Leisure | `#2F80ED` / `#84CC16` / `#64748B` / `#F59E0B` | `#5B9BF3` / `#A3E635` / `#94A3B8` / `#FBBF24` |
 
-The `*-ink` tones exist because the brand success, warning and urgent colours are not dark enough for text. Text always uses the ink tone on its container, or on the surface. Text on a section colour uses `DS.on(bg)` (dark ink or white, whichever has the higher contrast). **A unit test checks WCAG AA (4.5:1) for every text/background pair** in both themes (`DesignTokensTest`).
+The `*-ink` tones exist because the brand success, warning and urgent colours are not dark enough for text (and brand blue on its own container measures 4.4:1, so selected chips and "why" pills use primary-ink). Text always uses the ink tone on its container, or on the surface. Text on a section colour uses `DS.on(bg)` (dark ink or white, whichever has the higher contrast). **A unit test checks WCAG AA (4.5:1) for every text/background pair** in both themes (`DesignTokensTest`).
 
 ### Space, shape, elevation
 - **Spacing:** 4 / 8 / 12 / 16 / 24 / 32. Screen padding 24 dp.

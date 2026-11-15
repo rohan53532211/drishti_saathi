@@ -91,8 +91,8 @@ fun QrCard(lang: Lang, content: String, isLink: Boolean) {
 object ShareImage {
     fun render(context: Context, title: String, lines: List<String>, qr: String): Bitmap {
         val w = 1080; val pad = 64f
-        val regular = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.inter_deva_regular) ?: Typeface.DEFAULT
-        val bold = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.inter_deva_bold) ?: Typeface.DEFAULT_BOLD
+        val regular = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.jakarta_deva_regular) ?: Typeface.DEFAULT
+        val bold = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.jakarta_deva_bold) ?: Typeface.DEFAULT_BOLD
         fun paint(size: Float, face: Typeface, colour: Int) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = size; typeface = face; color = colour }
         fun layout(t: String, p: TextPaint) = StaticLayout.Builder.obtain(t, 0, t.length, p, (w - 2 * pad).toInt())
             .setAlignment(Layout.Alignment.ALIGN_NORMAL).setLineSpacing(6f, 1f).build()

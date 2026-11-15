@@ -446,6 +446,13 @@ Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, me
 ### UI phase 0: design spec (done)
 - `docs/DESIGN.md`: screen inventory (app + portal, purpose, primary action, role), navigation map per role, principles, the design-system tokens and components, and the per-screen specs for phases 2–7.
 
+### UI phase 1: design system (done)
+- Type: Plus Jakarta Sans + Noto Sans Devanagari merged per weight (`res/font/jakarta_deva_*.ttf`, `tools/build_fonts.py`, OFL licence in assets); Inter removed. Scale Display 32/40 · Headline 24/32 · Title 20/28 · Body 17/26 · Label 14/20 · Caption 13/18, tabular figures everywhere.
+- Colour: the spec palette, light + full dark (`ui/Tokens.kt`), plus `surfaceAlt` and `primaryInk` (brand blue on its container is 4.4:1). Section colours updated in both copies of `anamnesis_questions.json` and the PDF rings.
+- `ui/designsystem/`: Components (buttons, cards, ListRow, ChoiceCard, SegmentedControl, FrequencySlider, ProgressDots, EyeProgress, TopBar, BottomNav, StatusPill, Banner, Empty/Error states, Skeleton, Snackbar, BottomSheet, Avatar, ChatBubble, TextField, PinField, SuccessCheck, Countdown, DistancePill), Motion (200 ms screen fade/slide in NavHost, 120 ms press scale, reduce-motion aware), Haptics, custom rounded-stroke icons (eye mark, lens, Amsler grid, colour plate), spot illustrations, Previews.
+- Old shared components (AppScaffold, LangToggle, BigButton, AnswerCard, PrimaryButton) now delegate to the design system, so every screen picks up the new look.
+- `DesignTokensTest`: spec hexes, WCAG AA for every text/background pair in both themes, type scale, spacing, motion, no colour literals in the design system.
+
 ## Test pass before submission (15 Nov)
 
 Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.
