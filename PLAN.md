@@ -496,7 +496,12 @@ Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, me
 - Hindi: every new string reviewed for natural phrasing; the 20% battery line reworded so the placeholder check passes in both languages.
 - Performance: every lazy list has stable keys (chat items, optometrists, sessions, catalogue, tips). App start under 2 s was **not measured**: no phone over adb in this environment.
 - `docs/DESIGN.md` §6 lists every screenshot (170 files).
-- Tests now: app 440, engine 397, backend 118, all passing. Same API calls and security rules (text nodes only, no inline handlers, `noopener` on every new tab). Screenshots `docs/screens/p6_portal_*` (desktop light/dark, phone width).
+- Tests now: app 440, engine 397, backend 118, all passing.
+
+### UI phase 8: finish (done)
+- APK `D:\drishti-data\drishti-ui.apk` (debug-signed like v1.2, installs over it), pre-release [v1.3](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.3) on `feature/ui-polish`.
+- PR [#9](https://github.com/rohan53532211/drishti_saathi/pull/9) `feature/ui-polish` → `main` (not merged).
+- Open: phone test of the new UI (start time, scrolling, the eye-test countdown with the real camera). Same API calls and security rules (text nodes only, no inline handlers, `noopener` on every new tab). Screenshots `docs/screens/p6_portal_*` (desktop light/dark, phone width).
 
 ## Test pass before submission (15 Nov)
 
