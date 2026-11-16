@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.rounded.CenterFocusWeak
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -531,40 +535,42 @@ private fun ReadScreen(
     var notCaught by remember { mutableStateOf(false) }
     var typing by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
+    // Far check: a 3-2-1 first; until then no letters, no tap and no voice tap (UI only, the measuring is unchanged).
+    var ready by remember { mutableStateOf(shortInstruction == null) }
 
     val tapNow: () -> Unit = {
-        val t = System.currentTimeMillis()
-        // a faulty distance (zero, negative, not a number) is never turned into a power: it counts as "not caught"
-        val mm = (if (simulated) reading?.takeIf { it.faceVisible }?.distanceMm else buffer.atTap(t))?.takeIf { PowerRange.validBlurMm(it) }
-        if (mm == null) notCaught = true else { notCaught = false; onTap(mm, t, false) }
+        if (ready) {
+            val t = System.currentTimeMillis()
+            // a faulty distance (zero, negative, not a number) is never turned into a power: it counts as "not caught"
+            val mm = (if (simulated) reading?.takeIf { it.faceVisible }?.distanceMm else buffer.atTap(t))?.takeIf { PowerRange.validBlurMm(it) }
+            if (mm == null) notCaught = true else { notCaught = false; onTap(mm, t, false) }
+        }
     }
     BlurKeyword(voice, tapNow, onNewLetters)
 
     val controls: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.size(14.dp).background(if (live) Color(0xFF2E7D32) else Color(0xFF9E9E9E), CircleShape))
-                Text((if (live) SShop.measuring else SShop.noFaceDot)[l], style = MaterialTheme.typography.bodyMedium)
+            if (shortInstruction == null) LiveDistance(l, reading, live)
+            if (notCaught) com.drishtisaathi.ui.designsystem.Banner(SShop.notCaught[l], com.drishtisaathi.ui.designsystem.Tone.WARNING)
+            // the main action, at thumb height under the letters
+            com.drishtisaathi.ui.designsystem.PrimaryButton(SShop.cantRead[l], tapNow, enabled = ready)
+            second?.let { (label, action) ->
+                com.drishtisaathi.ui.designsystem.SecondaryButton(label[l], { action?.invoke() }, enabled = ready && action != null)
             }
-            if (notCaught) Text(SShop.notCaught[l], color = Color(0xFFB26A00), style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold)
-            BigButton(SShop.cantRead[l], selected = true, onClick = tapNow)
-            second?.let { (label, action) -> BigButton(label[l], enabled = action != null, onClick = { action?.invoke() }) }
             if (!typing) {
-                TextButton(onClick = { typing = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SShop.typeDistance[l]) }
+                com.drishtisaathi.ui.designsystem.DsTextButton(SShop.typeDistance[l], { typing = true }, Modifier.align(Alignment.CenterHorizontally),
+                    color = com.drishtisaathi.ui.DS.colors.inkSecondary)
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        typed, { typed = it.filter(Char::isDigit).take(3) }, Modifier.weight(1f), singleLine = true,
-                        label = { Text(SShop.distanceCmLabel[l]) },
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                    )
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.drishtisaathi.ui.designsystem.DsTextField(typed, { typed = it.filter(Char::isDigit).take(3) }, SShop.distanceCmLabel[l],
+                        Modifier.weight(1f), keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
                     val cm = typed.toIntOrNull()?.takeIf { it in 5..100 }
-                    BigButton(SShop.useDistance[l], enabled = cm != null, modifier = Modifier.weight(1f),
-                        onClick = { cm?.let { onTap(it * 10.0, System.currentTimeMillis(), true) } })
+                    com.drishtisaathi.ui.designsystem.PrimaryButton(SShop.useDistance[l], { cm?.let { onTap(it * 10.0, System.currentTimeMillis(), true) } },
+                        Modifier.weight(1f), enabled = cm != null)
                 }
             }
     }
-    if (shortInstruction != null) PanelLayout(env, header, shortInstruction, instruction, reading, debugLine, onSkip, target, controls, onNewLetters)
+    if (shortInstruction != null) PanelLayout(env, eye, header, shortInstruction, instruction, reading, live, debugLine, onSkip, target, controls,
+        onNewLetters, ready) { ready = true }
     else TestLayout(
         env, SAnamnesis.quickTitle, eye, instruction,
         reading, status, 0, 1, onSkip, background = Color.White, bigDistance = true, header = header, quiet = true,
@@ -579,45 +585,86 @@ private fun ReadScreen(
  */
 @Composable
 private fun PanelLayout(
-    env: TestEnv, header: Txt, short: Txt, full: Txt, reading: DistanceReading?, debugLine: String?, onSkip: () -> Unit,
+    env: TestEnv, eye: TestEye, header: Txt, short: Txt, full: Txt, reading: DistanceReading?, live: Boolean, debugLine: String?, onSkip: () -> Unit,
     target: @Composable BoxScope.() -> Unit, controls: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
     onNewLetters: (() -> Unit)? = null,
+    ready: Boolean = true, onReady: () -> Unit = {},
 ) {
     val l = env.lang
     var showHow by remember { mutableStateOf(false) }
     LaunchedEffect(full) { env.onInstruction(full) }
     val panelHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * PANEL_SHARE).dp
-    Column(
-        Modifier.fillMaxSize().background(Color.White).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(header[l], color = Color.Black, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(short[l], Modifier.weight(1f), color = Color.Black, style = MaterialTheme.typography.bodyLarge,
-                maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            TextButton(onClick = { showHow = true }) { Text(SShop.howTo[l]) }
+    // Immersive and always white (black letters on white, as the test needs), so the light tokens in both themes.
+    com.drishtisaathi.ui.DrishtiTheme(dark = false) {
+        val c = com.drishtisaathi.ui.DS.colors
+        Column(
+            Modifier.fillMaxSize().background(Color.White).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // header: which eye, and R ●○ L
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(header[l], Modifier.weight(1f), color = c.ink, style = MaterialTheme.typography.titleLarge)
+                if (eye != TestEye.BOTH) com.drishtisaathi.ui.designsystem.EyeProgress(
+                    "R", "L", rightDone = eye == TestEye.LEFT, leftDone = false, currentRight = eye == TestEye.RIGHT,
+                    description = (if (eye == TestEye.RIGHT) com.drishtisaathi.i18n.SGuide.rightNow else com.drishtisaathi.i18n.SGuide.leftNow)[l],
+                )
+            }
+            // one instruction line with a small drawing; the full text in a sheet behind "How to"
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                com.drishtisaathi.ui.designsystem.Illustration(com.drishtisaathi.ui.designsystem.Spot.PHONE_DISTANCE, size = 52.dp)
+                Text(short[l], Modifier.weight(1f), color = c.ink, style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                com.drishtisaathi.ui.designsystem.DsTextButton(SShop.howTo[l], { showHow = true })
+            }
+            LiveDistance(l, reading, live)
+            debugLine?.let { Text(it, color = c.inkSecondary, style = MaterialTheme.typography.bodySmall) }
+            Box(
+                Modifier.fillMaxWidth().height(panelHeight)
+                    .background(c.surfaceAlt, androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).padding(8.dp)
+                    .background(Color.White, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (ready) target()
+                else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    com.drishtisaathi.ui.designsystem.Countdown(onReady, label = { com.drishtisaathi.i18n.SGuide.startingIn.format(it)[l] })
+                    Text(com.drishtisaathi.i18n.SGuide.getReady[l], color = c.inkSecondary, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            // "New letters": a small refresh button right under the letter panel (also by voice, "badlo")
+            if (ready) onNewLetters?.let { NewLettersButton(SShop.newLettersShort[l], it, Modifier.align(Alignment.End)) }
+            Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = controls)
+            com.drishtisaathi.ui.designsystem.DsTextButton(SVision.skipTest[l], onSkip, Modifier.align(Alignment.CenterHorizontally), color = c.inkSecondary)
         }
-        val dist = reading?.takeIf { it.faceVisible }?.let { SVision.distanceNow.format((it.distanceMm / 10.0).roundToInt())[l] } ?: SVision.distanceUnknown[l]
-        Text(dist, color = Color.Black, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-        debugLine?.let { Text(it, color = Color(0xFF616161), style = MaterialTheme.typography.bodySmall) }
-        Box(
-            Modifier.fillMaxWidth().height(panelHeight)
-                .background(Color(0xFFE0E0E0), androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).padding(8.dp)
-                .background(Color.White, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center,
-            content = target,
-        )
-        // "New letters": a small refresh button right under the letter panel (also by voice, "badlo")
-        onNewLetters?.let { NewLettersButton(SShop.newLettersShort[l], it, Modifier.align(Alignment.End)) }
-        Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = controls)
-        TextButton(onClick = onSkip, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(SVision.skipTest[l], color = Color.Black) }
+        if (showHow) com.drishtisaathi.ui.designsystem.DsBottomSheet(onDismiss = { showHow = false }) {
+            Text(SShop.howTo[l], style = MaterialTheme.typography.titleLarge, color = c.ink)
+            Text(full[l], style = MaterialTheme.typography.bodyLarge, color = c.ink)
+            com.drishtisaathi.ui.designsystem.PrimaryButton(SShop.ok[l], { showHow = false })
+        }
     }
-    if (showHow) androidx.compose.material3.AlertDialog(
-        onDismissRequest = { showHow = false },
-        confirmButton = { TextButton(onClick = { showHow = false }) { Text(SShop.ok[l]) } },
-        title = { Text(SShop.howTo[l]) },
-        text = { Text(full[l], style = MaterialTheme.typography.bodyLarge) },
-    )
+}
+
+/** The live distance as a pill: "Distance: 34 cm" with a tick while the face is tracked, else "Face not found". */
+@Composable
+private fun LiveDistance(l: Lang, reading: DistanceReading?, live: Boolean) {
+    val c = com.drishtisaathi.ui.DS.colors
+    val cm = reading?.takeIf { it.faceVisible && it.distanceMm > 0 }?.let { (it.distanceMm / 10.0).roundToInt() }
+    val text = when {
+        cm != null -> SVision.distanceNow.format(cm)[l]
+        reading == null -> SVision.distanceUnknown[l]
+        else -> SShop.noFaceDot[l]
+    }
+    val ok = live && cm != null
+    Row(
+        Modifier.background(if (ok) c.successSoft else c.warningSoft, com.drishtisaathi.ui.DS.pill).padding(horizontal = 16.dp, vertical = 8.dp)
+            .semantics(mergeDescendants = true) { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        androidx.compose.material3.Icon(
+            if (ok) androidx.compose.material.icons.Icons.Rounded.CheckCircle else androidx.compose.material.icons.Icons.Rounded.CenterFocusWeak,
+            contentDescription = null, tint = if (ok) c.successInk else c.warningInk, modifier = Modifier.size(22.dp))
+        Text(text, color = if (ok) c.successInk else c.warningInk, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+            maxLines = 1)
+    }
 }
 
 /** A small icon button (refresh arrow + "New") for a new set of letters. */

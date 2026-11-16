@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import com.drishtisaathi.i18n.Lang
 import com.drishtisaathi.i18n.S
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -46,58 +49,53 @@ fun AppScaffold(
     onLang: (Lang) -> Unit,
     title: String = S.appName[lang],
     onBack: (() -> Unit)? = null,
+    /** Icon actions before the language switch (e.g. Video, WhatsApp on the chat). */
+    actions: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val c = DS.colors
     Scaffold(
         containerColor = c.background,
+        // calm top bar: the page colour, the title in ink, a back arrow, the language switch, a hairline below;
+        // with icon actions the switch becomes one compact button (the other language) so the title keeps its room
         topBar = {
-            // calm top bar: the page colour, the title in ink, a hairline below
-            Column {
-                TopAppBar(
-                    title = { Text(title, maxLines = 1, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
-                    navigationIcon = {
-                        if (onBack != null) TextButton(onClick = onBack, modifier = Modifier.heightIn(min = DS.minTouch)) {
-                            Text("‹ " + S.back[lang], color = c.primary, style = MaterialTheme.typography.labelMedium)
-                        }
-                    },
-                    actions = { LangToggle(lang, onLang) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = c.background, titleContentColor = c.ink,
-                        navigationIconContentColor = c.primary, actionIconContentColor = c.ink),
-                )
-                androidx.compose.material3.HorizontalDivider(color = c.hairline)
+            com.drishtisaathi.ui.designsystem.DsTopBar(title, S.back[lang], onBack) {
+                if (actions != null) { actions(); CompactLangButton(lang, onLang) } else LangToggle(lang, onLang)
             }
         },
         content = content,
     )
 }
 
-/** Language switch: two pill chips, each a 48 dp touch target. */
+/** Language switch: a two-way segmented control (हिंदी | EN) in the top bar; each half is a 44 dp target in a 52 dp bar. */
 @Composable
-fun LangToggle(lang: Lang, onLang: (Lang) -> Unit) {
+fun LangToggle(lang: Lang, onLang: (Lang) -> Unit, modifier: Modifier = Modifier, long: Boolean = false) {
+    val langs = listOf(Lang.HI, Lang.EN)
+    com.drishtisaathi.ui.designsystem.SegmentedControl(
+        listOf("हिंदी", if (long) "English" else "EN"), langs.indexOf(lang), { onLang(langs[it]) },
+        modifier.padding(end = if (long) 0.dp else 8.dp).then(if (long) Modifier.fillMaxWidth() else Modifier.width(148.dp)),
+    )
+}
+
+/** One 48 dp button that switches to the other language ("EN" in Hindi, "हिं" in English). */
+@Composable
+fun CompactLangButton(lang: Lang, onLang: (Lang) -> Unit) {
+    val other = if (lang == Lang.HI) Lang.EN else Lang.HI
     val c = DS.colors
-    Row(Modifier.padding(end = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf(Lang.HI to "हिंदी", Lang.EN to "EN").forEach { (l, label) ->
-            val selected = l == lang
-            androidx.compose.material3.Surface(
-                onClick = { onLang(l) }, shape = DS.pill,
-                color = if (selected) c.primary else c.surface,
-                border = if (selected) null else BorderStroke(1.dp, c.hairline),
-                modifier = Modifier.heightIn(min = DS.minTouch).semantics { this.selected = selected; role = Role.Tab },
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(label, color = if (selected) c.onPrimary else c.ink, style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
-                }
-            }
+    androidx.compose.material3.Surface(
+        onClick = { onLang(other) }, shape = DS.pill, color = c.surfaceAlt,
+        modifier = Modifier.padding(end = 8.dp).heightIn(min = DS.minTouch).widthIn(min = DS.minTouch)
+            .semantics { contentDescription = if (other == Lang.EN) "English" else "हिंदी" },
+    ) {
+        androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 12.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Text(if (other == Lang.EN) "EN" else "हिं", style = MaterialTheme.typography.labelLarge, color = c.ink)
         }
     }
 }
 
 /**
- * Large touch target (at least 64 dp). [selected] or a [container] colour makes it the filled main action; otherwise it
- * is a quiet card-like button (surface, hairline border).
+ * A 56 dp button. [selected] or a [container] colour makes it the filled main action (PrimaryButton); otherwise it is
+ * the outlined SecondaryButton.
  */
 @Composable
 fun BigButton(
@@ -108,31 +106,11 @@ fun BigButton(
     enabled: Boolean = true,
     container: Color? = null,
 ) {
-    val c = DS.colors
-    val filled = selected || container != null
-    val bg = when {
-        !enabled -> c.hairline
-        filled -> container ?: c.primary
-        else -> c.surface
-    }
-    val fg = when {
-        !enabled -> c.inkSecondary
-        filled -> if (container == null) c.onPrimary else DS.on(bg)
-        else -> c.ink
-    }
-    androidx.compose.material3.Surface(
-        onClick = onClick, enabled = enabled, shape = DS.button, color = bg,
-        border = if (filled || !enabled) null else BorderStroke(1.dp, c.hairline),
-        modifier = modifier.fillMaxWidth().heightIn(min = DS.answerMin).semantics { role = Role.Button },
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(text, color = fg, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp))
-        }
-    }
+    if (selected || container != null) com.drishtisaathi.ui.designsystem.PrimaryButton(text, onClick, modifier, enabled = enabled, container = container)
+    else com.drishtisaathi.ui.designsystem.SecondaryButton(text, onClick, modifier, enabled = enabled)
 }
 
-/** A soft card with a title: surface, 24 dp corners, hairline border, no shadow. [container] tints it (warnings). */
+/** A flat card with a title: surface, 20 dp corners, hairline border, no shadow. [container] tints it (warnings). */
 @Composable
 fun SectionCard(title: String, modifier: Modifier = Modifier, container: Color = Color.Unspecified, content: @Composable () -> Unit) {
     val c = DS.colors
@@ -171,7 +149,7 @@ fun CenteredBox(content: @Composable () -> Unit) =
 fun MatchChip(label: com.drishtisaathi.engine.MatchLabel, text: String) {
     val (fg, bg) = when (label) {
         com.drishtisaathi.engine.MatchLabel.HIGHLY_RECOMMENDED -> OkGreen to OkBg
-        com.drishtisaathi.engine.MatchLabel.MODERATE -> Teal to TealLight
+        com.drishtisaathi.engine.MatchLabel.MODERATE -> DS.colors.primaryInk to TealLight
         com.drishtisaathi.engine.MatchLabel.LOWER -> RoutineAmber to RoutineBg
     }
     Text(

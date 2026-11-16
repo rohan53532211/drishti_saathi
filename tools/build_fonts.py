@@ -1,4 +1,4 @@
-"""Build the app's bundled fonts: Inter (Latin) + Noto Sans Devanagari (Hindi) merged into one font per weight.
+"""Build the app's bundled fonts: Plus Jakarta Sans (Latin) + Noto Sans Devanagari (Hindi) merged into one font per weight.
 
 Compose does not fall back glyph by glyph between fonts in one FontFamily (it falls back to the phone's system
 font), so Hindi text with Latin parts ("PD", "mm", digits) needs both scripts in one file. Also merged in: the few
@@ -6,16 +6,16 @@ arrows / maths signs and the tick and cross the UI uses, which the text fonts la
 Symbols 2).
 
 Sources (all SIL OFL 1.1):
-  Inter[opsz,wght].ttf            https://github.com/google/fonts/tree/main/ofl/inter  (saved as Inter-VF.ttf)
+  PlusJakartaSans[wght].ttf       https://github.com/google/fonts/tree/main/ofl/plusjakartasans  (saved as PlusJakartaSans-VF.ttf)
   NotoSansDevanagari-<W>.ttf      https://github.com/notofonts/notofonts.github.io  fonts/NotoSansDevanagari/unhinted/ttf
   NotoSansMath-Regular.ttf, NotoSansSymbols2-Regular.ttf   same repository
 
 Usage:
     python -I tools/build_fonts.py <src_dir> <out_res_font_dir>
-Needs fontTools (pip install fonttools). Writes inter_deva_<weight>.ttf (lower case: Android resource names).
+Needs fontTools (pip install fonttools). Writes jakarta_deva_<weight>.ttf (lower case: Android resource names).
 
-Inter is a variable font: each weight is instanced at optical size 14 and scaled from 2048 to 1000 units per em, so it
-can be merged with Noto Sans Devanagari. Inter's tabular figures (the "tnum" feature) stay in the merged font.
+Plus Jakarta Sans is a variable font (weight axis only, 1000 units per em): each weight is instanced, then merged with
+Noto Sans Devanagari. Its tabular figures (the "tnum" feature) stay in the merged font.
 """
 import os
 import sys
@@ -31,7 +31,7 @@ WEIGHTS = {"Regular": 400, "Medium": 500, "SemiBold": 600, "Bold": 700}
 UPEM = 1000
 
 LATIN = list(range(0x20, 0x7F)) + list(range(0xA0, 0x250)) + list(range(0x2000, 0x2070)) + \
-    list(range(0x20A0, 0x20C1)) + [0x2122, 0x2116, 0x2212, 0x25CC, 0xFEFF, 0xFFFD]
+    list(range(0x20A0, 0x20C1)) + [0x2122, 0x2116, 0x2212, 0x25CB, 0x25CC, 0x25CF, 0xFEFF, 0xFFFD]
 DEVANAGARI = list(range(0x0900, 0x0980)) + list(range(0xA8E0, 0xA900)) + list(range(0x1CD0, 0x1D00)) + \
     [0x200B, 0x200C, 0x200D, 0x25CC, 0x0964, 0x0965, 0x20B9]
 MATH = [0x2190, 0x2191, 0x2192, 0x2193, 0x2194, 0x2248, 0x2260, 0x2264, 0x2265]
@@ -60,8 +60,8 @@ def scaled(path):
     return f
 
 
-def inter_instance(src_dir, weight):
-    vf = TTFont(os.path.join(src_dir, "Inter-VF.ttf"))
+def latin_instance(src_dir, weight):
+    vf = TTFont(os.path.join(src_dir, "PlusJakartaSans-VF.ttf"))
     axes = {a.axisTag for a in vf["fvar"].axes}
     loc = {"wght": WEIGHTS[weight]}
     if "opsz" in axes:
@@ -73,7 +73,7 @@ def inter_instance(src_dir, weight):
 
 def build(src_dir, out_dir, weight, tmp):
     parts = [
-        subset_font(inter_instance(src_dir, weight), LATIN, os.path.join(tmp, f"lat-{weight}.ttf")),
+        subset_font(latin_instance(src_dir, weight), LATIN, os.path.join(tmp, f"lat-{weight}.ttf")),
         subset_font(scaled(os.path.join(src_dir, f"NotoSansDevanagari-{weight}.ttf")), DEVANAGARI, os.path.join(tmp, f"dev-{weight}.ttf")),
         subset_font(scaled(os.path.join(src_dir, "NotoSansMath-Regular.ttf")), MATH, os.path.join(tmp, "math.ttf"), layout=False),
         subset_font(scaled(os.path.join(src_dir, "NotoSansSymbols2-Regular.ttf")), SYMBOLS2, os.path.join(tmp, "sym.ttf"), layout=False),
@@ -93,10 +93,10 @@ def build(src_dir, out_dir, weight, tmp):
     os2.usWeightClass = WEIGHTS[weight]
     for rec in merged["name"].names:
         if rec.nameID in (1, 4, 16):
-            rec.string = {1: "Drishti Inter Devanagari", 4: f"Drishti Inter Devanagari {weight}", 16: "Drishti Inter Devanagari"}[rec.nameID]
+            rec.string = {1: "Drishti Jakarta Devanagari", 4: f"Drishti Jakarta Devanagari {weight}", 16: "Drishti Jakarta Devanagari"}[rec.nameID]
         elif rec.nameID == 6:
-            rec.string = f"DrishtiInterDevanagari-{weight}"
-    out = os.path.join(out_dir, f"inter_deva_{weight.lower()}.ttf")
+            rec.string = f"DrishtiJakartaDevanagari-{weight}"
+    out = os.path.join(out_dir, f"jakarta_deva_{weight.lower()}.ttf")
     merged.save(out)
     return out
 

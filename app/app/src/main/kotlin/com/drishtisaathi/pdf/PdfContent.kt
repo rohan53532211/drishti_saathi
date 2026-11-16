@@ -34,7 +34,7 @@ enum class Tone { NORMAL, MUTED, URGENT, ROUTINE, ACCENT }
 
 object PdfContent {
     /** The section colours of the rings (the design tokens: work, digital, mobility, leisure). */
-    val RING_RGB = mapOf("WORK" to 0x2F80ED, "DIGITAL" to 0xA3D33A, "MOBILITY" to 0x6B7785, "LEISURE" to 0xF2A93B)
+    val RING_RGB = mapOf("WORK" to 0x2F80ED, "DIGITAL" to 0x84CC16, "MOBILITY" to 0x64748B, "LEISURE" to 0xF59E0B)
 
     private fun date(ms: Long?) = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US).format(Date(ms ?: System.currentTimeMillis()))
 

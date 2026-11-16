@@ -440,6 +440,69 @@ Patient registers in the app, takes the test, asks for a consultation; a verifie
 3. Fix whatever the phone test finds; re-tune thresholds; native-speaker Hindi pass.
 4. Then: APK size, pilot data for the priors.
 
+## UI polish (`feature/ui-polish`, from `feature/teleconsult`, 15 Nov 2026)
+Spec: `docs/DESIGN.md`. UI layer only: the engine, safety rules, lens engine, measurements and backend logic are unchanged.
+
+### UI phase 0: design spec (done)
+- `docs/DESIGN.md`: screen inventory (app + portal, purpose, primary action, role), navigation map per role, principles, the design-system tokens and components, and the per-screen specs for phases 2–7.
+
+### UI phase 1: design system (done)
+- Type: Plus Jakarta Sans + Noto Sans Devanagari merged per weight (`res/font/jakarta_deva_*.ttf`, `tools/build_fonts.py`, OFL licence in assets); Inter removed. Scale Display 32/40 · Headline 24/32 · Title 20/28 · Body 17/26 · Label 14/20 · Caption 13/18, tabular figures everywhere.
+- Colour: the spec palette, light + full dark (`ui/Tokens.kt`), plus `surfaceAlt` and `primaryInk` (brand blue on its container is 4.4:1). Section colours updated in both copies of `anamnesis_questions.json` and the PDF rings.
+- `ui/designsystem/`: Components (buttons, cards, ListRow, ChoiceCard, SegmentedControl, FrequencySlider, ProgressDots, EyeProgress, TopBar, BottomNav, StatusPill, Banner, Empty/Error states, Skeleton, Snackbar, BottomSheet, Avatar, ChatBubble, TextField, PinField, SuccessCheck, Countdown, DistancePill), Motion (200 ms screen fade/slide in NavHost, 120 ms press scale, reduce-motion aware), Haptics, custom rounded-stroke icons (eye mark, lens, Amsler grid, colour plate), spot illustrations, Previews.
+- Old shared components (AppScaffold, LangToggle, BigButton, AnswerCard, PrimaryButton) now delegate to the design system, so every screen picks up the new look.
+- `DesignTokensTest`: spec hexes, WCAG AA for every text/background pair in both themes, type scale, spacing, motion, no colour literals in the design system.
+
+### UI phase 2: first run and accounts (done)
+- Android 12 SplashScreen API (core-splashscreen): eye mark on brand blue; adaptive launcher icon with a monochrome layer (the app had no icon before).
+- `firstrun/FirstRun.kt`: Welcome (logo, name, bilingual tagline, हिंदी | EN at the top) → "Who is using this phone?" (patient / optical shop / optometrist → opens `/portal` on the hosted server) → patient: Create account / Log in.
+- Sign-up wizard, one step per screen with progress dots: name + mobile → age + gender (optional) → password (show/hide) + consent with a folding "What we share" → "Profile ready" with the first-test CTA. Same validation as before (`TeleText`).
+- Login: mobile + password, show/hide, inline errors, "Forgot password? Ask your shop or optometrist".
+- `RoleStore` remembers the role; the app opens on the role's home (shop home, or the patient's account page / create-account). "Change who uses this phone" on the patient page and in Shop tools. The one-time phone setup now opens only on the shop home. "Consult an optometrist" without a login opens the new Login screen.
+- Screenshot tests: Robolectric 4.17 + Roborazzi 1.77 (`ScreensTest`), light/dark × Hindi/English × font 1.0/1.3, saved to `docs/screens/`.
+
+### UI phase 3: homes and navigation per role (done)
+- `home/Homes.kt`. Patient: bottom nav Home · Consultations · Profile. Home = greeting, hero "Start eye test (10 min)", Last result (mini rings, date, urgent pill), My optometrist (newest consultation with status pill, or "Consult an optometrist" after a test), tips row. Profile = avatar initials, details, app language, change role, server, log out, delete account (confirm bottom sheet), about + disclaimer.
+- Shop: bottom nav Home · Customers · Tools. Home = connection pill, setup banner, hero "Start new customer", tiles (Past sessions, Frames, Tools). Customers = saved checks with referral pills and optometrist status, delete via bottom sheet. Tools = frames, demo customers; "Advanced" folds away phone setup/calibration, server URL + token, diagnostics/staff checks, change role. Default server stays the hosted one.
+- Consultations list shared by the tab and the old route: avatar, name, case no., time, message count, status pill (icon + word), urgent pill; skeleton, error with retry, illustrated empty state.
+- `SessionViewModel.lastResult` (read-only: newest session + its Vision Profile from the existing builder). Old HomeScreen / PatientScreen removed.
+
+### UI phase 4: guided test flow (done)
+- New "Before you start" checklist after consent (`guide/GuideScreens.kt`): good light, phone charged, bank card + glasses, each with an illustration; one "I'm ready".
+- Eye tests (`QuickEstimateFlow` panel): always-white immersive canvas in light tokens, R ●○ L eye progress, one instruction line + illustration ("How to" opens a bottom sheet with the full text), live distance pill (icon + words, polite live region), a 3-2-1 countdown before the letters (taps and voice are only taken after it), the "Tap when letters blur" button at thumb height. Procedures, distances and timings unchanged.
+- Screening (Amsler, contrast, colour): one template — illustration + instruction line → test (light tokens on the white canvas, 48 dp Skip) → success tick with the test's name and "Done". The setup page has a large illustration.
+- Red flag: full-width urgent block (icon in a circle, contrast-picked text in both themes, assertive live region), warning haptic, spoken on show + "Read aloud" button, numbered "What to do now" card, nothing else on the page.
+- The survey already matched the spec from phase 1 (one question per screen, ChoiceCards, sliders, mic FAB with pulse + transcript, "Why we ask?" sheet, section intros in section colour).
+
+### UI phase 5: results, consult, chat (done)
+- Result: date / age / language header → Vision Profile rings → Measurements (big R/L numbers, range, method) → main lens card (illustration, name, why bullets, "Your optician confirms the final lens") → second pairs → "What next": Consult an optometrist (primary), Share + PDF side by side → bridge card → QR folded behind "Show QR code for the shop". The shop PDF moved into the folded "For the shop" section.
+- Choose optometrist: "Any available" first and highlighted (Fastest), then rows with avatar, name, qualification · city, language chips, fee or Free, reg. no.; radio check icon (not colour alone); skeleton while loading, retry on error, info banner when nobody is online; sticky Send bar.
+- Consultation: top bar Video + WhatsApp icons (compact language button so the title fits), pinned "Your optometrist started a video call" card, case header with avatar and status pill, chat bubbles (mine right/primary, theirs left/surface) with times and Today / Yesterday / date separators, waiting empty state, sticky rounded input with a round send button; lazy list with stable keys.
+- Advice: optician-slip card — R/L table SPH / CYL / AXIS, ADD, PD, lens advice, referral, follow-up, notes, optometrist name + qualification + reg. no., trial-lens caveat, Download PDF.
+- `ChooseOptometristContent` / `ConsultationContent` are stateless so the screenshot tests draw them without a server.
+
+### UI phase 6: optometrist web portal (done)
+- `backend/app/static/portal.html` restyled in the app's language: Plus Jakarta Sans + Noto Devanagari (the app's merged fonts, OFL, served from `/portal/assets/`), the app palette light + dark, 20 px cards, 16 px buttons, Material Symbols Rounded icons (a 7 KB subset of the Apache-2.0 font, self-hosted in `static/portal/`, no third-party request).
+- Layout: left sidebar (Queue, My active, Completed, Profile with live counts, red when an urgent case waits) and a top bar with the availability switch, new-case sound, theme, avatar and log out; bottom navigation below 860 px.
+- Queue: one table of waiting requests, urgent pinned on top ("Urgent · see first"), then by waiting time; columns patient, priority pill (icon + word), age, language, waiting, red flags; becomes cards on narrow screens. Skeleton while loading, illustrated empty states.
+- Case page: two columns — report (urgent banner first, rings, measurements with the range big and the method below, screening lines with status icons and the Amsler grids, lens suggestions, folded answers) and a sticky actions panel (Accept, Chat with day separators and bubbles, Video, WhatsApp, Write advice, Close).
+- Advice form: SPH / CYL / AXIS steppers per eye (±0.25 D, ±5°), ADD and PD steppers, lens picker chips from the catalogue, then a preview of exactly what the patient sees before "Send to patient".
+- Login, register and pending pages as one centred card with the eye mark.
+
+### UI phase 7: brand and quality (done)
+- Icon: the adaptive eye-mark icon with a monochrome layer was done in phase 2; the portal uses the same mark.
+- `AccessibilityTest`: welcome, role, login, patient home, shop home, checklist, red flag, choose optometrist, chat — Hindi and English at font scale 1.0 / 1.3 / 1.5 — every tappable element has a TalkBack label and a ≥ 48 dp target. Status is icon + word everywhere (pills, screening lines, portal).
+- Font scale 1.5 in Hindi rendered for the key screens (`p7_*_150`): nothing clipped; the screening distance pill may now wrap to two lines; top-bar titles ellipsise (TalkBack reads the full title).
+- Hindi: every new string reviewed for natural phrasing; the 20% battery line reworded so the placeholder check passes in both languages.
+- Performance: every lazy list has stable keys (chat items, optometrists, sessions, catalogue, tips). App start under 2 s was **not measured**: no phone over adb in this environment.
+- `docs/DESIGN.md` §6 lists every screenshot (170 files).
+- Tests now: app 440, engine 397, backend 118, all passing.
+
+### UI phase 8: finish (done)
+- APK `D:\drishti-data\drishti-ui.apk` (debug-signed like v1.2, installs over it), pre-release [v1.3](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.3) on `feature/ui-polish`.
+- PR [#9](https://github.com/rohan53532211/drishti_saathi/pull/9) `feature/ui-polish` → `main` (not merged).
+- Open: phone test of the new UI (start time, scrolling, the eye-test countdown with the real camera). Same API calls and security rules (text nodes only, no inline handlers, `noopener` on every new tab). Screenshots `docs/screens/p6_portal_*` (desktop light/dark, phone width).
+
 ## Test pass before submission (15 Nov)
 
 Full report: `TEST_REPORT.md`. Tests now: engine 397, app 396, backend 106 = 899, all passing.

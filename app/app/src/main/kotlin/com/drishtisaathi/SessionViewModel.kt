@@ -39,6 +39,7 @@ import com.drishtisaathi.bridge.BridgeProfile
 import com.drishtisaathi.bridge.BridgeSettings
 import com.drishtisaathi.bridge.ReplyNotifier
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -202,6 +203,13 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
     private val dao = db.sessions()
     val sessions: Flow<List<SessionEntity>> = dao.observeAll()
+
+    /** Home "Last result": the newest saved session and its Vision Profile (read only; null = no session yet). */
+    val lastResult: Flow<Pair<SessionEntity, com.drishtisaathi.engine.profile.VisionProfile>?> = sessions.map { list ->
+        list.maxByOrNull { it.createdAt }?.let { e ->
+            runCatching { e to profileView(loaded(UiState(lang = _state.value.lang), e, null)).profile }.getOrNull()
+        }
+    }.flowOn(Dispatchers.Default)
 
 
     // ---- learning loop: per-phone-model correction ------------------------------------------

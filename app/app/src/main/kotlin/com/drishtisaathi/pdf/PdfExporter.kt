@@ -30,9 +30,9 @@ object PdfExporter {
     }
 
     fun write(context: Context, blocks: List<Block>, file: File, thumbs: Map<String, android.graphics.Bitmap> = emptyMap()): File {
-        // Same bundled font (Inter + Noto Sans Devanagari) as the screens, so the PDF does not depend on the phone's font either.
-        val regular = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.inter_deva_regular) ?: Typeface.DEFAULT
-        val boldFace = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.inter_deva_bold) ?: Typeface.DEFAULT_BOLD
+        // Same bundled font (Plus Jakarta Sans + Noto Sans Devanagari) as the screens, so the PDF does not depend on the phone's font either.
+        val regular = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.jakarta_deva_regular) ?: Typeface.DEFAULT
+        val boldFace = ResourcesCompat.getFont(context, com.drishtisaathi.R.font.jakarta_deva_bold) ?: Typeface.DEFAULT_BOLD
         val doc = PdfDocument()
         var pageNo = 0
         var page: PdfDocument.Page? = null

@@ -35,6 +35,17 @@ android {
     androidResources { noCompress += listOf("task", "tflite", "glb") }
     // Compress native libs in the APK (OpenCV + MediaPipe are ~60 MB stored); Android extracts them on install.
     packaging { jniLibs { useLegacyPackaging = true } }
+    testOptions {
+        unitTests {
+            // Robolectric screenshot tests render with the app's fonts and drawables.
+            isIncludeAndroidResources = true
+            all {
+                it.systemProperty("robolectric.graphicsMode", "NATIVE")
+                it.systemProperty("roborazzi.test.record", "true")
+                it.maxHeapSize = "3g"
+            }
+        }
+    }
 }
 
 kotlin {
@@ -58,6 +69,9 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.extended)
+    // Android 12 SplashScreen API on every supported version (minSdk 26).
+    implementation(libs.androidx.core.splashscreen)
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.room.runtime)
@@ -83,4 +97,11 @@ dependencies {
     implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
+    // Screenshot tests (ScreensTest → docs/screens/)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

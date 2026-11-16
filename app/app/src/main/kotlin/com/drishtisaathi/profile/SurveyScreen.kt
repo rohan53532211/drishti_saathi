@@ -259,7 +259,7 @@ private fun QuestionBody(
             modifier = Modifier.heightIn(min = DS.minTouch).semantics { role = Role.Button },
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text("?  " + SProfile.whyWeAsk[lang], color = c.primary, style = MaterialTheme.typography.labelMedium,
+                Text("?  " + SProfile.whyWeAsk[lang], color = c.primaryInk, style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
         }
@@ -275,22 +275,10 @@ private fun QuestionBody(
     }
 }
 
-/** A large tappable answer card (at least 64 dp), with a tick when selected. */
+/** A large tappable answer card (at least 64 dp), with a check when selected: the design system's ChoiceCard. */
 @Composable
-fun AnswerCard(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val c = DS.colors
-    Surface(
-        onClick = onClick, shape = DS.button,
-        color = if (selected) c.primarySoft else c.surface,
-        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) c.primary else c.hairline),
-        modifier = modifier.fillMaxWidth().heightIn(min = DS.answerMin).semantics { this.selected = selected; role = Role.RadioButton },
-    ) {
-        Row(Modifier.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = c.ink)
-            if (selected) Text("✓", color = c.primary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        }
-    }
-}
+fun AnswerCard(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) =
+    com.drishtisaathi.ui.designsystem.ChoiceCard(text, selected, onClick, modifier)
 
 /** Never / Sometimes / Often: a labelled three-stop slider plus "Next" (a tap on a label also answers). */
 @Composable
@@ -352,26 +340,14 @@ private fun NumberAnswer(lang: Lang, q: SurveyQuestion, current: Double?, submit
 private fun StepButton(label: String, onClick: () -> Unit) {
     val c = DS.colors
     Surface(onClick = onClick, shape = CircleShape, color = c.primarySoft, modifier = Modifier.size(DS.minTouch).semantics { contentDescription = label }) {
-        Box(contentAlignment = Alignment.Center) { Text(label, color = c.primary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        Box(contentAlignment = Alignment.Center) { Text(label, color = c.primaryInk, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
     }
 }
 
-/** The main action of a screen: filled, full width, 64 dp. */
+/** The main action of a screen: the design system's PrimaryButton (56 dp, filled, full width). */
 @Composable
-fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, colour: Color? = null, onClick: () -> Unit) {
-    val c = DS.colors
-    val bg = colour ?: c.primary
-    Surface(
-        onClick = onClick, enabled = enabled, shape = DS.button,
-        color = if (enabled) bg else c.hairline,
-        modifier = modifier.fillMaxWidth().heightIn(min = DS.answerMin).semantics { role = Role.Button },
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(text, color = if (enabled) (if (colour == null) c.onPrimary else DS.on(bg)) else c.inkSecondary,
-                style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp))
-        }
-    }
-}
+fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, colour: Color? = null, onClick: () -> Unit) =
+    com.drishtisaathi.ui.designsystem.PrimaryButton(text, onClick, modifier, enabled = enabled, container = colour)
 
 /** Listens for the options' keywords while a question is shown: a single answer submits, a multi option toggles. */
 @Composable

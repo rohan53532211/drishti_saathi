@@ -204,7 +204,7 @@ core questions → red banner (if a red flag) → survey → camera distance + P
 ### 6.9 Design system (`ui/Tokens.kt`, `ui/Theme.kt`)
 
 - Colours come from `DS.colors` (light or dark tokens); the older colour names map onto the tokens, so every screen follows the theme. The vision tests always use the light theme.
-- One merged font per weight (Inter + Noto Sans Devanagari), tabular figures on.
+- One merged font per weight (Plus Jakarta Sans + Noto Sans Devanagari), tabular figures on.
 
 ## References
 
