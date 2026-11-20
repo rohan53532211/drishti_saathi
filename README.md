@@ -8,7 +8,9 @@ A customer walks into an optical shop and says, “The board is blurry, but I ca
 
 ### Download and install (Android 8+)
 
-[Download the v1.3 APK](https://github.com/rohan53532211/drishti_saathi/releases/download/v1.3/Drishti_saathi-final_v1.3.apk) · [Open the optometrist portal](https://drishti-saathi-backend.onrender.com/portal) · [Get the v1.2 submission build](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.2)
+- **v1.3 (latest):** [Download the v1.3 APK](https://github.com/rohan53532211/drishti_saathi/releases/download/v1.3/Drishti_saathi-final_v1.3.apk)
+- **v1.2:** [hackathon submission build](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.2)
+- **Portal:** [Open the hosted optometrist portal](https://drishti-saathi-backend.onrender.com/portal) (Free Render server – data resets on restart; first load may take ~1 min.)
 
 **The shop phone is already configured for the hosted demo.** With internet access, the v1.3 APK sends shop reports to the [deployed optometrist bridge](https://drishti-saathi-backend.onrender.com/). Judges can install the app and start with its default settings.
 
@@ -20,13 +22,13 @@ A customer walks into an optical shop and says, “The board is blurry, but I ca
 
 | Release | What to look for |
 |---|---|
+| [v1.3 redesign (latest)](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.3) | A new eye-mark icon and welcome screen lead to separate patient and shop homes. The guided check adds a readiness checklist, countdown and right/left progress. Results bring **Consult**, **Share** and **PDF** together. The portal adds a two-column case view and advice preview. The measurement, referral and lens logic carries forward from v1.2. |
+| [v1.2 hackathon submission build](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.2) | Patients gained accounts and consultation history. They can send a report, chat, join a video call and download an optometrist’s advice. The browser portal lets optometrists accept cases and admins approve optometrists. This build also includes fixes from the November 15 phone test. |
 | [v1.1 vision-profile build](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.1) | The shop workflow added vision-profile rings, the ZEISS lens-family rules, new screen tests and a lens-assisted check for stronger minus powers. |
-| [v1.2 teleconsult demo](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.2) | Patients gained accounts and consultation history. They can send a report, chat, join a video call and download an optometrist’s advice. The browser portal lets optometrists accept cases and admins approve optometrists. This build also includes fixes from the November 15 phone test. |
-| [v1.3 redesign](https://github.com/rohan53532211/drishti_saathi/releases/tag/v1.3) | A new eye-mark icon and welcome screen lead to separate patient and shop homes. The guided check adds a readiness checklist, countdown and right/left progress. Results bring **Consult**, **Share** and **PDF** together. The portal adds a two-column case view and advice preview. The measurement, referral and lens logic carries forward from v1.2. |
 
 ## Six-step guided demo
 
-These screenshots come from demonstration sessions. Follow the sequence to see what each role does. The case numbers can differ between examples.
+These screenshots come from demonstration sessions. **Screening, not a diagnosis:** the app prepares a starting point for the shop’s eye exam. Follow the sequence to see what each role does. The case numbers can differ between examples.
 
 ### 1. Choose who is using the phone
 
@@ -88,7 +90,7 @@ The summary offers a shop PDF, a Hindi customer PDF, a shareable summary and a Q
 
 - **Accessibility.** Hindi and English screens support read-aloud prompts, voice or tap input, light and dark themes, and status icons paired with words. The v1.3 accessibility tests check TalkBack labels and 48 dp touch targets on key screens at three font scales.
 - **Shop report.** The bridge accepts consented answers and measurements under a case ID and rejects direct identifiers such as a name, photo or phone number. Camera frames are processed in memory. Saved sessions use SQLCipher with an Android Keystore-protected key.
-- **Patient consultation.** The patient agrees to share their name and report. The accepting optometrist can see the contact number. AI transcription has its own consent step and the Sarvam key stays on the server. WhatsApp and Jitsi are external services. Payments are placeholders in this demo.
+- **Patient consultation.** The patient agrees to share their name and report. The accepting optometrist can see the contact number. The optional AI interview has its own consent step because speech is sent through the backend for transcription, and the Sarvam key stays on the server. WhatsApp and Jitsi are external services. Payments are placeholders in this demo.
 - **Clinical scope.** The phone provides screening observations and a starting trial lens. A qualified professional confirms refraction and any prescription. The custom colour plates, contrast steps and phone estimates still require clinical validation. The project team authored the rules for suggesting ZEISS lens families.
 
 > यह चिकित्सीय निदान या पर्चा नहीं है / Not a medical diagnosis or prescription.
@@ -100,8 +102,6 @@ The summary offers a shop PDF, a Hindi customer PDF, a shareable summary and a Q
 | [Android app](app/app/) | Kotlin and Jetpack Compose for Hindi and English screens. CameraX, MediaPipe and OpenCV support camera measurements. Filament renders 3D frames. Room stores sessions with SQLCipher encryption and an Android Keystore-protected key. |
 | [Decision engine](app/engine/) | Pure Kotlin implements power estimation, referral checks and frame ranking. The [app assets](app/app/src/main/assets/) contain the interview questions, thresholds and lens catalogue. |
 | [Backend and browser portal](backend/) | FastAPI and SQLite serve the shop bridge, patient consultations and admin approval workflow. The backend holds the optional Sarvam AI key. WhatsApp and Jitsi open as external services. |
-
-**What gets shared.** The shop bridge receives consented interview answers and measurements under a case ID and rejects direct identifiers such as names, photos and phone numbers. In patient teleconsultation, patients consent to share their report and name, and the accepting optometrist can see their contact number. Camera frames are processed in memory. The optional AI interview has separate consent because speech is sent through the backend for transcription.
 
 ## Optional developer setup
 
@@ -157,4 +157,4 @@ Use sample data for demos. The [Render configuration](render.yaml) uses temporar
 
 The [v1.2 pre-submission test report](TEST_REPORT.md) records **899 passing tests** across the engine, app and backend, including checks that an urgent case suppresses product suggestions in reports and exports. The [v1.3 build log](PLAN.md) records **955 passing tests** after the redesign (397 engine, 440 app and 118 backend). These counts describe automated software checks. The v1.3 release notes leave physical-device startup and scrolling performance unmeasured.
 
-[Architecture](docs/ARCHITECTURE.md) · [Design and accessibility](docs/DESIGN.md) · [App and portal screenshots](docs/screens/) · [Backend reference](backend/README.md) · [Project brief](PROJECT_BRIEF.md) · [Build history and open work](PLAN.md)
+[Architecture](docs/ARCHITECTURE.md) · [Design and accessibility](docs/DESIGN.md) · [App and portal screenshots](docs/screens/) · [Backend reference](backend/README.md) · [Project brief](PROJECT_BRIEF.md) · [Project plan (PLAN.md)](PLAN.md)
